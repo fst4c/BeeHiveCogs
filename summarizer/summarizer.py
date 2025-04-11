@@ -871,7 +871,7 @@ class ChatSummary(commands.Cog):
             "gpt-3.5-turbo": ("💬", "Original imprint of LLM technology with balanced performance."),
             "gpt-4": ("💬", "Standard version of GPT-4 with balanced performance."),
             "chatgpt-4o-latest": ("💬", "Model used on chatgpt.com with versatile capabilities."),
-            "gpt-4o": ("💬", "Versatile model with high intelligence."),
+            "gpt-4o": ("💬", "$0.0000025 per token in / $0.00001 per token out"),
             "gpt-4o-mini": ("💬", "Fast and affordable model for focused tasks."),
             "gpt-4-turbo": ("💬", "Enhanced version of GPT-4 with faster processing and improved efficiency."),
             "o1": ("🧠", "Model using reinforcement learning for complex reasoning with high intelligence."),
