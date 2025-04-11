@@ -868,14 +868,14 @@ class ChatSummary(commands.Cog):
 
         # Define valid models with descriptions and emojis
         model_details = {
-            "gpt-3.5-turbo": ("🌀", "Original imprint of LLM technology with balanced performance."),
-            "gpt-4": ("🔍", "Standard version of GPT-4 with balanced performance."),
-            "chatgpt-4o-latest": ("🌐", "Model used on chatgpt.com with versatile capabilities."),
-            "gpt-4o": ("🧠", "Versatile model with high intelligence."),
-            "gpt-4o-mini": ("⚡", "Fast and affordable model for focused tasks."),
-            "gpt-4-turbo": ("🚀", "Enhanced version of GPT-4 with faster processing and improved efficiency."),
-            "o1": ("🤖", "Model using reinforcement learning for complex reasoning with high intelligence."),
-            "o3-mini": ("🔬", "Newest small reasoning model with high intelligence."),
+            "gpt-3.5-turbo": ("💬", "Original imprint of LLM technology with balanced performance."),
+            "gpt-4": ("💬", "Standard version of GPT-4 with balanced performance."),
+            "chatgpt-4o-latest": ("💬", "Model used on chatgpt.com with versatile capabilities."),
+            "gpt-4o": ("💬", "Versatile model with high intelligence."),
+            "gpt-4o-mini": ("💬", "Fast and affordable model for focused tasks."),
+            "gpt-4-turbo": ("💬", "Enhanced version of GPT-4 with faster processing and improved efficiency."),
+            "o1": ("🧠", "Model using reinforcement learning for complex reasoning with high intelligence."),
+            "o3-mini": ("🧠", "Newest small reasoning model with high intelligence."),
         }
 
         # Create a dropdown menu for model selection
@@ -911,7 +911,7 @@ class ChatSummary(commands.Cog):
         view = ModelDropdownView(self.config, user)
         embed = discord.Embed(
             title="Select a preferred model",
-            description="Adjusting your model can change your experience drastically.\n\n- Some models are very intelligent and have reasoning built-in, but can be more expensive to use\n- Other models may be cheaper and faster, but lack an up-to-date knowledge window or the ability to reason, think, or deduce.\n- The variable intelligence of each AI model can impact the outputs of all summarization tool use drastically.\n\n[Click here to learn more about each model's capabilities](<https://platform.openai.com/docs/models>)\n\nModels labeled with a \"💬\" are chat-first models\nModels labeled with a \"🧠 \" are reasoning/thinking models.",
+            description="Adjusting your model can change your experience drastically.\n\n- Some models are very intelligent and have reasoning built-in, but can be more expensive to use\n- Other models may be cheaper and faster, but lack an up-to-date knowledge window or the ability to reason, think, or deduce.\n- The variable intelligence of each AI model can impact the outputs of all summarization tool use drastically.\n\n[Click here to learn more about each model's capabilities](<https://platform.openai.com/docs/models>)\n\nModels labeled with a \"💬\" are chat-first models\nModels labeled with a \"🧠\" are reasoning/thinking models.",
             color=0x2bbd8e
         )
         await ctx.send(embed=embed, view=view)
