@@ -960,7 +960,7 @@ class ChatSummary(commands.Cog):
             description += f"- The sentence ```{sentence}``` is tokenized as ```{tokens}``` with a total of {token_count} tokens.\n\n"
 
         description += (
-            "\nUnderstanding how text is tokenized can help you estimate the cost and efficiency of using AI models."
+            "\nUnderstanding how text is tokenized and transformed as input and output can help you estimate the cost and efficiency of using different AI models for different tasks."
         )
 
         embed = discord.Embed(
