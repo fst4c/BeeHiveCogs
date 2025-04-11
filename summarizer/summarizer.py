@@ -916,6 +916,48 @@ class ChatSummary(commands.Cog):
         )
         await ctx.send(embed=embed, view=view)
 
+    @summarizer.command(name="tokens")
+    async def summarizer_tokens(self, ctx: commands.Context):
+        """Explain how words are converted into tokens and provide examples."""
+        import tiktoken
+
+        # Define sentences to tokenize
+        sentences = [
+            "The quick brown fox jumped over the lazy dog",
+            "Before you get home, can you stop at the grocery store and pick up a can of corn for dinner?",
+            "I wonder how the stock markets are doing, DGVXX was up at lunch and has been returning solid investments over the last 3 dividends. This is a buy recommendation for sure."
+        ]
+
+        # Initialize the encoding
+        encoding = tiktoken.get_encoding("o200k_base")
+
+        # Tokenize each sentence and prepare the token chains
+        token_chains = []
+        for sentence in sentences:
+            tokens = encoding.encode(sentence)
+            token_chains.append((sentence, tokens))
+
+        # Create the description with real token chains
+        description = (
+            "AI and Natural Language models process text by breaking it down into smaller units called tokens. The AI understands the value of words by their tokenized values to know what the word is - the AI itself does not read your English as English. "
+            "A token can be as short as one character or as long as one word. "
+            "The number of tokens affects the cost and speed of processing text.\n\n"
+            "Here are some examples with real token chains:\n"
+        )
+        for sentence, tokens in token_chains:
+            description += f"- The sentence ```{sentence}``` is tokenized as ```{tokens}```\n"
+
+        description += (
+            "\nUnderstanding how text is tokenized can help you estimate the cost and efficiency of using AI models."
+        )
+
+        embed = discord.Embed(
+            title="Understanding Tokens in AI Models",
+            description=description,
+            color=0xfffffe
+        )
+        embed.set_footer(text="For more detailed information, refer to the OpenAI documentation.")
+        await ctx.send(embed=embed)
 
 
     @commands.command(name="away")
