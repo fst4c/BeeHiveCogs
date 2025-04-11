@@ -912,7 +912,7 @@ class ChatSummary(commands.Cog):
         embed = discord.Embed(
             title="Select a preferred model",
             description="Adjusting your model can change your experience drastically.\n\n- Some models are very intelligent and have reasoning built-in, but can be more expensive to use\n- Other models may be cheaper and faster, but lack an up-to-date knowledge window or the ability to reason, think, or deduce.\n- The variable intelligence of each AI model can impact the outputs of all summarization tool use drastically.\n\n[Click here to learn more about each model's capabilities](<https://platform.openai.com/docs/models>)\n\n- Models labeled with a \"💬\" are chat-first models\n- Models labeled with a \"🧠\" are reasoning/thinking models.\n- Models are sorted from cheapest to most expensive based on averaged input and output per token per model.",
-            color=0x2bbd8e
+            color=0xfffffe
         )
         await ctx.send(embed=embed, view=view)
 
