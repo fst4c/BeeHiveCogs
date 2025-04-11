@@ -909,7 +909,12 @@ class ChatSummary(commands.Cog):
 
         # Send the dropdown view to the user
         view = ModelDropdownView(self.config, user)
-        await ctx.send("Please select your preferred AI model for summarization", view=view)
+        embed = discord.Embed(
+            title="Select a preferred model",
+            description="Adjusting your model can change your experience drastically.\n- Some models are very intelligent and have reasoning built-in, but can be more expensive to use\n- Other models may be cheaper and faster, but lack an up-to-date knowledge window or the ability to reason, think, or deduce.\n- The variable intelligence of each AI model can impact the outputs of all summarization tool use drastically.",
+            color=0x2bbd8e
+        )
+        await ctx.send(embed=embed, view=view)
 
 
 
