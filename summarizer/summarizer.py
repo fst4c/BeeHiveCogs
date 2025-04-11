@@ -868,14 +868,14 @@ class ChatSummary(commands.Cog):
 
         # Define valid models with descriptions and emojis
         model_details = {
-            "gpt-3.5-turbo": "🌀 Original imprint of LLM technology with balanced performance.",
-            "gpt-4": "🔍 Standard version of GPT-4 with balanced performance.",
-            "chatgpt-4o-latest": "🌐 Model used on chatgpt.com with versatile capabilities.",
-            "gpt-4o": "🧠 Versatile model with high intelligence.",
-            "gpt-4o-mini": "⚡ Fast and affordable model for focused tasks.",
-            "gpt-4-turbo": "🚀 Enhanced version of GPT-4 with faster processing and improved efficiency.",
-            "o1": "🤖 Model using reinforcement learning for complex reasoning with high intelligence.",
-            "o3-mini": "🔬 Newest small reasoning model with high intelligence.",
+            "gpt-3.5-turbo": ("🌀", "Original imprint of LLM technology with balanced performance."),
+            "gpt-4": ("🔍", "Standard version of GPT-4 with balanced performance."),
+            "chatgpt-4o-latest": ("🌐", "Model used on chatgpt.com with versatile capabilities."),
+            "gpt-4o": ("🧠", "Versatile model with high intelligence."),
+            "gpt-4o-mini": ("⚡", "Fast and affordable model for focused tasks."),
+            "gpt-4-turbo": ("🚀", "Enhanced version of GPT-4 with faster processing and improved efficiency."),
+            "o1": ("🤖", "Model using reinforcement learning for complex reasoning with high intelligence."),
+            "o3-mini": ("🔬", "Newest small reasoning model with high intelligence."),
         }
 
         # Create a dropdown menu for model selection
@@ -884,8 +884,8 @@ class ChatSummary(commands.Cog):
                 self.config = config
                 self.user = user
                 options = [
-                    discord.SelectOption(label=model, description=description)
-                    for model, description in model_details.items()
+                    discord.SelectOption(label=model, description=description, emoji=emoji)
+                    for model, (emoji, description) in model_details.items()
                 ]
                 super().__init__(placeholder="Choose your preferred model...", min_values=1, max_values=1, options=options)
 
