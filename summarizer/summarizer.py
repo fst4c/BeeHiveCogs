@@ -935,7 +935,7 @@ class ChatSummary(commands.Cog):
         token_chains = []
         for sentence in sentences:
             tokens = encoding.encode(sentence)
-            token_chains.append((sentence, tokens))
+            token_chains.append((sentence, tokens, len(tokens)))
 
         # Create the description with real token chains
         description = (
@@ -944,8 +944,8 @@ class ChatSummary(commands.Cog):
             "The number of tokens affects the cost and speed of processing text.\n\n"
             "Here are some examples with real token chains:\n"
         )
-        for sentence, tokens in token_chains:
-            description += f"- The sentence ```{sentence}``` is tokenized as ```{tokens}```\n"
+        for sentence, tokens, token_count in token_chains:
+            description += f"- The sentence ```{sentence}``` is tokenized as ```{tokens}``` with a total of {token_count} tokens.\n"
 
         description += (
             "\nUnderstanding how text is tokenized can help you estimate the cost and efficiency of using AI models."
