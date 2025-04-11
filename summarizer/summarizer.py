@@ -919,11 +919,6 @@ class ChatSummary(commands.Cog):
     @summarizer.command(name="tokens")
     async def summarizer_tokens(self, ctx: commands.Context):
         """Explain how words are converted into tokens and provide examples."""
-        try:
-            import tiktoken
-        except ImportError:
-            await ctx.send("The tiktoken module is not installed. Please install it to use this command.")
-            return
 
         # Define sentences to tokenize
         sentences = [
