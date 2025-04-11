@@ -957,7 +957,7 @@ class ChatSummary(commands.Cog):
             "Here are 3 examples to help you understand how language is processed\n\n"
         )
         for sentence, tokens, token_count in token_chains:
-            description += f"- The sentence ```{sentence}``` is tokenized as ```{tokens}``` with a total of {token_count} tokens.\n"
+            description += f"- The sentence ```{sentence}``` is tokenized as ```{tokens}``` with a total of {token_count} tokens.\n\n"
 
         description += (
             "\nUnderstanding how text is tokenized can help you estimate the cost and efficiency of using AI models."
