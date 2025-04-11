@@ -880,9 +880,10 @@ class ChatSummary(commands.Cog):
 
         # Create a dropdown menu for model selection
         class ModelDropdown(discord.ui.Select):
-            def __init__(self, config, user):
+            def __init__(self, config, user, embed_message):
                 self.config = config
                 self.user = user
+                self.embed_message = embed_message
                 options = [
                     discord.SelectOption(label=model, description=description, emoji=emoji)
                     for model, (emoji, description) in model_details.items()
@@ -896,25 +897,29 @@ class ChatSummary(commands.Cog):
             async def set_model(self, interaction: discord.Interaction, model: str):
                 await self.config.user(self.user).preferred_model.set(model)
                 try:
-                    await interaction.response.defer(ephemeral=True)
+                    await interaction.response.defer()
                 except discord.errors.NotFound:
                     await interaction.followup.send("Interaction not found. Please try again.", ephemeral=True)
                     return
-                await interaction.followup.send(f"Your preferred model has been set to {model}.", ephemeral=True)
+                # Update the original embed with the selected model
+                embed = self.embed_message.embeds[0]
+                embed.add_field(name="Preferred Model", value=model, inline=False)
+                await self.embed_message.edit(embed=embed)
 
         class ModelDropdownView(discord.ui.View):
-            def __init__(self, config, user):
+            def __init__(self, config, user, embed_message):
                 super().__init__(timeout=30)
-                self.add_item(ModelDropdown(config, user))
+                self.add_item(ModelDropdown(config, user, embed_message))
 
         # Send the dropdown view to the user
-        view = ModelDropdownView(self.config, user)
         embed = discord.Embed(
             title="Select a preferred model",
             description="Adjusting your model can change your experience drastically.\n\n- Some models are very intelligent and have reasoning built-in, but can be more expensive to use\n- Other models may be cheaper and faster, but lack an up-to-date knowledge window or the ability to reason, think, or deduce.\n- The variable intelligence of each AI model can impact the outputs of all summarization tool use drastically.\n\n[Click here to learn more about each model's capabilities](<https://platform.openai.com/docs/models>)\n\n- Models labeled with a \"💬\" are chat-first models\n- Models labeled with a \"🧠\" are reasoning/thinking models.\n- Models are sorted from cheapest to most expensive based on averaged input and output per token per model.",
             color=0xfffffe
         )
-        await ctx.send(embed=embed, view=view)
+        embed_message = await ctx.send(embed=embed)
+        view = ModelDropdownView(self.config, user, embed_message)
+        await embed_message.edit(view=view)
 
     @summarizer.command(name="tokens")
     async def summarizer_tokens(self, ctx: commands.Context):
