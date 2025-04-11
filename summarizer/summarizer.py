@@ -919,7 +919,11 @@ class ChatSummary(commands.Cog):
     @summarizer.command(name="tokens")
     async def summarizer_tokens(self, ctx: commands.Context):
         """Explain how words are converted into tokens and provide examples."""
-        import tiktoken
+        try:
+            import tiktoken
+        except ImportError:
+            await ctx.send("The tiktoken module is not installed. Please install it to use this command.")
+            return
 
         # Define sentences to tokenize
         sentences = [
@@ -929,13 +933,21 @@ class ChatSummary(commands.Cog):
         ]
 
         # Initialize the encoding
-        encoding = tiktoken.get_encoding("o200k_base")
+        try:
+            encoding = tiktoken.get_encoding("o200k_base")
+        except Exception as e:
+            await ctx.send(f"Failed to initialize encoding: {e}")
+            return
 
         # Tokenize each sentence and prepare the token chains
         token_chains = []
         for sentence in sentences:
-            tokens = encoding.encode(sentence)
-            token_chains.append((sentence, tokens, len(tokens)))
+            try:
+                tokens = encoding.encode(sentence)
+                token_chains.append((sentence, tokens, len(tokens)))
+            except Exception as e:
+                await ctx.send(f"Failed to tokenize sentence: {sentence}. Error: {e}")
+                return
 
         # Create the description with real token chains
         description = (
