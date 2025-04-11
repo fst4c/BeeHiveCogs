@@ -868,14 +868,14 @@ class ChatSummary(commands.Cog):
 
         # Define valid models with descriptions and emojis
         model_details = {
-            "gpt-3.5-turbo": ("💬", "Original imprint of LLM technology with balanced performance."),
-            "gpt-4": ("💬", "Standard version of GPT-4 with balanced performance."),
-            "chatgpt-4o-latest": ("💬", "Model used on chatgpt.com with versatile capabilities."),
+            "gpt-3.5-turbo": ("💬", "$0.0000005 per token in / $0.0000015 per token out"),
+            "gpt-4o-mini": ("💬", "$0.00000015 per token in / $0.0000006 per token out"),
+            "o3-mini": ("🧠", "$0.0000011 per token in / $0.0000044 per token out"),
             "gpt-4o": ("💬", "$0.0000025 per token in / $0.00001 per token out"),
-            "gpt-4o-mini": ("💬", "Fast and affordable model for focused tasks."),
-            "gpt-4-turbo": ("💬", "Enhanced version of GPT-4 with faster processing and improved efficiency."),
-            "o1": ("🧠", "Model using reinforcement learning for complex reasoning with high intelligence."),
-            "o3-mini": ("🧠", "Newest small reasoning model with high intelligence."),
+            "chatgpt-4o-latest": ("💬", "$0.000005 per token in / $0.000015 per token out"),
+            "gpt-4-turbo": ("💬", "$0.00001 per token in / $0.00003 per token out"),
+            "o1": ("🧠", "$0.000015 per token in / $0.00006 per token out"),
+            "gpt-4": ("💬", "$0.00003 per token in / $0.00006 per token out"),
         }
 
         # Create a dropdown menu for model selection
