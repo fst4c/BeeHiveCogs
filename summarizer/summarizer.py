@@ -901,9 +901,10 @@ class ChatSummary(commands.Cog):
                 except discord.errors.NotFound:
                     await interaction.followup.send("Interaction not found. Please try again.", ephemeral=True)
                     return
-                # Update the original embed with the selected model
+                # Update the original embed with the selected model and pricing
                 embed = self.embed_message.embeds[0]
-                embed.add_field(name="Preferred Model", value=model, inline=False)
+                emoji, pricing = model_details[model]
+                embed.add_field(name="Model selected", value=f"{emoji} {model}\n{pricing}", inline=False)
                 await self.embed_message.edit(embed=embed)
 
         class ModelDropdownView(discord.ui.View):
