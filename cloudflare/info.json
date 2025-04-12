@@ -2,7 +2,7 @@
     "author": [
         "adminescalation"
     ],
-    "description": "Interact with Cloudflare services thru your Discord bot",
+    "description": "Manage and interact with Cloudflare services through your Discord bot",
     "install_msg": "## :white_check_mark: Successfully installed Cloudflare.\n**Questions?** [We're listening](<https://www.beehive.systems/contact-us>)\n**Interested in CyberSecurity and CyberSafety?** Join our Discord! https://discord.gg/ckdzsm7mTs",
     "name": "Cloudflare",
     "hidden": false,
@@ -14,11 +14,16 @@
         "R2",
         "Email Routing",
         "HyperDrive",
-        "Intelligence"
+        "Intelligence",
+        "DNSSEC",
+        "Load Balancing",
+        "Bot Management",
+        "Domain History",
+        "URL Scanning"
     ],
     "permissions": [
         "embed_links"
     ],
-    "short": "Interact with your Cloudflare account, zones, and assets thru Red-Discordbot",
+    "short": "Manage your Cloudflare account, zones, and assets through Red-Discordbot",
     "min_bot_version": "3.5.0"
 }
