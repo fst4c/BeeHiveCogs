@@ -110,4 +110,5 @@ class TwilioLookup(commands.Cog):
                 await self.config.user(self.user).customer_id.set(self.customer_id.value)
                 await interaction.response.send_message(f"Customer ID for {self.user.name} has been set.", ephemeral=True)
 
-        await ctx.send_modal(CustomerIDModal(user))
+        # Use the interaction object to send the modal instead of ctx
+        await ctx.interaction.response.send_modal(CustomerIDModal(user))
