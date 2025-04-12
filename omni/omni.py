@@ -120,7 +120,7 @@ class Omni(commands.Cog):
                 ),
                 color=0xfffffe
             )
-            embed.set_footer(text=f"Use {command_prefix}omni vote to give feedback on this server's moderation")
+            embed.set_footer(text=f"Use \"{command_prefix}omni vote\" to give feedback on this server's moderation")
             embed.set_thumbnail(url="https://www.beehive.systems/hubfs/Icon%20Packs/White/sparkles.png")
             await channel.send(embed=embed)
         except discord.HTTPException as e:
@@ -266,7 +266,7 @@ class Omni(commands.Cog):
             if timeout_duration > 0:
                 try:
                     reason = (
-                        f"The AI moderator issued a timeout. Violation scores: " +
+                        f"AI moderator issued a timeout. Violation scores: " +
                         ", ".join(f"{category}: {score:.2f}" for category, score in category_scores.items() if score > 0.2) +
                         f". Flagged message: {message.content}"
                     )
@@ -282,7 +282,7 @@ class Omni(commands.Cog):
             if log_channel_id:
                 log_channel = guild.get_channel(log_channel_id)
                 if log_channel:
-                    embed = await self._create_moderation_embed(message, category_scores, "✨ Message moderated using AI")
+                    embed = await self._create_moderation_embed(message, category_scores, "AI moderator action")
                     if message_deleted and timeout_issued:
                         embed.description += "\nThe **message was deleted** and the **user was issued a timeout**."
                     elif message_deleted:
@@ -290,7 +290,7 @@ class Omni(commands.Cog):
                     elif timeout_issued:
                         embed.description += "\nThe **user was issued a timeout**."
                     else:
-                        embed.description += "\nNo further action was taken."
+                        embed.description += "\nNo action was taken."
                     await log_channel.send(embed=embed, view=await self._create_jump_view(message))
         except Exception as e:
             raise RuntimeError(f"Failed to handle moderation: {e}")
