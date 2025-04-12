@@ -203,7 +203,7 @@ class ChatSummary(commands.Cog):
                                         embed.add_field(name="Extra copy", value="Yes" if self.generate_document else "No", inline=True)
                                         await interaction.message.edit(embed=embed, view=None)
 
-                                        input_text = f"What are 5 recent {self.selected_category} news stories?"
+                                        input_text = f"Give me 5 recent or recently updated {self.selected_category} news stories"
                                         payload = {
                                             "model": "gpt-4o",
                                             "tools": [{"type": "web_search_preview", "search_context_size": selected_context_size}],
