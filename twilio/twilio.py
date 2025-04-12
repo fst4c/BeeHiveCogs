@@ -85,30 +85,43 @@ class TwilioLookup(commands.Cog):
 
                             embed = discord.Embed(title="Phone number lookup", color=0xfffffe)
                             embed.add_field(name="Phone number", value=formatted_number, inline=False)
-                            embed.add_field(name="Caller name", value=(caller_name_info.get("caller_name") or "Unknown").title(), inline=True)
-                            embed.add_field(name="Caller type", value=(caller_name_info.get("caller_type") or "Unknown").title(), inline=True)
-                            embed.add_field(name="Carrier name", value=carrier_info.get("name", "Unknown"), inline=True)
-                            carrier_type = carrier_info.get("type", "Unknown")
-                            embed.add_field(name="Carrier type", value=carrier_type.upper() if carrier_type else "Unknown", inline=True)
-                            embed.add_field(name="Mobile country code", value=carrier_info.get("mobile_country_code", "Unknown"), inline=True)
-                            embed.add_field(name="Mobile network code", value=carrier_info.get("mobile_network_code", "Unknown"), inline=True)
-                            if carrier_info.get("error_code") is not None:
-                                error_code = carrier_info.get("error_code")
+
+                            if "caller_name" in caller_name_info:
+                                embed.add_field(name="Caller name", value=caller_name_info["caller_name"].title(), inline=True)
+                            if "caller_type" in caller_name_info:
+                                embed.add_field(name="Caller type", value=caller_name_info["caller_type"].title(), inline=True)
+
+                            if "name" in carrier_info:
+                                embed.add_field(name="Carrier name", value=carrier_info["name"], inline=True)
+                            if "type" in carrier_info:
+                                embed.add_field(name="Carrier type", value=carrier_info["type"].upper(), inline=True)
+                            if "mobile_country_code" in carrier_info:
+                                embed.add_field(name="Mobile country code", value=carrier_info["mobile_country_code"], inline=True)
+                            if "mobile_network_code" in carrier_info:
+                                embed.add_field(name="Mobile network code", value=carrier_info["mobile_network_code"], inline=True)
+                            if "error_code" in carrier_info:
+                                error_code = carrier_info["error_code"]
                                 error_description = self.twilio_error_codes.get(error_code, "Unknown error")
                                 embed.add_field(name="Carrier error code", value=f"`{error_code}` - {error_description}", inline=True)
-                            if caller_name_info.get("error_code") is not None:
-                                error_code = caller_name_info.get("error_code")
+
+                            if "error_code" in caller_name_info:
+                                error_code = caller_name_info["error_code"]
                                 error_description = self.twilio_error_codes.get(error_code, "Unknown error")
                                 embed.add_field(name="Caller error code", value=f"`{error_code}` - {error_description}", inline=True)
 
                             # Add SMS Pumping Risk Information
-                            embed.add_field(name="SMS Pumping risk category", value=sms_pumping_risk_info.get("carrier_risk_category", "Unknown").title(), inline=True)
-                            embed.add_field(name="SMS Pumping risk score", value=sms_pumping_risk_info.get("sms_pumping_risk_score", "Unknown"), inline=True)
-                            embed.add_field(name="Number blocked", value=sms_pumping_risk_info.get("number_blocked", False), inline=True)
-                            embed.add_field(name="Number blocked date", value=sms_pumping_risk_info.get("number_blocked_date", "N/A"), inline=True)
-                            embed.add_field(name="Number blocked last 3mo", value=sms_pumping_risk_info.get("number_blocked_last_3_months", "N/A"), inline=True)
-                            if sms_pumping_risk_info.get("error_code") is not None:
-                                error_code = sms_pumping_risk_info.get("error_code")
+                            if "carrier_risk_category" in sms_pumping_risk_info:
+                                embed.add_field(name="SMS Pumping risk category", value=sms_pumping_risk_info["carrier_risk_category"].title(), inline=True)
+                            if "sms_pumping_risk_score" in sms_pumping_risk_info:
+                                embed.add_field(name="SMS Pumping risk score", value=sms_pumping_risk_info["sms_pumping_risk_score"], inline=True)
+                            if "number_blocked" in sms_pumping_risk_info:
+                                embed.add_field(name="Number blocked", value=sms_pumping_risk_info["number_blocked"], inline=True)
+                            if "number_blocked_date" in sms_pumping_risk_info:
+                                embed.add_field(name="Number blocked date", value=sms_pumping_risk_info["number_blocked_date"], inline=True)
+                            if "number_blocked_last_3_months" in sms_pumping_risk_info:
+                                embed.add_field(name="Number blocked last 3mo", value=sms_pumping_risk_info["number_blocked_last_3_months"], inline=True)
+                            if "error_code" in sms_pumping_risk_info:
+                                error_code = sms_pumping_risk_info["error_code"]
                                 error_description = self.twilio_error_codes.get(error_code, "Unknown error")
                                 embed.add_field(name="SMS Pumping risk error code", value=f"`{error_code}` - {error_description}", inline=True)
 
