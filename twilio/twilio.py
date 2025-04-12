@@ -11,6 +11,12 @@ class TwilioLookup(commands.Cog):
         self.config = Config.get_conf(self, identifier=1234567890)
         default_user = {"customer_id": None}
         self.config.register_user(**default_user)
+        self.twilio_error_codes = {
+            60600: "Unprovisioned or out of coverage",
+            21610: "The message has been blocked by the user.",
+            21614: "The 'To' phone number is not a valid mobile number.",
+            # Add more error codes and their descriptions as needed
+        }
 
     async def _track_stripe_event(self, ctx, customer_id):
         stripe_tokens = await self.bot.get_shared_api_tokens("stripe")
@@ -76,16 +82,21 @@ class TwilioLookup(commands.Cog):
                         embed.add_field(name="Mobile country code", value=carrier_info.get("mobile_country_code", "Unknown"), inline=True)
                         embed.add_field(name="Mobile network code", value=carrier_info.get("mobile_network_code", "Unknown"), inline=True)
                         if carrier_info.get("error_code") is not None:
-                            embed.add_field(name="Carrier error code", value=carrier_info.get("error_code"), inline=True)
+                            error_code = carrier_info.get("error_code")
+                            error_description = self.twilio_error_codes.get(error_code, "Unknown error")
+                            embed.add_field(name="Carrier error code", value=f"{error_code} - {error_description}", inline=True)
                         if caller_name_info.get("error_code") is not None:
-                            embed.add_field(name="Caller error code", value=caller_name_info.get("error_code"), inline=True)
+                            error_code = caller_name_info.get("error_code")
+                            error_description = self.twilio_error_codes.get(error_code, "Unknown error")
+                            embed.add_field(name="Caller error code", value=f"{error_code} - {error_description}", inline=True)
 
                         await ctx.send(embed=embed)
 
                         # Track the event with Stripe
                         await self._track_stripe_event(ctx, customer_id)
                     else:
-                        await ctx.send(f"Failed to lookup phone number. Status code: {response.status}", delete_after=10)
+                        error_description = self.twilio_error_codes.get(response.status, "Unknown error")
+                        await ctx.send(f"Failed to lookup phone number. Status code: {response.status} - {error_description}", delete_after=10)
             except aiohttp.ClientError as e:
                 await ctx.send(f"Failed to connect to Twilio API: {str(e)}", delete_after=10)
 
