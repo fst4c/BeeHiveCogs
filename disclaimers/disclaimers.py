@@ -16,7 +16,8 @@ class Disclaimers(commands.Cog):
 
     async def save_disclaimer(self, user_id: int, disclaimer: str):
         async with self.config.user_from_id(user_id).disclaimers() as disclaimers:
-            disclaimers.append(disclaimer)
+            if disclaimer not in disclaimers:
+                disclaimers.append(disclaimer)
 
     async def remove_disclaimer(self, user_id: int, disclaimer: str):
         async with self.config.user_from_id(user_id).disclaimers() as disclaimers:
