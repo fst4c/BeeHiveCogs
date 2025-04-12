@@ -84,11 +84,11 @@ class TwilioLookup(commands.Cog):
                         if carrier_info.get("error_code") is not None:
                             error_code = carrier_info.get("error_code")
                             error_description = self.twilio_error_codes.get(error_code, "Unknown error")
-                            embed.add_field(name="Carrier error code", value=f"{error_code} - {error_description}", inline=True)
+                            embed.add_field(name="Carrier error code", value=f"`{error_code}` - {error_description}", inline=True)
                         if caller_name_info.get("error_code") is not None:
                             error_code = caller_name_info.get("error_code")
                             error_description = self.twilio_error_codes.get(error_code, "Unknown error")
-                            embed.add_field(name="Caller error code", value=f"{error_code} - {error_description}", inline=True)
+                            embed.add_field(name="Caller error code", value=f"`{error_code}` - {error_description}", inline=True)
 
                         await ctx.send(embed=embed)
 
