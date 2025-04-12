@@ -1,10 +1,10 @@
 {
     "name": "TwilioLookup",
-    "author": ["Your Name"],
+    "author": ["adminelevation"],
     "description": "A Discord bot cog to lookup phone numbers using the Twilio API and charge users via Stripe.",
     "install_msg": "Thank you for installing TwilioLookup. Please set up your Twilio and Stripe API tokens.",
     "short": "Phone number lookup using Twilio.",
-    "requirements": ["discord", "redbot-core", "aiohttp"],
+    "requirements": ["aiohttp"],
     "tags": ["twilio", "phone", "lookup", "stripe"],
     "min_bot_version": "3.5.0",
     "hidden": false,
