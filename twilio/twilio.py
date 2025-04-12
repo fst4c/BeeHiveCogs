@@ -69,7 +69,7 @@ class TwilioLookup(commands.Cog):
             await ctx.send("There's no customer ID attached to your Discord profile. Talk to staff about getting onboarded.", delete_after=10)
             return
 
-        twilio_url = f"https://lookups.twilio.com/v1/PhoneNumbers/{phone_number}?Type=carrier&Type=caller-name"
+        twilio_url = f"https://lookups.twilio.com/v1/PhoneNumbers/{phone_number}?Type=carrier&Type=caller-name&Fields=sms_pumping_risk"
         auth = aiohttp.BasicAuth(twilio_account_sid, twilio_auth_token)
 
         async with aiohttp.ClientSession() as session:
@@ -79,6 +79,7 @@ class TwilioLookup(commands.Cog):
                         data = await response.json()
                         carrier_info = data.get("carrier", {})
                         caller_name_info = data.get("caller_name") or {}
+                        sms_pumping_risk_info = data.get("sms_pumping_risk", {})
                         formatted_number = data.get("national_format", phone_number)
 
                         embed = discord.Embed(title="Phone number lookup", color=0xfffffe)
@@ -98,6 +99,17 @@ class TwilioLookup(commands.Cog):
                             error_code = caller_name_info.get("error_code")
                             error_description = self.twilio_error_codes.get(error_code, "Unknown error")
                             embed.add_field(name="Caller error code", value=f"`{error_code}` - {error_description}", inline=True)
+
+                        # Add SMS Pumping Risk Information
+                        embed.add_field(name="SMS Pumping risk category", value=sms_pumping_risk_info.get("carrier_risk_category", "Unknown").title(), inline=True)
+                        embed.add_field(name="SMS Pumping risk score", value=sms_pumping_risk_info.get("sms_pumping_risk_score", "Unknown"), inline=True)
+                        embed.add_field(name="Number blocked", value=sms_pumping_risk_info.get("number_blocked", False), inline=True)
+                        embed.add_field(name="Number blocked date", value=sms_pumping_risk_info.get("number_blocked_date", "N/A"), inline=True)
+                        embed.add_field(name="Number blocked last 3mo", value=sms_pumping_risk_info.get("number_blocked_last_3_months", "N/A"), inline=True)
+                        if sms_pumping_risk_info.get("error_code") is not None:
+                            error_code = sms_pumping_risk_info.get("error_code")
+                            error_description = self.twilio_error_codes.get(error_code, "Unknown error")
+                            embed.add_field(name="SMS Pumping risk error code", value=f"`{error_code}` - {error_description}", inline=True)
 
                         await ctx.send(embed=embed)
 
