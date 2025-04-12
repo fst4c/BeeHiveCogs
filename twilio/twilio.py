@@ -12,7 +12,7 @@ class TwilioLookup(commands.Cog):
         default_user = {"customer_id": None}
         self.config.register_user(**default_user)
 
-    async def _track_stripe_event(self, ctx, customer_id, event_type, tokens):
+    async def _track_stripe_event(self, ctx, customer_id):
         stripe_tokens = await self.bot.get_shared_api_tokens("stripe")
         stripe_key = stripe_tokens.get("api_key") if stripe_tokens else None
 
@@ -23,10 +23,9 @@ class TwilioLookup(commands.Cog):
                 "Content-Type": "application/x-www-form-urlencoded"
             }
             stripe_payload = {
-                "event_name": f"twilio_lookup_{event_type}",
+                "event_name": "phone-number-lookup",
                 "timestamp": int(datetime.now().timestamp()),
-                "payload[stripe_customer_id]": customer_id,
-                "payload[tokens]": tokens
+                "payload[stripe_customer_id]": customer_id
             }
             async with aiohttp.ClientSession() as session:
                 try:
@@ -80,7 +79,7 @@ class TwilioLookup(commands.Cog):
                         await ctx.send(embed=embed)
 
                         # Track the event with Stripe
-                        await self._track_stripe_event(ctx, customer_id, "lookup", 1)
+                        await self._track_stripe_event(ctx, customer_id)
                     else:
                         await ctx.send(f"Failed to lookup phone number. Status code: {response.status}", delete_after=10)
             except aiohttp.ClientError as e:
