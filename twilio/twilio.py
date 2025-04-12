@@ -96,7 +96,18 @@ class TwilioLookup(commands.Cog):
 
     @commands.admin_or_permissions()
     @lookupset.command(name="id")
-    async def set_customer_id(self, ctx: commands.Context, user: discord.User, customer_id: str):
-        """Set a customer's ID for a user."""
-        await self.config.user(user).customer_id.set(customer_id)
-        await ctx.send(f"Customer ID for {user.name} has been set.")
+    async def set_customer_id(self, ctx: commands.Context, user: discord.User):
+        """Set a customer's ID for a user using a modal for secure input."""
+        
+        class CustomerIDModal(discord.ui.Modal):
+            def __init__(self, user):
+                super().__init__(title="Set Customer ID")
+                self.user = user
+                self.customer_id = discord.ui.TextInput(label="Customer ID", style=discord.TextStyle.short, required=True)
+                self.add_item(self.customer_id)
+
+            async def on_submit(self, interaction: discord.Interaction):
+                await self.config.user(self.user).customer_id.set(self.customer_id.value)
+                await interaction.response.send_message(f"Customer ID for {self.user.name} has been set.", ephemeral=True)
+
+        await ctx.send_modal(CustomerIDModal(user))
