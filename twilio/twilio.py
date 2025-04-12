@@ -83,8 +83,8 @@ class TwilioLookup(commands.Cog):
 
                         embed = discord.Embed(title="Phone number lookup", color=0xfffffe)
                         embed.add_field(name="Phone number", value=formatted_number, inline=False)
-                        embed.add_field(name="Caller name", value=caller_name_info.get("caller_name", "Unknown").title(), inline=True)
-                        embed.add_field(name="Caller type", value=caller_name_info.get("caller_type", "Unknown").title(), inline=True)
+                        embed.add_field(name="Caller name", value=(caller_name_info.get("caller_name") or "Unknown").title(), inline=True)
+                        embed.add_field(name="Caller type", value=(caller_name_info.get("caller_type") or "Unknown").title(), inline=True)
                         embed.add_field(name="Carrier name", value=carrier_info.get("name", "Unknown"), inline=True)
                         carrier_type = carrier_info.get("type", "Unknown")
                         embed.add_field(name="Carrier type", value=carrier_type.upper() if carrier_type else "Unknown", inline=True)
