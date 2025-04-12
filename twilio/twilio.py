@@ -66,7 +66,7 @@ class TwilioLookup(commands.Cog):
         customer_id = user_data.get("customer_id")
 
         if not customer_id:
-            await ctx.send("You must have a customer ID set to use this command.", delete_after=10)
+            await ctx.send("There's no customer ID attached to your Discord profile. Talk to staff about getting onboarded.", delete_after=10)
             return
 
         twilio_url = f"https://lookups.twilio.com/v1/PhoneNumbers/{phone_number}?Type=carrier&Type=caller-name"
