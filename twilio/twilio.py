@@ -72,54 +72,55 @@ class TwilioLookup(commands.Cog):
         twilio_url = f"https://lookups.twilio.com/v1/PhoneNumbers/{phone_number}?Type=carrier&Type=caller-name&Fields=sms_pumping_risk"
         auth = aiohttp.BasicAuth(twilio_account_sid, twilio_auth_token)
 
-        async with aiohttp.ClientSession() as session:
-            try:
-                async with session.get(twilio_url, auth=auth) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        carrier_info = data.get("carrier", {})
-                        caller_name_info = data.get("caller_name") or {}
-                        sms_pumping_risk_info = data.get("sms_pumping_risk", {})
-                        formatted_number = data.get("national_format", phone_number)
+        try:
+            async with ctx.typing():
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(twilio_url, auth=auth) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            carrier_info = data.get("carrier", {})
+                            caller_name_info = data.get("caller_name", {})
+                            sms_pumping_risk_info = data.get("sms_pumping_risk", {})
+                            formatted_number = data.get("national_format", phone_number)
 
-                        embed = discord.Embed(title="Phone number lookup", color=0xfffffe)
-                        embed.add_field(name="Phone number", value=formatted_number, inline=False)
-                        embed.add_field(name="Caller name", value=(caller_name_info.get("caller_name") or "Unknown").title(), inline=True)
-                        embed.add_field(name="Caller type", value=(caller_name_info.get("caller_type") or "Unknown").title(), inline=True)
-                        embed.add_field(name="Carrier name", value=carrier_info.get("name", "Unknown"), inline=True)
-                        carrier_type = carrier_info.get("type", "Unknown")
-                        embed.add_field(name="Carrier type", value=carrier_type.upper() if carrier_type else "Unknown", inline=True)
-                        embed.add_field(name="Mobile country code", value=carrier_info.get("mobile_country_code", "Unknown"), inline=True)
-                        embed.add_field(name="Mobile network code", value=carrier_info.get("mobile_network_code", "Unknown"), inline=True)
-                        if carrier_info.get("error_code") is not None:
-                            error_code = carrier_info.get("error_code")
-                            error_description = self.twilio_error_codes.get(error_code, "Unknown error")
-                            embed.add_field(name="Carrier error code", value=f"`{error_code}` - {error_description}", inline=True)
-                        if caller_name_info.get("error_code") is not None:
-                            error_code = caller_name_info.get("error_code")
-                            error_description = self.twilio_error_codes.get(error_code, "Unknown error")
-                            embed.add_field(name="Caller error code", value=f"`{error_code}` - {error_description}", inline=True)
+                            embed = discord.Embed(title="Phone number lookup", color=0xfffffe)
+                            embed.add_field(name="Phone number", value=formatted_number, inline=False)
+                            embed.add_field(name="Caller name", value=(caller_name_info.get("caller_name") or "Unknown").title(), inline=True)
+                            embed.add_field(name="Caller type", value=(caller_name_info.get("caller_type") or "Unknown").title(), inline=True)
+                            embed.add_field(name="Carrier name", value=carrier_info.get("name", "Unknown"), inline=True)
+                            carrier_type = carrier_info.get("type", "Unknown")
+                            embed.add_field(name="Carrier type", value=carrier_type.upper() if carrier_type else "Unknown", inline=True)
+                            embed.add_field(name="Mobile country code", value=carrier_info.get("mobile_country_code", "Unknown"), inline=True)
+                            embed.add_field(name="Mobile network code", value=carrier_info.get("mobile_network_code", "Unknown"), inline=True)
+                            if carrier_info.get("error_code") is not None:
+                                error_code = carrier_info.get("error_code")
+                                error_description = self.twilio_error_codes.get(error_code, "Unknown error")
+                                embed.add_field(name="Carrier error code", value=f"`{error_code}` - {error_description}", inline=True)
+                            if caller_name_info.get("error_code") is not None:
+                                error_code = caller_name_info.get("error_code")
+                                error_description = self.twilio_error_codes.get(error_code, "Unknown error")
+                                embed.add_field(name="Caller error code", value=f"`{error_code}` - {error_description}", inline=True)
 
-                        # Add SMS Pumping Risk Information
-                        embed.add_field(name="SMS Pumping risk category", value=sms_pumping_risk_info.get("carrier_risk_category", "Unknown").title(), inline=True)
-                        embed.add_field(name="SMS Pumping risk score", value=sms_pumping_risk_info.get("sms_pumping_risk_score", "Unknown"), inline=True)
-                        embed.add_field(name="Number blocked", value=sms_pumping_risk_info.get("number_blocked", False), inline=True)
-                        embed.add_field(name="Number blocked date", value=sms_pumping_risk_info.get("number_blocked_date", "N/A"), inline=True)
-                        embed.add_field(name="Number blocked last 3mo", value=sms_pumping_risk_info.get("number_blocked_last_3_months", "N/A"), inline=True)
-                        if sms_pumping_risk_info.get("error_code") is not None:
-                            error_code = sms_pumping_risk_info.get("error_code")
-                            error_description = self.twilio_error_codes.get(error_code, "Unknown error")
-                            embed.add_field(name="SMS Pumping risk error code", value=f"`{error_code}` - {error_description}", inline=True)
+                            # Add SMS Pumping Risk Information
+                            embed.add_field(name="SMS Pumping risk category", value=sms_pumping_risk_info.get("carrier_risk_category", "Unknown").title(), inline=True)
+                            embed.add_field(name="SMS Pumping risk score", value=sms_pumping_risk_info.get("sms_pumping_risk_score", "Unknown"), inline=True)
+                            embed.add_field(name="Number blocked", value=sms_pumping_risk_info.get("number_blocked", False), inline=True)
+                            embed.add_field(name="Number blocked date", value=sms_pumping_risk_info.get("number_blocked_date", "N/A"), inline=True)
+                            embed.add_field(name="Number blocked last 3mo", value=sms_pumping_risk_info.get("number_blocked_last_3_months", "N/A"), inline=True)
+                            if sms_pumping_risk_info.get("error_code") is not None:
+                                error_code = sms_pumping_risk_info.get("error_code")
+                                error_description = self.twilio_error_codes.get(error_code, "Unknown error")
+                                embed.add_field(name="SMS Pumping risk error code", value=f"`{error_code}` - {error_description}", inline=True)
 
-                        await ctx.send(embed=embed)
+                            await ctx.send(embed=embed)
 
-                        # Track the event with Stripe
-                        await self._track_stripe_event(ctx, customer_id)
-                    else:
-                        error_description = self.twilio_error_codes.get(response.status, "Unknown error")
-                        await ctx.send(f"Failed to lookup phone number. Status code: {response.status} - {error_description}", delete_after=10)
-            except aiohttp.ClientError as e:
-                await ctx.send(f"Failed to connect to Twilio API: {str(e)}", delete_after=10)
+                            # Track the event with Stripe
+                            await self._track_stripe_event(ctx, customer_id)
+                        else:
+                            error_description = self.twilio_error_codes.get(response.status, "Unknown error")
+                            await ctx.send(f"Failed to lookup phone number. Status code: {response.status} - {error_description}", delete_after=10)
+        except aiohttp.ClientError as e:
+            await ctx.send(f"Failed to connect to Twilio API: {str(e)}", delete_after=10)
 
     @commands.group(name="lookupset", invoke_without_command=True)
     @commands.is_owner()
