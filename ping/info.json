@@ -1,7 +1,7 @@
 {
     "author": ["adminescalation", "escalateprivs"],
     "description": "A simple ping command to check the bot's latency and network speed.",
-    "install_msg": "## :white_check_mark: Successfully installed Ping.\nUse `[p]ping` to check the bot's latency and network speed. Make sure you load this cog with `[p]load ping`",
+    "install_msg": "> :white_check_mark: Successfully installed `ping`.\nUse `[p]ping` to check the bot's latency and network speed. Make sure you load this cog with `[p]load ping`\n\nJoin our Discord! https://discord.gg/X8huyaeXrA",
     "end_user_data_statement": "This cog stores no user information",
     "name": "ping",
     "short": "Check bot's latency and network speed",
