@@ -63,7 +63,7 @@ class TwilioLookup(commands.Cog):
                     if response.status == 200:
                         data = await response.json()
                         carrier_info = data.get("carrier", {})
-                        caller_name_info = data.get("caller_name", {})
+                        caller_name_info = data.get("caller_name") or {}
                         formatted_number = data.get("national_format", phone_number)
 
                         embed = discord.Embed(title="Phone number lookup", color=0xfffffe)
