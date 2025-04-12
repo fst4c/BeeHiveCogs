@@ -85,9 +85,15 @@ class TwilioLookup(commands.Cog):
             except aiohttp.ClientError as e:
                 await ctx.send(f"Failed to connect to Twilio API: {str(e)}", delete_after=10)
 
-    @commands.command(name="setcustomerid")
+    @commands.group(name="lookupset", invoke_without_command=True)
     @commands.is_owner()
+    async def lookupset(self, ctx: commands.Context):
+        """Manage customer-related settings."""
+        await ctx.send_help(ctx.command)
+
+    @commands.admin_or_permissions()
+    @lookupset.command(name="id")
     async def set_customer_id(self, ctx: commands.Context, user: discord.User, customer_id: str):
         """Set a customer's ID for a user."""
         await self.config.user(user).customer_id.set(customer_id)
-        await ctx.send(f"Customer ID for {user.name} has been set to {customer_id}.")
+        await ctx.send(f"Customer ID for {user.name} has been set.")
