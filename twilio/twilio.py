@@ -67,14 +67,14 @@ class TwilioLookup(commands.Cog):
 
                         embed = discord.Embed(title="Phone number lookup", color=0xfffffe)
                         embed.add_field(name="Phone number", value=phone_number, inline=False)
+                        embed.add_field(name="Caller name", value=caller_name_info.get("caller_name", "Unknown").title(), inline=True)
+                        embed.add_field(name="Caller type", value=caller_name_info.get("caller_type", "Unknown").title(), inline=True)
                         embed.add_field(name="Carrier name", value=carrier_info.get("name", "Unknown"), inline=True)
                         embed.add_field(name="Carrier type", value=carrier_info.get("type", "Unknown"), inline=True)
-                        embed.add_field(name="Carrier mobile country code", value=carrier_info.get("mobile_country_code", "Unknown"), inline=True)
-                        embed.add_field(name="Carrier mobile network code", value=carrier_info.get("mobile_network_code", "Unknown"), inline=True)
+                        embed.add_field(name="Mobile country code", value=carrier_info.get("mobile_country_code", "Unknown"), inline=True)
+                        embed.add_field(name="Mobile network code", value=carrier_info.get("mobile_network_code", "Unknown"), inline=True)
                         if carrier_info.get("error_code") is not None:
                             embed.add_field(name="Carrier error code", value=carrier_info.get("error_code"), inline=True)
-                        embed.add_field(name="Caller name", value=caller_name_info.get("caller_name", "Unknown"), inline=True)
-                        embed.add_field(name="Caller type", value=caller_name_info.get("caller_type", "Unknown"), inline=True)
                         if caller_name_info.get("error_code") is not None:
                             embed.add_field(name="Caller error code", value=caller_name_info.get("error_code"), inline=True)
 
