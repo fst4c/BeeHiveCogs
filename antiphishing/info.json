@@ -1,7 +1,7 @@
 {
     "author": ["adminescalation"],
     "description": "Guard users from malicious links and phishing attempts with customizable protection options, backed by enterprise-grade threat intelligence.",
-    "install_msg": "## :white_check_mark: Successfully installed AntiPhishing.\n**Questions?** [We're listening](<https://www.beehive.systems/contact-us>)\n**Interested in CyberSecurity and CyberSafety?** Join our Discord! https://discord.gg/ckdzsm7mTs",
+    "install_msg": "## :white_check_mark: Successfully installed AntiPhishing.\n**Questions?** [We're listening](<https://www.beehive.systems/contact-us>)\n**Interested in CyberSecurity and CyberSafety?** Join our Discord! https://discord.gg/X8huyaeXrA",
     "end_user_data_statement": "This cog stores no user information. It stores statistical information about threats actioned while installed.",
     "name": "antiphishing",
     "permissions": [

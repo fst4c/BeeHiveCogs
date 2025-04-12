@@ -6,5 +6,5 @@
     "requirements": [],
     "tags": ["abuseipdb", "ip", "security", "api"],
     "end_user_data_statement": "This cog stores no user data. You'll need to set an AbuseIPDB API key to use this.",
-    "install_msg": "Thank you for installing the AbuseIPDB cog. Use `[p]abuseipdbset setapikey <API_KEY>` to set your API key. Available commands:\n- `[p]abuseipdb report` to create a new IP abuse report.\n- `[p]abuseipdb leaderboard` to show the top 10 reporters over the last 30 days.\n- `[p]abuseipdb list <IP>` to check reports for an IP address.\n- `[p]abuseipdb check <IP>` to see details about an IP address."
+    "install_msg": "Thank you for installing the AbuseIPDB cog. Use `[p]abuseipdbset setapikey <API_KEY>` to set your API key. Available commands:\n- `[p]abuseipdb report` to create a new IP abuse report.\n- `[p]abuseipdb leaderboard` to show the top 10 reporters over the last 30 days.\n- `[p]abuseipdb list <IP>` to check reports for an IP address.\n- `[p]abuseipdb check <IP>` to see details about an IP address.\nYou're invited to join our Discord for any questions - https://discord.gg/X8huyaeXrA"
 }

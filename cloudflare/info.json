@@ -3,7 +3,7 @@
         "adminescalation"
     ],
     "description": "Manage and interact with Cloudflare services through your Discord bot",
-    "install_msg": "## :white_check_mark: Successfully installed Cloudflare.\n**Questions?** [We're listening](<https://www.beehive.systems/contact-us>)\n**Interested in CyberSecurity and CyberSafety?** Join our Discord! https://discord.gg/ckdzsm7mTs",
+    "install_msg": "## :white_check_mark: Successfully installed Cloudflare.\n**Questions?** [We're listening](<https://www.beehive.systems/contact-us>)\n**Interested in CyberSecurity and CyberSafety?** Join our Discord! https://discord.gg/X8huyaeXrA",
     "name": "Cloudflare",
     "hidden": false,
     "disabled": false,
