@@ -45,10 +45,10 @@ class TwilioLookup(commands.Cog):
     @commands.command(name="lookup")
     async def lookup_phone_number(self, ctx: commands.Context, phone_number: str):
         """
-        Lookup any phone number in the world.
+        Lookup any phone number in the world, billed at $0.50/lookup
         
         Formatting matters.
-        
+
         :x: `+1(302)6002611`
         :white_check_mark: `+13026002611`
         :x: `+1 302 600-2611`
