@@ -1,0 +1,25 @@
+{
+    "author" : [
+        "adminelevation"
+    ],
+    "description" : "Give and revoke timeouts for users",
+    "disabled" : false,
+    "end_user_data_statement" : "This cog does not persistently store any data or metadata about users.",
+    "hidden" : false,
+    "install_msg" : "Thank you for installing. Run `[p]load timeout` to load the cog.",
+    "min_bot_version" : "3.5.0",
+    "name" : "timeout",
+    "permissions" : [
+        "manage_guild",
+        "manage_roles"
+    ],
+    "required_cogs" : {},
+    "requirements" : [
+        "humanize"
+    ],
+    "short" : "Manage timeouts",
+    "tags" : [
+        "mod",
+        "timeout"
+    ]
+}
