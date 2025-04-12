@@ -44,7 +44,16 @@ class TwilioLookup(commands.Cog):
 
     @commands.command(name="lookup")
     async def lookup_phone_number(self, ctx: commands.Context, phone_number: str):
-        """Lookup a phone number using the Twilio API."""
+        """
+        Lookup any phone number in the world.
+        
+        Formatting matters.
+        
+        :x: `+1(302)6002611`
+        :white_check_mark: `+13026002611`
+        :x: `+1 302 600-2611`
+        
+        """
         twilio_tokens = await self.bot.get_shared_api_tokens("twilio")
         twilio_account_sid = twilio_tokens.get("account_sid")
         twilio_auth_token = twilio_tokens.get("auth_token")
