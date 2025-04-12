@@ -64,9 +64,10 @@ class TwilioLookup(commands.Cog):
                         data = await response.json()
                         carrier_info = data.get("carrier", {})
                         caller_name_info = data.get("caller_name", {})
+                        formatted_number = data.get("national_format", phone_number)
 
                         embed = discord.Embed(title="Phone number lookup", color=0xfffffe)
-                        embed.add_field(name="Phone number", value=phone_number, inline=False)
+                        embed.add_field(name="Phone number", value=formatted_number, inline=False)
                         embed.add_field(name="Caller name", value=caller_name_info.get("caller_name", "Unknown").title(), inline=True)
                         embed.add_field(name="Caller type", value=caller_name_info.get("caller_type", "Unknown").title(), inline=True)
                         embed.add_field(name="Carrier name", value=carrier_info.get("name", "Unknown"), inline=True)
