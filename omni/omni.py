@@ -267,7 +267,7 @@ class Omni(commands.Cog):
                 try:
                     reason = (
                         f"AI moderator issued a timeout. Violation scores: " +
-                        ", ".join(f"{category}: {score:.2f}" for category, score in category_scores.items() if score > 0.2) +
+                        ", ".join(f"{category}: {score * 100:.0f}%" for category, score in category_scores.items() if score > 0.2) +
                         f". Flagged message: {message.content}"
                     )
                     await message.author.timeout(timedelta(minutes=timeout_duration), reason=reason)
