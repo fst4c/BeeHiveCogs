@@ -356,12 +356,12 @@ class InviteFilter(commands.Cog):
 
         embed = discord.Embed(title="Invite filter settings", color=0xfffffe) # Use a different color
 
-        embed.add_field(name="Filter status", value="✅ Enabled" if delete_invites else "❌ Disabled", inline=False)
-        embed.add_field(name="Whitelisted channels", value=", ".join(whitelisted_channels_mentions) or "None", inline=False)
-        embed.add_field(name="Whitelisted roles", value=", ".join(whitelisted_roles_mentions) or "None", inline=False)
-        embed.add_field(name="Whitelisted categories", value=", ".join(whitelisted_categories_names) or "None", inline=False)  # New: Display whitelisted categories
-        embed.add_field(name="Logging channel", value=logging_channel_mention, inline=False)
-        embed.add_field(name="Timeout duration", value=f"{timeout_duration} minutes" + (" (disabled)" if timeout_duration == 0 else ""), inline=False)
+        embed.add_field(name="Filter status", value="✅ Enabled" if delete_invites else "❌ Disabled", inline=True)
+        embed.add_field(name="Whitelisted channels", value=", ".join(whitelisted_channels_mentions) or "None", inline=True)
+        embed.add_field(name="Whitelisted roles", value=", ".join(whitelisted_roles_mentions) or "None", inline=True)
+        embed.add_field(name="Whitelisted categories", value=", ".join(whitelisted_categories_names) or "None", inline=True)  # New: Display whitelisted categories
+        embed.add_field(name="Logging channel", value=logging_channel_mention, inline=True)
+        embed.add_field(name="Timeout duration", value=f"{timeout_duration} minutes" + (" (disabled)" if timeout_duration == 0 else ""), inline=True)
 
         await ctx.send(embed=embed)
 
