@@ -877,12 +877,14 @@ class Omni(commands.Cog):
     @omni.group()
     @commands.admin_or_permissions(manage_guild=True)
     async def whitelist(self, ctx):
-        """Manage whitelists for channels, roles, users, and categories."""
+        """
+        Manage whitelisting/"bypassing" parts of the server from moderation.
+        """
         pass
 
     @whitelist.command(name="channel")
     async def whitelist_channel(self, ctx, channel: discord.TextChannel):
-        """Add or remove a channel from the whitelist."""
+        """Bypass/unbypass channels"""
         try:
             guild = ctx.guild
             whitelisted_channels = await self.config.guild(guild).whitelisted_channels()
@@ -906,7 +908,7 @@ class Omni(commands.Cog):
 
     @whitelist.command(name="role")
     async def whitelist_role(self, ctx, role: discord.Role):
-        """Add or remove a role from the whitelist."""
+        """Bypass/unbypass users in a role"""
         try:
             guild = ctx.guild
             whitelisted_roles = await self.config.guild(guild).whitelisted_roles()
@@ -930,7 +932,7 @@ class Omni(commands.Cog):
 
     @whitelist.command(name="user")
     async def whitelist_user(self, ctx, user: discord.User):
-        """Add or remove a user from the whitelist."""
+        """Bypass/unbypass a user"""
         try:
             guild = ctx.guild
             whitelisted_users = await self.config.guild(guild).whitelisted_users()
@@ -954,7 +956,7 @@ class Omni(commands.Cog):
 
     @whitelist.command(name="category")
     async def whitelist_category(self, ctx, category: discord.CategoryChannel):
-        """Add or remove a category from the whitelist."""
+        """Bypass/unbypass a channel category"""
         try:
             guild = ctx.guild
             whitelisted_categories = await self.config.guild(guild).whitelisted_categories()
