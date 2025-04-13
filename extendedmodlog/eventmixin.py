@@ -1011,18 +1011,16 @@ class EventMixin:
         )
         await i18n.set_contextual_locales_from_guild(self.bot, guild)
         # set guild level i18n
-        channel_type = str(old_channel.type).replace("_", " ").title()
         time = datetime.datetime.now(datetime.timezone.utc)
+        channel_type = str(old_channel.type).replace("_", " ").title()
         embed = discord.Embed(
-            description=old_channel.name,
+            title=_("{chan_type} channel deleted").format(chan_type=channel_type),
+            description=_(">>> {channel_name}").format(channel_name=f"#{old_channel.name}"),
             timestamp=time,
             colour=await self.get_event_colour(guild, "channel_delete"),
         )
-        embed.set_author(
-            name=_("{chan_type} Channel Deleted ({chan_id})").format(
-                chan_type=channel_type, chan_id=old_channel.id
-            )
-        )
+        embed.set_footer(text=_("Channel ID: {chan_id}").format(chan_id=old_channel.id))
+        
         entry = await self.get_audit_log_entry(
             guild, old_channel, discord.AuditLogAction.channel_delete
         )
@@ -1035,11 +1033,11 @@ class EventMixin:
 
         if perp:
             perp_msg = _("by {perp} (`{perp_id}`)").format(perp=perp, perp_id=perp.id)
-            embed.add_field(name=_("Deleted by "), value=perp.mention)
+            embed.add_field(name=_("Deleted by"), value=perp.mention, inline=False)
         if reason:
             perp_msg += _(" Reason: {reason}").format(reason=reason)
-            embed.add_field(name=_("Reason "), value=reason, inline=False)
-        embed.add_field(name=_("Channel ID"), value=box(str(old_channel.id)))
+            embed.add_field(name=_("Reason"), value=reason, inline=False)
+        
         msg = _("{emoji} {time} {chan_type} channel deleted {perp_msg} {channel}").format(
             emoji=self.settings[guild.id]["channel_delete"]["emoji"],
             time=discord.utils.format_dt(time),
