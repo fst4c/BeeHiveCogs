@@ -120,7 +120,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
         if honeypot_channel:
             embed = discord.Embed(
-                title="Honeypot Channel Exists",
+                title="Honeypot channel exists",
                 description=f"The honeypot channel already exists: {honeypot_channel.mention} ({honeypot_channel.id}).",
                 color=0xff4545
             )
