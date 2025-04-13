@@ -308,7 +308,10 @@ class EventMixin:
             else:
                 role = _("Not Set\nADMIN\n")
         elif privs is commands.PrivilegeLevel.BOT_OWNER:
-            role = humanize_list([f"<@{_id}>" for _id in ctx.bot.owner_ids or []])
+            if len(ctx.bot.owner_ids) > 1:
+                role = "DISCORD_TEAM"
+            else:
+                role = humanize_list([f"<@{_id}>" for _id in ctx.bot.owner_ids or []])
             role += f"\n{privs.name}\n"
         elif privs is commands.PrivilegeLevel.GUILD_OWNER:
             if guild.owner:
@@ -325,21 +328,18 @@ class EventMixin:
 
         if embed_links:
             embed = discord.Embed(
+                title="Command used",
                 description=f">>> {com_str}",
                 colour=await self.get_event_colour(guild, "commands_used"),
                 timestamp=time,
             )
             embed.add_field(name=_("Channel"), value=message.channel.mention)
-            embed.add_field(name=_("Author"), value=message.author.mention)
+            embed.add_field(name=_("User"), value=message.author.mention)
+            embed.add_field(name=_("User ID"), value=box(str(message.author.id)))
             embed.add_field(name=_("Can"), value=str(can_x))
-            embed.add_field(name=_("Requires"), value=role)
+            embed.add_field(name=_("User needs"), value=role)
             if i_require:
-                embed.add_field(name=_("Bot Requires"), value=i_require)
-            author_title = _("{member} ({m_id}) Used a Command").format(
-                member=message.author, m_id=message.author.id
-            )
-            embed.set_author(name=author_title, icon_url=message.author.display_avatar)
-            embed.add_field(name=_("Member ID"), value=box(str(message.author.id)))
+                embed.add_field(name=_("Bot needs"), value=i_require)
             await channel.send(embed=embed, allowed_mentions=self.allowed_mentions)
         else:
             infomessage = _(
