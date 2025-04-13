@@ -491,6 +491,7 @@ class EventMixin:
         if embed_links:
             content = f">>> {message.content}" if message.content else None
             embed = discord.Embed(
+                title="Message deleted",
                 description=content,
                 colour=await self.get_event_colour(guild, "message_delete"),
                 timestamp=time,
@@ -499,7 +500,7 @@ class EventMixin:
             embed.add_field(name=_("Channel"), value=message_channel.mention)
             embed.add_field(name=_("Author"), value=message.author.mention)
             if perp:
-                embed.add_field(name=_("Deleted by"), value=perp.mention)
+                embed.add_field(name=_("Deleted by"), value=f"{perp.mention}\n{perp.id}")
             if reason:
                 embed.add_field(name=_("Reason"), value=reason)
             if message.attachments:
@@ -509,12 +510,6 @@ class EventMixin:
                 embed.add_field(name=_("Replying to:"), value=replying)
 
             embed.add_field(name=_("Message ID"), value=box(str(message.id)))
-            embed.set_author(
-                name=_("{member} ({m_id}) - Deleted Message").format(
-                    member=author, m_id=author.id
-                ),
-                icon_url=message.author.display_avatar,
-            )
             await channel.send(embed=embed, allowed_mentions=self.allowed_mentions)
         else:
             clean_msg = message.clean_content[: (1990 - len(infomessage))]
