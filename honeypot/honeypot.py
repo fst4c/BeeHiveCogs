@@ -108,7 +108,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @commands.admin_or_permissions()
     @commands.group()
     async def honeypot(self, ctx: commands.Context) -> None:
-        """Set the honeypot settings. Only administrators can use this command for security reasons."""
+        """Honeypots are channels that attracted automated scam bots."""
         pass
 
     @commands.admin_or_permissions()
