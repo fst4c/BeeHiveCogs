@@ -602,18 +602,18 @@ class Omni(commands.Cog):
             last_reminder_display = last_reminder_time if last_reminder_time else "Never"
 
             embed = discord.Embed(title="Omni settings", color=0xfffffe)
-            embed.add_field(name="Moderative threshold", value=str(moderation_threshold), inline=True)
+            embed.add_field(name="Moderative threshold", value=f"{moderation_threshold * 100:.2f}%", inline=True)
             embed.add_field(name="Timeout duration", value=f"{timeout_duration} minutes", inline=True)
             embed.add_field(name="Log channel", value=log_channel_name, inline=True)
             embed.add_field(name="Moderation enabled", value="Yes" if moderation_enabled else "No", inline=True)
             embed.add_field(name="Deletion enabled", value="Yes" if delete_violatory_messages else "No", inline=True)
             embed.add_field(name="Debug mode", value="Enabled" if debug_mode else "Disabled", inline=True)
-            embed.add_field(name="Whitelisted channels", value=whitelisted_channels_names, inline=False)
-            embed.add_field(name="Whitelisted roles", value=whitelisted_roles_names, inline=False)
-            embed.add_field(name="Whitelisted users", value=whitelisted_users_names, inline=False)
-            embed.add_field(name="Whitelisted categories", value=whitelisted_categories_names, inline=False)
-            embed.add_field(name="Last disclosure notice", value=last_reminder_display, inline=False)
-            embed.add_field(name="Bypass NSFW", value="Enabled" if bypass_nsfw else "Disabled", inline=True)
+            embed.add_field(name="Whitelisted channels", value=whitelisted_channels_names, inline=True)
+            embed.add_field(name="Whitelisted roles", value=whitelisted_roles_names, inline=True)
+            embed.add_field(name="Whitelisted users", value=whitelisted_users_names, inline=True)
+            embed.add_field(name="Whitelisted categories", value=whitelisted_categories_names, inline=True)
+            embed.add_field(name="Whitelisted NSFW", value="Enabled" if bypass_nsfw else "Disabled", inline=True)
+            embed.add_field(name="Last disclosure notice", value=last_reminder_display, inline=True)
 
             await ctx.send(embed=embed)
         except Exception as e:
