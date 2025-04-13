@@ -190,6 +190,7 @@ class InviteFilter(commands.Cog):
         status = "enabled" if new_status else "disabled"
         await ctx.send(f"✅ Invite filter is now **{status}**.")
 
+    @commands.mod_or_permissions()
     @invitefilter.group(invoke_without_command=True)
     async def whitelist(self, ctx):
         """Manage the invite filter whitelist (channels, categories, and roles)."""
