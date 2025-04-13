@@ -397,11 +397,12 @@ class EventMixin:
                 return
             if embed_links:
                 embed = discord.Embed(
-                    description=_("*Message's content unknown.*"),
+                    title=_("Message deleted"),
+                    description=_("*Message's content could not be found, but a deletion event was logged.*"),
                     colour=await self.get_event_colour(guild, "message_delete"),
+                    timestamp=datetime.datetime.now(datetime.timezone.utc),
                 )
                 embed.add_field(name=_("Channel"), value=message_channel.mention)
-                embed.set_author(name=_("Deleted Message"))
                 embed.add_field(name=_("Message ID"), value=box(str(payload.message_id)))
                 await channel.send(embed=embed, allowed_mentions=self.allowed_mentions)
             else:
