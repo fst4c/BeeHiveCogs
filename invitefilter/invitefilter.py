@@ -172,6 +172,7 @@ class InviteFilter(commands.Cog):
         """Manage the invite filter settings."""
         await ctx.send_help(ctx.command)
 
+    @commands.mod_or_permissions()
     @invitefilter.command()
     async def toggle(self, ctx, on_off: bool = None):
         """Toggle the invite filter on or off.
