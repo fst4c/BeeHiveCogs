@@ -661,7 +661,7 @@ class EventMixin:
                         ).format(
                             code=invite.code,
                             inviter=str(
-                                getattr(invite.inviter, "mention", _("Widget Integration"))
+                                getattr(invite.inviter, "mention", _("Web integration"))
                             ),
                         )
 
@@ -724,7 +724,6 @@ class EventMixin:
         # set guild level i18n
         time = datetime.datetime.now(datetime.timezone.utc)
         users = len(guild.members)
-        # https://github.com/Cog-Creators/Red-DiscordBot/blob/develop/cogs/general.py
         user_created = int(member.created_at.timestamp())
 
         created_on = "<t:{user_created}>\n(<t:{user_created}:R>)".format(user_created=user_created)
@@ -732,25 +731,18 @@ class EventMixin:
         possible_link = await self.get_invite_link(member)
         if embed_links:
             embed = discord.Embed(
-                description=member,
+                title=_("User joined the server"),
+                description=_("{member} has joined the guild.").format(member=member.mention),
                 colour=await self.get_event_colour(guild, "user_join"),
                 timestamp=member.joined_at
                 if member.joined_at
                 else datetime.datetime.now(datetime.timezone.utc),
             )
-            embed.add_field(name=_("Member"), value=member.mention)
-            embed.add_field(name=_("Member ID"), value=box(str(member.id)))
-            embed.add_field(name=_("Total Users:"), value=str(users))
-            embed.add_field(name=_("Account created on:"), value=created_on)
-            embed.set_author(
-                name=_("{member} ({m_id}) has joined the guild").format(
-                    member=member, m_id=member.id
-                ),
-                url=member.display_avatar,
-                icon_url=member.display_avatar,
-            )
+            embed.add_field(name=_("Member ID"), value=box(str(member.id)), inline=True)
+            embed.add_field(name=_("User count now"), value=str(users), inline=True)
+            embed.add_field(name=_("Account created"), value=created_on, inline=False)
             if possible_link:
-                embed.add_field(name=_("Invite Link"), value=possible_link)
+                embed.add_field(name=_("Invite used"), value=possible_link, inline=False)
             embed.set_thumbnail(url=member.display_avatar)
             await channel.send(embed=embed, allowed_mentions=self.allowed_mentions)
         else:
