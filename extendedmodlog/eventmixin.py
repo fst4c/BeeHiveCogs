@@ -224,8 +224,9 @@ class EventMixin:
         message = ctx.message
         can_run = await ctx.command.can_run(ctx, check_all_parents=True)
         can_see = await ctx.command.can_see(ctx)
-        can_x = _("**See:** {can_see}\n**Run:** {can_run}").format(
-            can_run=can_run, can_see=can_see
+        can_x = _("{can_see} **See**\n{can_run} **Run**").format(
+            can_run=":white_check_mark:" if can_run else ":x:",
+            can_see=":white_check_mark:" if can_see else ":x:"
         )
         logger.verbose("on_command name: %s", ctx.command.qualified_name)
         if ctx.interaction:
