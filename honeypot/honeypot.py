@@ -22,6 +22,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
             "scam_stats": {"nitro": 0, "steam": 0, "other": 0, "csam": 0},
         }
         self.config.register_guild(**default_guild)
+        self.global_scam_stats = {"nitro": 0, "steam": 0, "other": 0, "csam": 0}
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -57,6 +58,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         # Update scam stats
         scam_stats = config["scam_stats"]
         scam_stats[scam_type] += 1
+        self.global_scam_stats[scam_type] += 1
         await self.config.guild(message.guild).scam_stats.set(scam_stats)
 
         action = config["action"]
@@ -280,5 +282,6 @@ class Honeypot(commands.Cog, name="Honeypot"):
             embed.add_field(name="Honeypot channel", value=f"<#{config['honeypot_channel']}>" if config["honeypot_channel"] else "Not set", inline=False)
             embed.add_field(name="Mute role", value=f"<@&{config['mute_role']}>" if config["mute_role"] else "Not set", inline=False)
             embed.add_field(name="Days to delete on ban", value=config["ban_delete_message_days"], inline=False)
-            embed.add_field(name="Historical detection types", value=f"Nitro: {config['scam_stats'].get('nitro', 0)}\nSteam: {config['scam_stats'].get('steam', 0)}\nCSAM: {config['scam_stats'].get('csam', 0)}\nOther: {config['scam_stats'].get('other', 0)}", inline=False)
+            embed.add_field(name="Server detections", value=f"Nitro: {config['scam_stats'].get('nitro', 0)}\nSteam: {config['scam_stats'].get('steam', 0)}\nCSAM: {config['scam_stats'].get('csam', 0)}\nOther: {config['scam_stats'].get('other', 0)}", inline=False)
+            embed.add_field(name="Global detections", value=f"Nitro: {self.global_scam_stats.get('nitro', 0)}\nSteam: {self.global_scam_stats.get('steam', 0)}\nCSAM: {self.global_scam_stats.get('csam', 0)}\nOther: {self.global_scam_stats.get('other', 0)}", inline=False)
             await ctx.send(embed=embed)
