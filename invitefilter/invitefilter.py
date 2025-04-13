@@ -136,22 +136,22 @@ class InviteFilter(commands.Cog):
                 logging_channel = guild.get_channel(logging_channel_id)
                 if logging_channel and logging_channel.permissions_for(guild.me).send_messages and logging_channel.permissions_for(guild.me).embed_links:
                     embed = discord.Embed(
-                        title="💬 Invite Filter Action",
+                        title="Unwanted invite detected",
                         description="An invite link was detected and processed.",
-                        color=discord.Color.red() # Use discord Color object
+                        color=0xff4545
                     )
                     embed.add_field(name="Channel", value=message.channel.mention, inline=True)
                     embed.add_field(name="User", value=f"{member.mention} ({member.id})", inline=True)
-                    embed.add_field(name="Detected Invite", value=f"`{log_invite_url}`", inline=False) # Use the matched URL
+                    embed.add_field(name="Detected invite", value=f"`{log_invite_url}`", inline=False) # Use the matched URL
 
                     # Add invite details if fetched
                     for name, value in log_fields.items():
                          embed.add_field(name=name, value=value, inline=True)
 
                     if actions_taken:
-                        embed.add_field(name="Actions Taken", value="\n".join(f"- {action}" for action in actions_taken), inline=False)
+                        embed.add_field(name="Actions taken", value="\n".join(f"- {action}" for action in actions_taken), inline=False)
                     else:
-                         embed.add_field(name="Actions Taken", value="None", inline=False)
+                         embed.add_field(name="Actions taken", value="None", inline=False)
 
                     embed.set_footer(text=f"Message ID: {message.id}")
                     embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
