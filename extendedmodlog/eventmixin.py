@@ -1140,7 +1140,7 @@ class EventMixin:
         time = datetime.datetime.now(datetime.timezone.utc)
         embed = discord.Embed(
             title=_("{chan_type} channel updated").format(chan_type=channel_type),
-            description=_("Channel: {mention}").format(mention=after.mention),
+            description=_(">>> {mention}").format(mention=after.mention),
             timestamp=time,
             colour=await self.get_event_colour(guild, "channel_change"),
         )
