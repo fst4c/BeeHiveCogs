@@ -269,6 +269,6 @@ class Honeypot(commands.Cog, name="Honeypot"):
         embed.add_field(name="Ping role", value=f"<@&{config['ping_role']}>" if config["ping_role"] else "Not set", inline=False)
         embed.add_field(name="Honeypot channel", value=f"<#{config['honeypot_channel']}>" if config["honeypot_channel"] else "Not set", inline=False)
         embed.add_field(name="Mute role", value=f"<@&{config['mute_role']}>" if config["mute_role"] else "Not set", inline=False)
-        embed.add_field(name="Ban delete message days", value=config["ban_delete_message_days"], inline=False)
+        embed.add_field(name="Days to delete on ban", value=config["ban_delete_message_days"], inline=False)
         embed.add_field(name="Scam types detected", value=f"Nitro: {config['scam_stats']['nitro']}, Steam: {config['scam_stats']['steam']}, Other: {config['scam_stats']['other']}", inline=False)
         await ctx.send(embed=embed)
