@@ -92,13 +92,13 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @commands.guild_only()
     @commands.admin_or_permissions()
     @commands.group()
-    async def sethoneypot(self, ctx: commands.Context) -> None:
+    async def honeypot(self, ctx: commands.Context) -> None:
         """Set the honeypot settings. Only administrators can use this command for security reasons."""
         pass
 
     @commands.admin_or_permissions()
-    @sethoneypot.command(aliases=["makechannel"])
-    async def createchannel(self, ctx: commands.Context) -> None:
+    @honeypot.command()
+    async def channel(self, ctx: commands.Context) -> None:
         """Create the honeypot channel."""
         honeypot_channel_id = self.config.get("honeypot_channel")
         honeypot_channel = ctx.guild.get_channel(honeypot_channel_id) if honeypot_channel_id else None
@@ -150,21 +150,21 @@ class Honeypot(commands.Cog, name="Honeypot"):
         )
 
     @commands.admin_or_permissions()
-    @sethoneypot.command()
+    @honeypot.command()
     async def enable(self, ctx: commands.Context) -> None:
         """Enable the honeypot functionality."""
         self.config["enabled"] = True
         await ctx.send("Honeypot functionality has been enabled.")
 
     @commands.admin_or_permissions()
-    @sethoneypot.command()
+    @honeypot.command()
     async def disable(self, ctx: commands.Context) -> None:
         """Disable the honeypot functionality."""
         self.config["enabled"] = False
         await ctx.send("Honeypot functionality has been disabled.")
 
     @commands.admin_or_permissions()
-    @sethoneypot.command()
+    @honeypot.command()
     async def setaction(self, ctx: commands.Context, action: str) -> None:
         """Set the action to take when a user is detected in the honeypot channel."""
         if action not in ["mute", "kick", "ban", "timeout"]:
@@ -174,7 +174,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         await ctx.send(f"Action has been set to {action}.")
 
     @commands.admin_or_permissions()
-    @sethoneypot.command()
+    @honeypot.command()
     async def setlogchannel(self, ctx: commands.Context, channel: discord.TextChannel) -> None:
         """Set the channel where logs will be sent."""
         self.config["logs_channel"] = channel.id
