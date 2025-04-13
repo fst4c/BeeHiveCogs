@@ -19,6 +19,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
             "honeypot_channel": None,
             "mute_role": None,
             "ban_delete_message_days": 3,
+            "scam_stats": {"nitro": 0, "steam": 0, "other": 0},
         }
         self.config.register_guild(**default_guild)
 
@@ -42,6 +43,18 @@ class Honeypot(commands.Cog, name="Honeypot"):
             await message.delete()
         except discord.HTTPException:
             pass
+
+        # Track scam type based on message content
+        scam_type = "other"
+        if "nitro" in message.content.lower():
+            scam_type = "nitro"
+        elif "steam" in message.content.lower():
+            scam_type = "steam"
+
+        # Update scam stats
+        scam_stats = config["scam_stats"]
+        scam_stats[scam_type] += 1
+        await self.config.guild(message.guild).scam_stats.set(scam_stats)
 
         action = config["action"]
         embed = discord.Embed(
@@ -211,4 +224,5 @@ class Honeypot(commands.Cog, name="Honeypot"):
         embed.add_field(name="Honeypot Channel", value=f"<#{config['honeypot_channel']}>" if config["honeypot_channel"] else "Not set", inline=False)
         embed.add_field(name="Mute Role", value=f"<@&{config['mute_role']}>" if config["mute_role"] else "Not set", inline=False)
         embed.add_field(name="Ban Delete Message Days", value=config["ban_delete_message_days"], inline=False)
+        embed.add_field(name="Scam types detected", value=f"Nitro: {config['scam_stats']['nitro']}, Steam: {config['scam_stats']['steam']}, Other: {config['scam_stats']['other']}", inline=False)
         await ctx.send(embed=embed)
