@@ -46,10 +46,13 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
         # Track scam type based on message content
         scam_type = "other"
-        if "nitro" in message.content.lower():
+        content_lower = message.content.lower()
+        if "nitro" in content_lower:
             scam_type = "nitro"
-        elif "steam" in message.content.lower():
+        elif "steam" in content_lower:
             scam_type = "steam"
+        elif any(word in content_lower for word in ["nude", "nudes", "teen", "teens"]):
+            scam_type = "csam"
 
         # Update scam stats
         scam_stats = config["scam_stats"]
@@ -74,16 +77,16 @@ class Honeypot(commands.Cog, name="Honeypot"):
                     mute_role_id = config.get("mute_role")
                     mute_role = message.guild.get_role(mute_role_id) if mute_role_id else None
                     if mute_role:
-                        await message.author.add_roles(mute_role, reason="Self bot/scammer detected.")
+                        await message.author.add_roles(mute_role, reason="User triggered honeypot defenses")
                     else:
                         failed = "**Failed:** The mute role is not set or doesn't exist anymore."
                 elif action == "kick":
-                    await message.author.kick(reason="Self bot/scammer detected.")
+                    await message.author.kick(reason="User triggered honeypot defenses")
                 elif action == "ban":
-                    await message.author.ban(reason="Self bot/scammer detected.", delete_message_days=config["ban_delete_message_days"])
+                    await message.author.ban(reason="User triggered honeypot defenses", delete_message_days=config["ban_delete_message_days"])
                 elif action == "timeout":
                     timeout_duration = timedelta(days=7)  # 7 day timeout
-                    await message.author.timeout_for(timeout_duration, reason="Self bot/scammer detected.")
+                    await message.author.timeout_for(timeout_duration, reason="User triggered honeypot defenses")
             except discord.HTTPException as e:
                 failed = f"**Failed:** An error occurred while trying to take action against the member:\n{e}"
             else:
@@ -269,5 +272,5 @@ class Honeypot(commands.Cog, name="Honeypot"):
         embed.add_field(name="Honeypot channel", value=f"<#{config['honeypot_channel']}>" if config["honeypot_channel"] else "Not set", inline=False)
         embed.add_field(name="Mute role", value=f"<@&{config['mute_role']}>" if config["mute_role"] else "Not set", inline=False)
         embed.add_field(name="Days to delete on ban", value=config["ban_delete_message_days"], inline=False)
-        embed.add_field(name="Scam types detected", value=f"Nitro: {config['scam_stats']['nitro']}, Steam: {config['scam_stats']['steam']}, Other: {config['scam_stats']['other']}", inline=False)
+        embed.add_field(name="Scam types detected", value=f"Nitro: {config['scam_stats']['nitro']}\nSteam: {config['scam_stats']['steam']}\nCSAM: {config['scam_stats']['csam']}\n Other: {config['scam_stats']['other']}", inline=False)
         await ctx.send(embed=embed)
