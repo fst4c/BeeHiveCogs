@@ -337,7 +337,7 @@ class EventMixin:
             embed.add_field(name=_("Channel"), value=message.channel.mention)
             embed.add_field(name=_("User"), value=message.author.mention)
             embed.add_field(name=_("User ID"), value=f"`{message.author.id}`")
-            embed.add_field(name=_("Can"), value=str(can_x))
+            embed.add_field(name=_("User can"), value=str(can_x))
             embed.add_field(name=_("User needs"), value=role)
             if i_require:
                 embed.add_field(name=_("Bot needs"), value=i_require)
