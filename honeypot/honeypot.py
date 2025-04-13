@@ -270,7 +270,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
     @commands.admin_or_permissions()
     @honeypot.command()
-    async def view(self, ctx: commands.Context) -> None:
+    async def settings(self, ctx: commands.Context) -> None:
         """View the current honeypot settings."""
         async with ctx.typing():
             config = await self.config.guild(ctx.guild).all()
@@ -282,6 +282,14 @@ class Honeypot(commands.Cog, name="Honeypot"):
             embed.add_field(name="Honeypot channel", value=f"<#{config['honeypot_channel']}>" if config["honeypot_channel"] else "Not set", inline=False)
             embed.add_field(name="Mute role", value=f"<@&{config['mute_role']}>" if config["mute_role"] else "Not set", inline=False)
             embed.add_field(name="Days to delete on ban", value=config["ban_delete_message_days"], inline=False)
+            await ctx.send(embed=embed)
+
+    @honeypot.command()
+    async def stats(self, ctx: commands.Context) -> None:
+        """View the current honeypot statistics."""
+        async with ctx.typing():
+            config = await self.config.guild(ctx.guild).all()
+            embed = discord.Embed(title="Honeypot statistics", color=0xfffffe)
             embed.add_field(name="Server detections", value=f"Nitro: {config['scam_stats'].get('nitro', 0)}\nSteam: {config['scam_stats'].get('steam', 0)}\nCSAM: {config['scam_stats'].get('csam', 0)}\nOther: {config['scam_stats'].get('other', 0)}", inline=False)
             embed.add_field(name="Global detections", value=f"Nitro: {self.global_scam_stats.get('nitro', 0)}\nSteam: {self.global_scam_stats.get('steam', 0)}\nCSAM: {self.global_scam_stats.get('csam', 0)}\nOther: {self.global_scam_stats.get('other', 0)}", inline=False)
             await ctx.send(embed=embed)
