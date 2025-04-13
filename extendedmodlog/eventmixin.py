@@ -1139,15 +1139,13 @@ class EventMixin:
         channel_type = str(after.type).replace("_", " ").title()
         time = datetime.datetime.now(datetime.timezone.utc)
         embed = discord.Embed(
-            description=after.mention,
+            title=_("{chan_type} channel updated").format(chan_type=channel_type),
+            description=_("Channel: {mention}").format(mention=after.mention),
             timestamp=time,
             colour=await self.get_event_colour(guild, "channel_change"),
         )
-        embed.set_author(
-            name=_("{chan_type} Channel Updated {chan_name} ({chan_id})").format(
-                chan_type=channel_type, chan_name=before.name, chan_id=before.id
-            )
-        )
+        embed.set_footer(text=_("Channel ID: {chan_id}").format(chan_id=before.id))
+        
         msg = _("{emoji} {time} Updated channel {channel}\n").format(
             emoji=self.settings[guild.id]["channel_change"]["emoji"],
             time=discord.utils.format_dt(time),
@@ -1179,8 +1177,6 @@ class EventMixin:
                 msg += _("After ") + f"{name} {after_attr}\n"
                 before_text += f"- {name} {before_attr}\n"
                 after_text += f"- {name} {after_attr}\n"
-                # embed.add_field(name=_("Before ") + name, value=str(before_attr)[:1024])
-                # embed.add_field(name=_("After ") + name, value=str(after_attr)[:1024])
                 entry = await self.get_audit_log_entry(
                     guild, before, discord.AuditLogAction.channel_update
                 )
@@ -1193,8 +1189,6 @@ class EventMixin:
             msg += _("After ") + f"NSFW {after.is_nsfw()}\n"
             before_text += _("- Age Restricted: {value}").format(value=before.is_nsfw())
             after_text += _("- Age Restricted: {value}").format(value=after.is_nsfw())
-            # embed.add_field(name=_("Before ") + "NSFW", value=str(before.is_nsfw()))
-            # embed.add_field(name=_("After ") + "NSFW", value=str(after.is_nsfw()))
             entry = await self.get_audit_log_entry(
                 guild, before, discord.AuditLogAction.channel_update
             )
@@ -1202,23 +1196,23 @@ class EventMixin:
             reason = getattr(entry, "reason", None)
         if before_text and after_text:
             for page in pagify(before_text, page_length=1024):
-                embed.add_field(name=_("Before"), value=page)
+                embed.add_field(name=_("Before"), value=page, inline=False)
             for page in pagify(after_text, page_length=1024):
-                embed.add_field(name=_("After"), value=page)
+                embed.add_field(name=_("After"), value=page, inline=False)
         p_msg = await self.get_permission_change(before, after, embed_links)
         if p_msg != "":
             worth_updating = True
             msg += _("Permissions Changed: ") + p_msg
             for page in pagify(p_msg, page_length=1024):
-                embed.add_field(name=_("Permissions"), value=page)
+                embed.add_field(name=_("Permissions"), value=page, inline=False)
 
         if perp:
             msg += _("Updated by ") + str(perp) + "\n"
-            embed.add_field(name=_("Updated by "), value=perp.mention)
+            embed.add_field(name=_("Updated by"), value=perp.mention, inline=True)
         if reason:
             msg += _("Reason ") + reason + "\n"
-            embed.add_field(name=_("Reason "), value=reason, inline=False)
-        embed.add_field(name=_("Channel ID"), value=box(str(after.id)))
+            embed.add_field(name=_("Reason"), value=reason, inline=True)
+        
         if not worth_updating:
             return
         if embed_links:
