@@ -272,6 +272,7 @@ class InviteFilter(commands.Cog):
         else:
             await ctx.send("No changes made to the role whitelist.")
 
+    @commands.mod_or_permissions()
     @invitefilter.command(name="logchannel", aliases=["logs"])
     async def set_log_channel(self, ctx, channel: discord.TextChannel = None):
         """Set the logging channel for invite detections.
@@ -290,7 +291,7 @@ class InviteFilter(commands.Cog):
             await self.config.guild(guild).logging_channel.set(None)
             await ctx.send("✅ Logging channel disabled.")
 
-
+    @commands.mod_or_permissions()
     @invitefilter.command(aliases=["duration"])
     async def timeout(self, ctx, minutes: int):
         """Set the timeout duration in minutes when an invite is detected.
@@ -332,6 +333,7 @@ class InviteFilter(commands.Cog):
 
         await ctx.send(embed=embed)
 
+    @commands.mod_or_permissions()
     @invitefilter.command()
     async def settings(self, ctx):
         """Display the current settings of the invite filter."""
