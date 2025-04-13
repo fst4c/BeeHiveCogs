@@ -142,16 +142,16 @@ class EventMixin:
             "user_left": discord.Colour.dark_green(),
             "channel_change": discord.Colour.teal(),
             "channel_create": discord.Colour.teal(),
-            "channel_delete": discord.Colour.dark_teal(),
+            "channel_delete": 0xff4545,
             "guild_change": discord.Colour.blurple(),
             "emoji_change": discord.Colour.gold(),
             "stickers_change": discord.Colour.gold(),
-            "commands_used": cmd_colour,
+            "commands_used": 0xfffffe,
             "invite_created": discord.Colour.blurple(),
-            "invite_deleted": discord.Colour.blurple(),
+            "invite_deleted": 0xff4545,
             "thread_change": discord.Colour.teal(),
             "thread_create": discord.Colour.teal(),
-            "thread_delete": discord.Colour.dark_teal(),
+            "thread_delete": 0xff4545,
         }
         colour = defaults[event_type]
         if self.settings[guild.id][event_type]["colour"] is not None:
