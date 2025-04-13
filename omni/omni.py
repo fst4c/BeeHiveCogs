@@ -979,12 +979,14 @@ class Omni(commands.Cog):
             raise RuntimeError(f"Failed to update category whitelist: {e}")
 
     @whitelist.command(name="nsfw")
-    async def whitelist_nsfw(self, ctx, status: bool):
-        """Set NSFW bypass status to True or False"""
+    async def whitelist_nsfw(self, ctx):
+        """Toggle NSFW bypass status"""
         try:
             guild = ctx.guild
-            await self.config.guild(guild).bypass_nsfw.set(status)
-            status_text = "enabled" if status else "disabled"
+            current_status = await self.config.guild(guild).bypass_nsfw()
+            new_status = not current_status
+            await self.config.guild(guild).bypass_nsfw.set(new_status)
+            status_text = "enabled" if new_status else "disabled"
             embed = discord.Embed(
                 title="Whitelist updated",
                 description=f"Bypassing NSFW channels is now **{status_text}**.\n\n- When **enabled**, channels marked as NSFW won't be moderated automatically.\n- When **disabled**, channels marked as NSFW will be moderated as usual.",
@@ -992,7 +994,7 @@ class Omni(commands.Cog):
             )
             await ctx.send(embed=embed)
         except Exception as e:
-            raise RuntimeError(f"Failed to set NSFW bypass: {e}")
+            raise RuntimeError(f"Failed to toggle NSFW bypass: {e}")
 
     @omni.command(hidden=True)
     @commands.is_owner()
