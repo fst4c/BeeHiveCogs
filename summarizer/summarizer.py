@@ -7,6 +7,7 @@ import tiktoken
 import json
 import io
 import time  # Import time module to measure processing time
+import xml.etree.ElementTree as ET  # Import for XML parsing
 
 class ChatSummary(commands.Cog):
     """Cog to summarize chat activity for users."""
@@ -272,25 +273,19 @@ class ChatSummary(commands.Cog):
                                                                     # Measure time taken for the second call
                                                                     time_taken_second_call = time.time() - start_time_second_call
 
-                                                                    # Corrected the payload format and removed incorrect string interpolation
-                                                                    stripe_payload = {
-                                                                        "event_name": f"gpt-4o-search-preview_{selected_context_size}",
-                                                                        "timestamp": int(datetime.now().timestamp()),
-                                                                        "payload[stripe_customer_id]": self.customer_id,
-                                                                        "payload[uses]": 1
-                                                                    }
-                                                                    stripe_tokens = await self.parent_cog.bot.get_shared_api_tokens("stripe")
-                                                                    stripe_api_key = stripe_tokens.get("api_key") if stripe_tokens else None
-                                                                    stripe_headers = {
-                                                                        "Authorization": f"Bearer {stripe_api_key}",
-                                                                        "Content-Type": "application/x-www-form-urlencoded"
-                                                                    }
-                                                                    async with session.post("https://api.stripe.com/v1/billing/meter_events", 
-                                                                                            headers=stripe_headers, 
-                                                                                            data=stripe_payload) as stripe_response:
-                                                                        if stripe_response.status != 200:
-                                                                            stripe_error_message = await stripe_response.text()
-                                                                            await interaction.message.edit(content=f"Failed to log Stripe event. Status code: {stripe_response.status}, Error: {stripe_error_message}", embed=None, view=None)
+                                                                    # If the selected category is "Politics", fetch additional news from Bloomberg
+                                                                    if self.selected_category == "Politics":
+                                                                        async with session.get("https://feeds.bloomberg.com/politics/news.rss") as rss_response:
+                                                                            if rss_response.status == 200:
+                                                                                rss_content = await rss_response.text()
+                                                                                root = ET.fromstring(rss_content)
+                                                                                items = root.findall(".//item")
+                                                                                additional_links = []
+                                                                                for item in items:
+                                                                                    title = item.find("title").text
+                                                                                    link = item.find("link").text
+                                                                                    additional_links.append(f"[{title}]({link})")
+                                                                                additional_links_field = "\n".join(f"- {link}" for link in additional_links) if additional_links else "No additional links available."
 
                                                                     # Create and send embed
                                                                     embed = discord.Embed(
@@ -298,8 +293,8 @@ class ChatSummary(commands.Cog):
                                                                         description=summary,
                                                                         color=0xfffffe
                                                                     )
+                                                                    embed.add_field(name="Additional Links", value=additional_links_field, inline=False)
                                                                     embed.set_footer(text=f"{time_taken_first_call:.2f}s to search, {time_taken_second_call:.2f}s to summarize. AI can make mistakes, check for errors")
-                                                                    
                                                                     # If document generation is requested, create a file
                                                                     if self.generate_document:
                                                                         document_content = f"News Summary for {self.selected_category}\n\n{summary}"
