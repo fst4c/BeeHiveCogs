@@ -312,7 +312,7 @@ class EventMixin:
                 role = "**`DISCORD_TEAM`**"
             else:
                 role = humanize_list([f"<@{_id}>" for _id in ctx.bot.owner_ids or []])
-            role += f"\n{privs.name}\n"
+            role += f"\n**`{privs.name}`**\n"
         elif privs is commands.PrivilegeLevel.GUILD_OWNER:
             if guild.owner:
                 role = guild.owner.mention + f"\n{privs.name}\n"
