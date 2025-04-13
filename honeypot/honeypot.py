@@ -86,7 +86,8 @@ class Honeypot(commands.Cog, name="Honeypot"):
                     await message.author.ban(reason="User triggered honeypot defenses", delete_message_days=config["ban_delete_message_days"])
                 elif action == "timeout":
                     timeout_duration = timedelta(days=7)  # 7 day timeout
-                    await message.author.timeout_for(timeout_duration, reason="User triggered honeypot defenses")
+                    # Since `timeout_for` is not available, we will use `edit` to set a timeout
+                    await message.author.edit(timed_out_until=discord.utils.utcnow() + timeout_duration, reason="User triggered honeypot defenses")
             except discord.HTTPException as e:
                 failed = f"**Failed:** An error occurred while trying to take action against the member:\n{e}"
             else:
