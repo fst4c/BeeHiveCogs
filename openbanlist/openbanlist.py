@@ -43,9 +43,9 @@ class OpenBanList(commands.Cog):
         """Enable the global banlist protection."""
         await self.config.guild(ctx.guild).enabled.set(True)
         embed = discord.Embed(
-            title="Banlist Enabled",
+            title="Banlist enabled",
             description="Global banlist protection has been enabled.",
-            color=discord.Color.green()
+            color=0x2bbd8e
         )
         await ctx.send(embed=embed)
 
@@ -55,9 +55,9 @@ class OpenBanList(commands.Cog):
         """Disable the global banlist protection."""
         await self.config.guild(ctx.guild).enabled.set(False)
         embed = discord.Embed(
-            title="Banlist Disabled",
+            title="Banlist disabled",
             description="Global banlist protection has been disabled.",
-            color=discord.Color.red()
+            color=0xff4545
         )
         await ctx.send(embed=embed)
 
@@ -68,7 +68,7 @@ class OpenBanList(commands.Cog):
         valid_actions = ["kick", "ban", "none"]
         if action not in valid_actions:
             embed = discord.Embed(
-                title="Invalid Action",
+                title="Invalid action",
                 description=f"Invalid action. Choose from: {', '.join(valid_actions)}",
                 color=discord.Color.orange()
             )
@@ -88,9 +88,9 @@ class OpenBanList(commands.Cog):
         """Set the logging channel for banlist actions."""
         await self.config.guild(ctx.guild).log_channel.set(channel.id)
         embed = discord.Embed(
-            title="Log Channel Set",
+            title="Logs configured",
             description=f"Logging channel set to {channel.mention}.",
-            color=discord.Color.green()
+            color=0x2bbd8e
         )
         await ctx.send(embed=embed)
 
@@ -110,7 +110,7 @@ class OpenBanList(commands.Cog):
                 if ban_info:
                     embed = discord.Embed(
                         title="OpenBanlist check",
-                        description=f"## Uh oh! <@{user_id}> is listed in the **[OpenBanlist](https://openbanlist.cc)**",
+                        description=f"> Uh oh! <@{user_id}> is listed in the **[OpenBanlist](https://openbanlist.cc)**",
                         color=0xff4545
                     )
                     embed.add_field(name="Banned for", value=ban_info.get("ban_reason", "No reason provided yet, check back soon"), inline=True)
@@ -129,11 +129,11 @@ class OpenBanList(commands.Cog):
                             appeal_status = "Denied"
                         else:
                             appeal_status = "Unknown"
-                        embed.add_field(name="Appeal Status", value=appeal_status, inline=True)
-                        embed.add_field(name="Appeal Verdict", value=ban_info.get("appeal_verdict", "No verdict provided"), inline=False)
+                        embed.add_field(name="Appeal status", value=appeal_status, inline=True)
+                        embed.add_field(name="Appeal verdict", value=ban_info.get("appeal_verdict", "No verdict provided"), inline=False)
                         appeal_reason = ban_info.get("appeal_reason", "")
                         if appeal_reason:
-                            embed.add_field(name="Appeal Reason", value=appeal_reason, inline=False)
+                            embed.add_field(name="Appeal reason", value=appeal_reason, inline=False)
                     evidence = ban_info.get("evidence", "")
                     if evidence:
                         embed.set_image(url=evidence)
@@ -142,16 +142,16 @@ class OpenBanList(commands.Cog):
                     if report_date != "Unknown":
                         embed.add_field(name="Reported on", value=f"<t:{report_date}:f>", inline=True)
                     else:
-                        embed.add_field(name="Report Date", value="Unknown", inline=True)
+                        embed.add_field(name="Report date", value="Unknown", inline=True)
                     if ban_date != "Unknown":
                         embed.add_field(name="Added to database", value=f"<t:{ban_date}:f>", inline=True)
                     else:
-                        embed.add_field(name="Ban Date", value="Unknown", inline=True)
+                        embed.add_field(name="Ban date", value="Unknown", inline=True)
                 else:
                     embed = discord.Embed(
                         title="OpenBanlist check",
                         description=f"User ID {user_id} is not on the banlist.",
-                        color=discord.Color.green()
+                        color=0x2bbd8e
                     )
                 await ctx.send(embed=embed)
 
@@ -272,11 +272,11 @@ class OpenBanList(commands.Cog):
                                 appeal_status = "Denied"
                             else:
                                 appeal_status = "Unknown"
-                            embed.add_field(name="Appeal Status", value=appeal_status, inline=True)
-                            embed.add_field(name="Appeal Verdict", value=ban_info.get("appeal_verdict", "No verdict provided"), inline=False)
+                            embed.add_field(name="Appeal status", value=appeal_status, inline=True)
+                            embed.add_field(name="Appeal verdict", value=ban_info.get("appeal_verdict", "No verdict provided"), inline=False)
                             appeal_reason = ban_info.get("appeal_reason", "")
                             if appeal_reason:
-                                embed.add_field(name="Appeal Reason", value=appeal_reason, inline=False)
+                                embed.add_field(name="Appeal reason", value=appeal_reason, inline=False)
                         evidence = ban_info.get("evidence", "")
                         if evidence:
                             embed.set_image(url=evidence)
@@ -295,9 +295,8 @@ class OpenBanList(commands.Cog):
                     if log_channel:
                         embed = discord.Embed(
                             title="User join screened",
-                            description=f"**{member.mention}** joined the server, and no active ban was found on the banlist.",
+                            description=f"**{member.mention}** ({member.id}) joined the server, and no active ban was found on the banlist.",
                             color=0x2bbd8e
                         )
-                        embed.add_field(name="User ID", value=f"```{member.id}```", inline=False)
                         embed.set_footer(text="Powered by OpenBanlist | openbanlist.cc")
                         await log_channel.send(embed=embed)
