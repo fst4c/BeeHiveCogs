@@ -165,11 +165,10 @@ class Honeypot(commands.Cog, name="Honeypot"):
         )
         await self.config.guild(ctx.guild).honeypot_channel.set(honeypot_channel.id)
         embed = discord.Embed(
-            title="Honeypot activated",
+            title="Honeypot created",
             description=(
-                f"The honeypot channel has been set to {honeypot_channel.mention} ({honeypot_channel.id}). "
-                "The honeypot is armed and will take action moving forward if bothered.\n"
-                "Please make sure to enable the cog and set the logs channel, the action to take, the role to ping (and the mute role) if you haven't already."
+                f"The honeypot has been created - {honeypot_channel.mention} ({honeypot_channel.id}).\n"
+                "Make sure to activate it after configuring a logging channel and punishment action\n- `honeypot activate`"
             ),
             color=0x2bbd8e
         )
@@ -177,7 +176,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
     @commands.admin_or_permissions()
     @honeypot.command()
-    async def enable(self, ctx: commands.Context) -> None:
+    async def activate(self, ctx: commands.Context) -> None:
         """Enable the honeypot functionality."""
         await self.config.guild(ctx.guild).enabled.set(True)
         embed = discord.Embed(
