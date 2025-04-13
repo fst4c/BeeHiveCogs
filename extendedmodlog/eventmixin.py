@@ -554,12 +554,10 @@ class EventMixin:
         message_amount = len(payload.message_ids)
         if embed_links:
             embed = discord.Embed(
-                description=message_channel.mention,
+                title="Messages deleted in bulk",
+                description=f">>> {message_channel.mention}",
                 colour=await self.get_event_colour(guild, "message_delete"),
-            )
-            embed.set_author(
-                name=_("Bulk message delete"),
-                icon_url=guild.icon,
+                timestamp=datetime.datetime.now(datetime.timezone.utc),
             )
             embed.add_field(name=_("Channel"), value=message_channel.mention)
             embed.add_field(name=_("Messages deleted"), value=str(message_amount))
