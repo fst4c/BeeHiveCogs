@@ -321,13 +321,13 @@ class InviteFilter(commands.Cog):
         embed = discord.Embed(title="Invite filter statistics", color=0xfffffe) # Use standard color
 
         # Guild Stats
-        embed.add_field(name="Invites deleted", value=invites_deleted, inline=False)
-        embed.add_field(name="Timeouts issued", value=timeouts_issued, inline=False)
-        embed.add_field(name="Timeout minutes applied", value=total_timeout_minutes, inline=False)
+        embed.add_field(name="Invites deleted", value=f"{invites_deleted} invites", inline=True)
+        embed.add_field(name="Timeouts issued", value=f"{timeouts_issued} timeouts", inline=True)
+        embed.add_field(name="Timeout minutes applied", value=f"{total_timeout_minutes} minutes", inline=True)
         embed.add_field(name="Current timeout setting", value=f"{timeout_duration} minutes" + (" (disabled)" if timeout_duration == 0 else ""), inline=False)
 
         # Global Stats
-        embed.add_field(name="Total Invites Deleted Across All Servers", value=total_invites_deleted, inline=False)
+        embed.add_field(name="Invites Deleted Across All Servers", value=total_invites_deleted, inline=False)
 
         await ctx.send(embed=embed)
 
