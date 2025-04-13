@@ -4,10 +4,11 @@ import typing
 import os
 from datetime import timedelta
 
-class Honeypot(commands.Cog):
+class Honeypot(commands.Cog, name="Honeypot"):
     """Create a channel at the top of the server to attract self bots/scammers and notify/mute/kick/ban them immediately!"""
 
     def __init__(self, bot: commands.Bot) -> None:
+        super().__init__()
         self.bot = bot
         self.config = {
             "enabled": False,
