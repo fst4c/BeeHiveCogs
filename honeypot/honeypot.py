@@ -165,6 +165,22 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
     @commands.admin_or_permissions()
     @honeypot.command()
+    async def remove(self, ctx: commands.Context) -> None:
+        """Disable the honeypot and delete the honeypot channel."""
+        honeypot_channel_id = self.config.get("honeypot_channel")
+        honeypot_channel = ctx.guild.get_channel(honeypot_channel_id) if honeypot_channel_id else None
+
+        if honeypot_channel:
+            await honeypot_channel.delete(reason=f"Honeypot channel removal requested by {ctx.author.display_name} ({ctx.author.id}).")
+            self.config["honeypot_channel"] = None
+            await ctx.send("Honeypot channel has been deleted and configuration cleared.")
+        else:
+            await ctx.send("No honeypot channel to delete.")
+
+        self.config["enabled"] = False
+
+    @commands.admin_or_permissions()
+    @honeypot.command()
     async def setaction(self, ctx: commands.Context, action: str) -> None:
         """Set the action to take when a user is detected in the honeypot channel."""
         if action not in ["mute", "kick", "ban", "timeout"]:
