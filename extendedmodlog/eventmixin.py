@@ -955,16 +955,17 @@ class EventMixin:
         time = datetime.datetime.now(datetime.timezone.utc)
         channel_type = str(new_channel.type).replace("_", " ").title()
         embed = discord.Embed(
-            description=new_channel.name,
+            title=_("{chan_type} channel created").format(chan_type=channel_type),
+            description=_("Channel: {channel_mention}\nType: {channel_type}\nID: {channel_id}").format(
+                channel_mention=new_channel.mention,
+                channel_type=channel_type,
+                channel_id=box(str(new_channel.id))
+            ),
             timestamp=time,
             colour=await self.get_event_colour(guild, "channel_create"),
         )
-        embed.set_author(
-            name=_("{chan_type} Channel Created ({chan_id})").format(
-                chan_type=channel_type, chan_id=new_channel.id
-            )
-        )
-        # msg = _("Channel Created ") + str(new_channel.id) + "\n"
+        embed.set_footer(text=_("Channel ID: {chan_id}").format(chan_id=new_channel.id))
+        
         entry = await self.get_audit_log_entry(
             guild, new_channel, discord.AuditLogAction.channel_create
         )
@@ -972,15 +973,13 @@ class EventMixin:
         reason = getattr(entry, "reason", None)
 
         perp_msg = ""
-        embed.add_field(name=_("Channel"), value=new_channel.mention)
-        embed.add_field(name=_("Type"), value=channel_type)
         if perp:
             perp_msg = _("by {perp} (`{perp_id}`)").format(perp=perp, perp_id=perp.id)
-            embed.add_field(name=_("Created by "), value=perp.mention)
+            embed.add_field(name=_("Created by"), value=perp.mention, inline=False)
         if reason:
             perp_msg += _(" Reason: {reason}").format(reason=reason)
-            embed.add_field(name=_("Reason "), value=reason, inline=False)
-        embed.add_field(name=_("Channel ID"), value=box(str(new_channel.id)))
+            embed.add_field(name=_("Reason"), value=reason, inline=False)
+        
         msg = _("{emoji} {time} {chan_type} channel created {perp_msg} {channel}").format(
             emoji=self.settings[guild.id]["channel_create"]["emoji"],
             time=discord.utils.format_dt(time),
