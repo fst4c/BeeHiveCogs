@@ -42,6 +42,7 @@ class Omni(commands.Cog):
             whitelisted_channels=[],
             whitelisted_roles=[],
             whitelisted_users=[],
+            whitelisted_categories=[],  # Added for channel categories
             moderation_enabled=True,
             user_message_counts={},
             image_count=0,
@@ -53,7 +54,8 @@ class Omni(commands.Cog):
             just_right_votes=0,
             last_vote_time=None,
             delete_violatory_messages=True,
-            last_reminder_time=None  # Added to track last reminder time
+            last_reminder_time=None,  # Added to track last reminder time
+            bypass_nsfw=False  # Added for NSFW channel bypass
         )
         self.config.register_global(
             global_message_count=0,
@@ -142,11 +144,18 @@ class Omni(commands.Cog):
             if message.channel.id in await self.config.guild(guild).whitelisted_channels():
                 return
 
+            whitelisted_categories = await self.config.guild(guild).whitelisted_categories()
+            if message.channel.category_id in whitelisted_categories:
+                return
+
             whitelisted_roles = await self.config.guild(guild).whitelisted_roles()
             if any(role.id in whitelisted_roles for role in message.author.roles):
                 return
 
             if message.author.id in await self.config.guild(guild).whitelisted_users():
+                return
+
+            if message.channel.is_nsfw() and await self.config.guild(guild).bypass_nsfw():
                 return
 
             self.increment_statistic(guild.id, 'message_count')
@@ -578,15 +587,18 @@ class Omni(commands.Cog):
             whitelisted_channels = await self.config.guild(guild).whitelisted_channels()
             whitelisted_roles = await self.config.guild(guild).whitelisted_roles()
             whitelisted_users = await self.config.guild(guild).whitelisted_users()
+            whitelisted_categories = await self.config.guild(guild).whitelisted_categories()
             moderation_enabled = await self.config.guild(guild).moderation_enabled()
             delete_violatory_messages = await self.config.guild(guild).delete_violatory_messages()
             last_reminder_time = await self.config.guild(guild).last_reminder_time()
+            bypass_nsfw = await self.config.guild(guild).bypass_nsfw()
 
             log_channel = guild.get_channel(log_channel_id) if log_channel_id else None
             log_channel_name = log_channel.mention if log_channel else "Not set"
             whitelisted_channels_names = ", ".join([guild.get_channel(ch_id).mention for ch_id in whitelisted_channels if guild.get_channel(ch_id)]) or "None"
             whitelisted_roles_names = ", ".join([guild.get_role(role_id).mention for role_id in whitelisted_roles if guild.get_role(role_id)]) or "None"
             whitelisted_users_names = ", ".join([f"<@{user_id}>" for user_id in whitelisted_users]) or "None"
+            whitelisted_categories_names = ", ".join([guild.get_channel_category(cat_id).name for cat_id in whitelisted_categories if guild.get_channel_category(cat_id)]) or "None"
             last_reminder_display = last_reminder_time if last_reminder_time else "Never"
 
             embed = discord.Embed(title="Omni settings", color=0xfffffe)
@@ -599,7 +611,9 @@ class Omni(commands.Cog):
             embed.add_field(name="Whitelisted channels", value=whitelisted_channels_names, inline=False)
             embed.add_field(name="Whitelisted roles", value=whitelisted_roles_names, inline=False)
             embed.add_field(name="Whitelisted users", value=whitelisted_users_names, inline=False)
+            embed.add_field(name="Whitelisted categories", value=whitelisted_categories_names, inline=False)
             embed.add_field(name="Last disclosure notice", value=last_reminder_display, inline=False)
+            embed.add_field(name="Bypass NSFW", value="Enabled" if bypass_nsfw else "Disabled", inline=True)
 
             await ctx.send(embed=embed)
         except Exception as e:
@@ -863,7 +877,7 @@ class Omni(commands.Cog):
     @omni.group()
     @commands.admin_or_permissions(manage_guild=True)
     async def whitelist(self, ctx):
-        """Manage whitelists for channels, roles, and users."""
+        """Manage whitelists for channels, roles, users, and categories."""
         pass
 
     @whitelist.command(name="channel")
@@ -937,6 +951,43 @@ class Omni(commands.Cog):
                 await ctx.send(embed=embed)
         except Exception as e:
             raise RuntimeError(f"Failed to update user whitelist: {e}")
+
+    @whitelist.command(name="category")
+    async def whitelist_category(self, ctx, category: discord.CategoryChannel):
+        """Add or remove a category from the whitelist."""
+        try:
+            guild = ctx.guild
+            whitelisted_categories = await self.config.guild(guild).whitelisted_categories()
+            changelog = []
+
+            if category.id in whitelisted_categories:
+                whitelisted_categories.remove(category.id)
+                changelog.append(f"Removed: {category.name}")
+            else:
+                whitelisted_categories.append(category.id)
+                changelog.append(f"Added: {category.name}")
+
+            await self.config.guild(guild).whitelisted_categories.set(whitelisted_categories)
+
+            if changelog:
+                changelog_message = "\n".join(changelog)
+                embed = discord.Embed(title="Whitelist Changelog", description=changelog_message, color=discord.Color.blue())
+                await ctx.send(embed=embed)
+        except Exception as e:
+            raise RuntimeError(f"Failed to update category whitelist: {e}")
+
+    @whitelist.command(name="nsfw")
+    async def whitelist_nsfw(self, ctx):
+        """Toggle bypassing channels marked as NSFW on or off."""
+        try:
+            guild = ctx.guild
+            current_status = await self.config.guild(guild).bypass_nsfw()
+            new_status = not current_status
+            await self.config.guild(guild).bypass_nsfw.set(new_status)
+            status = "enabled" if new_status else "disabled"
+            await ctx.send(f"Bypassing NSFW channels {status}.")
+        except Exception as e:
+            raise RuntimeError(f"Failed to toggle NSFW bypass: {e}")
 
     @omni.command(hidden=True)
     @commands.is_owner()
