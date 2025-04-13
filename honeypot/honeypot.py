@@ -119,7 +119,12 @@ class Honeypot(commands.Cog, name="Honeypot"):
         honeypot_channel = ctx.guild.get_channel(honeypot_channel_id) if honeypot_channel_id else None
 
         if honeypot_channel:
-            await ctx.send(f"The honeypot channel already exists: {honeypot_channel.mention} ({honeypot_channel.id}).")
+            embed = discord.Embed(
+                title="Honeypot Channel Exists",
+                description=f"The honeypot channel already exists: {honeypot_channel.mention} ({honeypot_channel.id}).",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
             return
 
         honeypot_channel = await ctx.guild.create_text_channel(
@@ -159,24 +164,40 @@ class Honeypot(commands.Cog, name="Honeypot"):
             files=[discord.File(os.path.join(os.path.dirname(__file__), "do_not_post_here.png"))],
         )
         await self.config.guild(ctx.guild).honeypot_channel.set(honeypot_channel.id)
-        await ctx.send(
-            f"The honeypot channel has been set to {honeypot_channel.mention} ({honeypot_channel.id}). You can now start attracting self bots/scammers!\n"
-            "Please make sure to enable the cog and set the logs channel, the action to take, the role to ping (and the mute role) if you haven't already."
+        embed = discord.Embed(
+            title="Honeypot activated",
+            description=(
+                f"The honeypot channel has been set to {honeypot_channel.mention} ({honeypot_channel.id}). "
+                "The honeypot is armed and will take action moving forward if bothered.\n"
+                "Please make sure to enable the cog and set the logs channel, the action to take, the role to ping (and the mute role) if you haven't already."
+            ),
+            color=0x2bbd8e
         )
+        await ctx.send(embed=embed)
 
     @commands.admin_or_permissions()
     @honeypot.command()
     async def enable(self, ctx: commands.Context) -> None:
         """Enable the honeypot functionality."""
         await self.config.guild(ctx.guild).enabled.set(True)
-        await ctx.send("Honeypot functionality has been enabled.")
+        embed = discord.Embed(
+            title="Honeypot enabled",
+            description="Honeypot functionality has been enabled.",
+            color=0x2bbd8e
+        )
+        await ctx.send(embed=embed)
 
     @commands.admin_or_permissions()
     @honeypot.command()
     async def disable(self, ctx: commands.Context) -> None:
         """Disable the honeypot functionality."""
         await self.config.guild(ctx.guild).enabled.set(False)
-        await ctx.send("Honeypot functionality has been disabled.")
+        embed = discord.Embed(
+            title="Honeypot disabled",
+            description="Honeypot functionality has been disabled.",
+            color=0xff4545
+        )
+        await ctx.send(embed=embed)
 
     @commands.admin_or_permissions()
     @honeypot.command()
@@ -188,9 +209,19 @@ class Honeypot(commands.Cog, name="Honeypot"):
         if honeypot_channel:
             await honeypot_channel.delete(reason=f"Honeypot channel removal requested by {ctx.author.display_name} ({ctx.author.id}).")
             await self.config.guild(ctx.guild).honeypot_channel.set(None)
-            await ctx.send("Honeypot channel has been deleted and configuration cleared.")
+            embed = discord.Embed(
+                title="Honeypot channel removed",
+                description="Honeypot channel has been deleted and configuration cleared.",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
         else:
-            await ctx.send("No honeypot channel to delete.")
+            embed = discord.Embed(
+                title="No honeypot channel",
+                description="No honeypot channel to delete.",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
 
         await self.config.guild(ctx.guild).enabled.set(False)
 
@@ -199,30 +230,45 @@ class Honeypot(commands.Cog, name="Honeypot"):
     async def action(self, ctx: commands.Context, action: str) -> None:
         """Set the action to take when a user is detected in the honeypot channel."""
         if action not in ["mute", "kick", "ban", "timeout"]:
-            await ctx.send("Invalid action. Please choose from: mute, kick, ban, timeout.")
+            embed = discord.Embed(
+                title="Invalid action",
+                description="Invalid action. Please choose from: mute, kick, ban, timeout.",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
             return
         await self.config.guild(ctx.guild).action.set(action)
-        await ctx.send(f"Action has been set to {action}.")
+        embed = discord.Embed(
+            title="Action set",
+            description=f"Action has been set to {action}.",
+            color=0x2bbd8e
+        )
+        await ctx.send(embed=embed)
 
     @commands.admin_or_permissions()
     @honeypot.command()
     async def logs(self, ctx: commands.Context, channel: discord.TextChannel) -> None:
         """Set the channel where logs will be sent."""
         await self.config.guild(ctx.guild).logs_channel.set(channel.id)
-        await ctx.send(f"Logs channel has been set to {channel.mention}.")
+        embed = discord.Embed(
+            title="Logs set",
+            description=f"Logs channel has been set to {channel.mention}.",
+            color=0x2bbd8e
+        )
+        await ctx.send(embed=embed)
 
     @commands.admin_or_permissions()
     @honeypot.command()
     async def view(self, ctx: commands.Context) -> None:
         """View the current honeypot settings."""
         config = await self.config.guild(ctx.guild).all()
-        embed = discord.Embed(title="Current Honeypot Settings", color=0x00ff00)
+        embed = discord.Embed(title="Current honeypot settings", color=0xfffffe)
         embed.add_field(name="Enabled", value=config["enabled"], inline=False)
         embed.add_field(name="Action", value=config["action"] or "Not set", inline=False)
-        embed.add_field(name="Logs Channel", value=f"<#{config['logs_channel']}>" if config["logs_channel"] else "Not set", inline=False)
-        embed.add_field(name="Ping Role", value=f"<@&{config['ping_role']}>" if config["ping_role"] else "Not set", inline=False)
-        embed.add_field(name="Honeypot Channel", value=f"<#{config['honeypot_channel']}>" if config["honeypot_channel"] else "Not set", inline=False)
-        embed.add_field(name="Mute Role", value=f"<@&{config['mute_role']}>" if config["mute_role"] else "Not set", inline=False)
-        embed.add_field(name="Ban Delete Message Days", value=config["ban_delete_message_days"], inline=False)
+        embed.add_field(name="Logs channel", value=f"<#{config['logs_channel']}>" if config["logs_channel"] else "Not set", inline=False)
+        embed.add_field(name="Ping role", value=f"<@&{config['ping_role']}>" if config["ping_role"] else "Not set", inline=False)
+        embed.add_field(name="Honeypot channel", value=f"<#{config['honeypot_channel']}>" if config["honeypot_channel"] else "Not set", inline=False)
+        embed.add_field(name="Mute role", value=f"<@&{config['mute_role']}>" if config["mute_role"] else "Not set", inline=False)
+        embed.add_field(name="Ban delete message days", value=config["ban_delete_message_days"], inline=False)
         embed.add_field(name="Scam types detected", value=f"Nitro: {config['scam_stats']['nitro']}, Steam: {config['scam_stats']['steam']}, Other: {config['scam_stats']['other']}", inline=False)
         await ctx.send(embed=embed)
