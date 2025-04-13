@@ -11,7 +11,7 @@ from .eventmixin import CommandPrivs, EventChooser, EventMixin, MemberUpdateEnum
 from .settings import inv_settings
 
 _ = Translator("ExtendedModLog", __file__)
-logger = getLogger("red.trusty-cogs.ExtendedModLog")
+logger = getLogger("red.beehive-cogs.ExtendedModLog")
 
 
 def wrapped_additional_help():
@@ -105,7 +105,7 @@ class ExtendedModLog(EventMixin, commands.Cog):
             for entry, default in inv_settings.items():
                 if entry not in data:
                     all_data[guild_id][entry] = inv_settings[entry]
-                if type(default) == dict:
+                if isinstance(default, dict):
                     for key, _default in inv_settings[entry].items():
                         if not isinstance(all_data[guild_id][entry], dict):
                             all_data[guild_id][entry] = default
@@ -113,7 +113,6 @@ class ExtendedModLog(EventMixin, commands.Cog):
                             if key not in all_data[guild_id][entry]:
                                 all_data[guild_id][entry][key] = _default
                         except TypeError:
-                            # del all_data[guild_id][entry]
                             logger.error("Somehow your dict was invalid.")
                             continue
             logger.info("Saving guild %s data to new version type", guild_id)
@@ -162,7 +161,6 @@ class ExtendedModLog(EventMixin, commands.Cog):
         for c in ign_chans:
             chn = guild.get_channel(c)
             if chn is None:
-                # a bit of automatic cleanup so things don't break
                 data["ignored_channels"].remove(c)
             else:
                 ignored_channels.append(chn)
@@ -175,22 +173,20 @@ class ExtendedModLog(EventMixin, commands.Cog):
             if data[settings]["channel"]:
                 chn = guild.get_channel(data[settings]["channel"])
                 if chn is None:
-                    # a bit of automatic cleanup so things don't break
                     data[settings]["channel"] = None
                 else:
                     msg += f" {chn.mention}\n"
             else:
                 msg += "\n"
 
-        if enabled == "":
+        if not enabled:
             enabled = _("None  ")
-        if disabled == "":
+        if not disabled:
             disabled = _("None  ")
         if ignored_channels:
             chans = ", ".join(c.mention for c in ignored_channels)
             msg += _("Ignored Channels") + ": " + chans
         await self.config.guild(ctx.guild).set(data)
-        # save the data back to config incase we had some deleted channels
         await ctx.maybe_send_embed(msg)
 
     @checks.admin_or_permissions(manage_channels=True)
@@ -229,14 +225,11 @@ class ExtendedModLog(EventMixin, commands.Cog):
 
         - `<colour>` must be a hex code or a [built colour.](https://discordpy.readthedocs.io/en/latest/api.html#colour)
         """
-        if len(events) == 0:
+        if not events:
             return await ctx.send(_("You must provide which events should be included."))
         if ctx.guild.id not in self.settings:
             self.settings[ctx.guild.id] = await self.config.guild(ctx.guild).all()
-        if colour:
-            new_colour = colour.value
-        else:
-            new_colour = colour
+        new_colour = colour.value if colour else colour
         for event in events:
             self.settings[ctx.guild.id][event]["colour"] = new_colour
         await self.save(ctx.guild)
@@ -257,7 +250,7 @@ class ExtendedModLog(EventMixin, commands.Cog):
 
         - `<true_or_false>` The desired embed setting either on or off.
         """
-        if len(events) == 0:
+        if not events:
             return await ctx.send(_("You must provide which events should be included."))
         if ctx.guild.id not in self.settings:
             self.settings[ctx.guild.id] = await self.config.guild(ctx.guild).all()
@@ -285,7 +278,7 @@ class ExtendedModLog(EventMixin, commands.Cog):
 
         - `<new_emoji>` can be any discord emoji or unicode emoji the bot has access to use.
         """
-        if len(events) == 0:
+        if not events:
             return await ctx.send(_("You must provide which events should be included."))
         if ctx.guild.id not in self.settings:
             self.settings[ctx.guild.id] = await self.config.guild(ctx.guild).all()
@@ -318,7 +311,7 @@ class ExtendedModLog(EventMixin, commands.Cog):
 
         - `<true_or_false>` Either on or off.
         """
-        if len(events) == 0:
+        if not events:
             return await ctx.send(_("You must provide which events should be included."))
         if ctx.guild.id not in self.settings:
             self.settings[ctx.guild.id] = await self.config.guild(ctx.guild).all()
@@ -345,7 +338,7 @@ class ExtendedModLog(EventMixin, commands.Cog):
 
         - `<channel>` The text channel to send the events to.
         """
-        if len(events) == 0:
+        if not events:
             return await ctx.send(_("You must provide which events should be included."))
         if ctx.guild.id not in self.settings:
             self.settings[ctx.guild.id] = await self.config.guild(ctx.guild).all()
@@ -369,7 +362,7 @@ class ExtendedModLog(EventMixin, commands.Cog):
         """
         Reset the modlog event to the default modlog channel.
         """
-        if len(events) == 0:
+        if not events:
             return await ctx.send(_("You must provide which events should be included."))
         if ctx.guild.id not in self.settings:
             self.settings[ctx.guild.id] = await self.config.guild(ctx.guild).all()
@@ -380,7 +373,7 @@ class ExtendedModLog(EventMixin, commands.Cog):
             _("{event} logs channel have been reset.").format(event=humanize_list(events))
         )
 
-    @_modlog.command(name="all", aliaes=["all_settings", "toggle_all"])
+    @_modlog.command(name="all", aliases=["all_settings", "toggle_all"])
     async def _toggle_all_logs(self, ctx: commands.Context, true_or_false: bool) -> None:
         """
         Turn all logging options on or off.
@@ -500,7 +493,6 @@ class ExtendedModLog(EventMixin, commands.Cog):
         for update_type in MemberUpdateEnum:
             msg += f"{update_type.get_name()}: **{data[update_type.name]}**\n"
         await self.save(ctx.guild)
-        # save the data back to config incase we had some deleted channels
         await ctx.maybe_send_embed(msg)
 
     @_members.command(name="nickname", aliases=["nicknames"])
@@ -618,8 +610,6 @@ class ExtendedModLog(EventMixin, commands.Cog):
                 ctx, _("Member flags will be tracked in member change logs.")
             )
 
-    # For whatever reason trying to toggle all these settings causes all of the guilds
-    # config to reset and I have no clue why so this will be unsupported for now
     @_members.command(name="all")
     async def _user_all_logging(self, ctx: commands.Context, set_to: bool) -> None:
         """
@@ -630,11 +620,9 @@ class ExtendedModLog(EventMixin, commands.Cog):
         if ctx.guild.id not in self.settings:
             self.settings[ctx.guild.id] = await self.config.guild(ctx.guild).all()
             logger.debug("Adding %s to cache", ctx.guild.id)
-        # async with self.config.guild(ctx.guild).user_change() as user_change:
         for update_type in MemberUpdateEnum:
             self.settings[ctx.guild.id]["user_change"][update_type.name] = set_to
         await self.save(ctx.guild)
-        # user_change[update_type.name] = set_to
         await self._members_settings(ctx)
 
     @_modlog.command(name="commandlevel", aliases=["commandslevel"])
@@ -655,7 +643,7 @@ class ExtendedModLog(EventMixin, commands.Cog):
         """
         if ctx.guild.id not in self.settings:
             self.settings[ctx.guild.id] = await self.config.guild(ctx.guild).all()
-        if len(level) == 0:
+        if not level:
             return await ctx.send_help()
         msg = _("Command logs set to: ")
         self.settings[ctx.guild.id]["commands_used"]["privs"] = list(level)
