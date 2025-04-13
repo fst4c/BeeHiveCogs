@@ -989,7 +989,7 @@ class Omni(commands.Cog):
             status = "enabled" if new_status else "disabled"
             embed = discord.Embed(
                 title="Whitelist updated",
-                description=f"Bypassing NSFW channels is now **{status}**.\n\n- When enabled, channels marked as NSFW won't be moderated automatically.\n- When disabled, channels marked as NSFW will be moderated as usual.",
+                description=f"Bypassing NSFW channels is now **{status}**.\n\n- When **enabled**, channels marked as NSFW won't be moderated automatically.\n- When **disabled**, channels marked as NSFW will be moderated as usual.",
                 color=0xfffffe
             )
             await ctx.send(embed=embed)
