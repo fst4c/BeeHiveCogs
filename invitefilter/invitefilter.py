@@ -354,14 +354,14 @@ class InviteFilter(commands.Cog):
         whitelisted_categories_names = [cat.name for i in whitelisted_categories_ids if (cat := guild.get_channel(i))]  # New: Fetch category names
         logging_channel_mention = (c.mention if (c := guild.get_channel(logging_channel_id)) else "None") if logging_channel_id else "None"
 
-        embed = discord.Embed(title="⚙️ Invite Filter Settings", color=discord.Color.orange()) # Use a different color
+        embed = discord.Embed(title="Invite filter settings", color=0xfffffe) # Use a different color
 
-        embed.add_field(name="Filter Status", value="✅ Enabled" if delete_invites else "❌ Disabled", inline=False)
-        embed.add_field(name="Whitelisted Channels", value=", ".join(whitelisted_channels_mentions) or "None", inline=False)
-        embed.add_field(name="Whitelisted Roles", value=", ".join(whitelisted_roles_mentions) or "None", inline=False)
-        embed.add_field(name="Whitelisted Categories", value=", ".join(whitelisted_categories_names) or "None", inline=False)  # New: Display whitelisted categories
-        embed.add_field(name="Logging Channel", value=logging_channel_mention, inline=False)
-        embed.add_field(name="Timeout Duration", value=f"{timeout_duration} minutes" + (" (disabled)" if timeout_duration == 0 else ""), inline=False)
+        embed.add_field(name="Filter status", value="✅ Enabled" if delete_invites else "❌ Disabled", inline=False)
+        embed.add_field(name="Whitelisted channels", value=", ".join(whitelisted_channels_mentions) or "None", inline=False)
+        embed.add_field(name="Whitelisted roles", value=", ".join(whitelisted_roles_mentions) or "None", inline=False)
+        embed.add_field(name="Whitelisted categories", value=", ".join(whitelisted_categories_names) or "None", inline=False)  # New: Display whitelisted categories
+        embed.add_field(name="Logging channel", value=logging_channel_mention, inline=False)
+        embed.add_field(name="Timeout duration", value=f"{timeout_duration} minutes" + (" (disabled)" if timeout_duration == 0 else ""), inline=False)
 
         await ctx.send(embed=embed)
 
