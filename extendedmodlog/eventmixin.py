@@ -806,25 +806,22 @@ class EventMixin:
         reason = getattr(entry, "reason", None)
         if embed_links:
             embed = discord.Embed(
-                description=member,
+                title=_("User left the server"),
+                description=_("{member} has left the guild.").format(member=member.mention),
                 colour=await self.get_event_colour(guild, "user_left"),
                 timestamp=time,
             )
-            embed.add_field(name=_("Member"), value=member.mention)
-            embed.add_field(name=_("Member ID"), value=box(str(member.id)))
-            embed.add_field(name=_("Total Users:"), value=str(len(guild.members)))
+            embed.add_field(name=_("Member ID"), value=box(str(member.id)), inline=True)
+            embed.add_field(name=_("Total Users"), value=str(len(guild.members)), inline=True)
             if member_time is not None:
-                embed.add_field(name=_("Member since:"), value=member_time)
+                embed.add_field(name=_("Member since"), value=member_time, inline=False)
 
             if perp:
-                embed.add_field(name=_("Kicked"), value=perp.mention)
+                embed.add_field(name=_("Kicked by"), value=perp.mention, inline=True)
             if reason:
                 embed.add_field(name=_("Reason"), value=str(reason), inline=False)
             embed.set_author(
-                name=_("{member} ({m_id}) has left the guild").format(
-                    member=member, m_id=member.id
-                ),
-                url=member.display_avatar,
+                name=_("{member} ({m_id})").format(member=member, m_id=member.id),
                 icon_url=member.display_avatar,
             )
             embed.set_thumbnail(url=member.display_avatar)
