@@ -956,11 +956,6 @@ class EventMixin:
         channel_type = str(new_channel.type).replace("_", " ").title()
         embed = discord.Embed(
             title=_("{chan_type} channel created").format(chan_type=channel_type),
-            description=_("Channel: {channel_mention}\nType: {channel_type}\nID: {channel_id}").format(
-                channel_mention=new_channel.mention,
-                channel_type=channel_type,
-                channel_id=box(str(new_channel.id))
-            ),
             timestamp=time,
             colour=await self.get_event_colour(guild, "channel_create"),
         )
