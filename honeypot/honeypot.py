@@ -113,7 +113,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
     @commands.admin_or_permissions()
     @honeypot.command()
-    async def channel(self, ctx: commands.Context) -> None:
+    async def create(self, ctx: commands.Context) -> None:
         """Create the honeypot channel."""
         honeypot_channel_id = await self.config.guild(ctx.guild).honeypot_channel()
         honeypot_channel = ctx.guild.get_channel(honeypot_channel_id) if honeypot_channel_id else None
