@@ -61,14 +61,14 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
         action = config["action"]
         embed = discord.Embed(
-            title="Honeypot detected a suspicious user",
+            title="Honeypot was triggered by a suspicious user",
             description=f">>> {message.content}",
             color=0xff4545,
             timestamp=message.created_at,
-        ).set_author(
-            name=f"{message.author.display_name} ({message.author.id})",
-            icon_url=message.author.display_avatar.url,
-        ).set_thumbnail(url=message.author.display_avatar.url)
+        )
+        embed.add_field(name="User display name", value=message.author.display_name, inline=True)
+        embed.add_field(name="User mention", value=message.author.mention, inline=True)
+        embed.add_field(name="User ID", value=message.author.id, inline=True)
 
         failed = None
         if action:
