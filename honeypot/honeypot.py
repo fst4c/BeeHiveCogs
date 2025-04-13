@@ -150,7 +150,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
             description="A honeypot is a security mechanism designed to lure cybercriminals into interacting with decoy targets. By doing so, cybersecurity experts can observe and analyze the attackers' methods, allowing them to develop effective countermeasures.\n\nSimilarly, this channel serves as a honeypot. It is intentionally placed in a conspicuous location with clear instructions not to engage in conversation here. Unsuspecting automated bots and low-quality spammers, such as those promoting nitro scams or explicit content, will likely post messages in this channel, unaware of its true purpose.",
             color=0xff4545,
         ).add_field(
-            name="What not to do?",
+            name="What do I do?",
             value="- **Do not speak in this channel**\n- **Do not send images in this channel**\n- **Do not send files in this channel**",
             inline=False,
         ).add_field(
