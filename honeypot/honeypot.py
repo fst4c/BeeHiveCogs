@@ -45,7 +45,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         embed = discord.Embed(
             title="Honeypot detected a suspicious user",
             description=f">>> {message.content}",
-            color=discord.Color.red(),
+            color=0xff4545,
             timestamp=message.created_at,
         ).set_author(
             name=f"{message.author.display_name} ({message.author.id})",
@@ -181,7 +181,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
     @commands.admin_or_permissions()
     @honeypot.command()
-    async def setaction(self, ctx: commands.Context, action: str) -> None:
+    async def action(self, ctx: commands.Context, action: str) -> None:
         """Set the action to take when a user is detected in the honeypot channel."""
         if action not in ["mute", "kick", "ban", "timeout"]:
             await ctx.send("Invalid action. Please choose from: mute, kick, ban, timeout.")
@@ -191,7 +191,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
     @commands.admin_or_permissions()
     @honeypot.command()
-    async def setlogchannel(self, ctx: commands.Context, channel: discord.TextChannel) -> None:
+    async def logs(self, ctx: commands.Context, channel: discord.TextChannel) -> None:
         """Set the channel where logs will be sent."""
         self.config["logs_channel"] = channel.id
         await ctx.send(f"Logs channel has been set to {channel.mention}.")
