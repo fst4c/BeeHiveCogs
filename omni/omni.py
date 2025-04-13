@@ -987,7 +987,12 @@ class Omni(commands.Cog):
             new_status = not current_status
             await self.config.guild(guild).bypass_nsfw.set(new_status)
             status = "enabled" if new_status else "disabled"
-            await ctx.send(f"Bypassing NSFW channels {status}.")
+            embed = discord.Embed(
+                title="Whitelist updated",
+                description=f"Bypassing NSFW channels is now **{status}**.\n\n- When enabled, channels marked as NSFW won't be moderated automatically.\n- When disabled, channels marked as NSFW will be moderated as usual.",
+                color=0xfffffe
+            )
+            await ctx.send(embed=embed)
         except Exception as e:
             raise RuntimeError(f"Failed to toggle NSFW bypass: {e}")
 
