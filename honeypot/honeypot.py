@@ -108,7 +108,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @commands.admin_or_permissions()
     @commands.group()
     async def honeypot(self, ctx: commands.Context) -> None:
-        """Honeypots are channels that attracted automated scam bots."""
+        """Honeypots are channels that attracted automated scam bots to detect and remove them from your server before they can hurt you or your members."""
         pass
 
     @commands.admin_or_permissions()
@@ -147,7 +147,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
         embed = discord.Embed(
             title="This channel is a security honeypot",
-            description="A honeypot is a piece of security tooling used by cybersecurity experts to attract cybercriminals to fake targets. In the same way, this channel is a honeypot. Placed in an obvious place, the instruction is made clear not to speak in this channel. Automated and low quality bots will send messages in this channel, like nitro scams and porn advertisements, not knowing it is a honeypot.",
+            description="A honeypot is a piece of security tooling used by cybersecurity experts to attract cybercriminals to fake targets. Attackers are baited to target fake targets, so defenders can study their attack mannerisms and craft defenses ahead of time.\n\nIn the same way, this channel is a honeypot. Placed in an obvious place, the instruction is made clear not to speak in this channel. Automated and low quality bots will send messages in this channel, like nitro scams and porn advertisements, not knowing it is a honeypot.",
             color=0xff4545,
         ).add_field(
             name="What not to do?",
