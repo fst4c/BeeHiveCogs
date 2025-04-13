@@ -300,16 +300,16 @@ class EventMixin:
             if mod_role_list != []:
                 role = humanize_list([r.mention for r in mod_role_list]) + f"\n{privs.name}\n"
             else:
-                role = _("Not Set\nMOD\n")
+                role = _(":warning: Not set\n**`MOD`**\n")
         elif privs is commands.PrivilegeLevel.ADMIN:
             admin_role_list = await ctx.bot.get_admin_roles(guild)
             if admin_role_list != []:
                 role = humanize_list([r.mention for r in admin_role_list]) + f"\n{privs.name}\n"
             else:
-                role = _("Not Set\nADMIN\n")
+                role = _(":warning: Not set\n**`ADMIN`**\n")
         elif privs is commands.PrivilegeLevel.BOT_OWNER:
             if len(ctx.bot.owner_ids) > 1:
-                role = "DISCORD_TEAM"
+                role = "**`DISCORD_TEAM`**"
             else:
                 role = humanize_list([f"<@{_id}>" for _id in ctx.bot.owner_ids or []])
             role += f"\n{privs.name}\n"
