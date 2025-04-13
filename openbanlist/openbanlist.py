@@ -295,8 +295,8 @@ class OpenBanList(commands.Cog):
                     if log_channel:
                         embed = discord.Embed(
                             title="User join screened",
-                            description=f"**{member.mention}** ({member.id}) joined the server, and no active ban was found on the banlist.",
+                            description=f"**{member.mention}** ({member.id}) joined the server, and no active ban was found on the OpenBanlist.",
                             color=0x2bbd8e
                         )
-                        embed.set_footer(text="Powered by OpenBanlist | openbanlist.cc")
+                        embed.set_footer(text="Powered by OpenBanlist, a BeeHive service | openbanlist.cc")
                         await log_channel.send(embed=embed)
