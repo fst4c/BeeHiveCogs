@@ -132,7 +132,7 @@ class EventMixin:
             cmd_colour = discord.Colour.red()
         defaults = {
             "message_edit": discord.Colour.orange(),
-            "message_delete": discord.Colour.dark_red(),
+            "message_delete": 0xff4545,
             "user_change": discord.Colour.greyple(),
             "role_change": changed_object.colour if changed_object else discord.Colour.blue(),
             "role_create": discord.Colour.blue(),
