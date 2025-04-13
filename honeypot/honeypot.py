@@ -131,7 +131,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
             color=0xff4545,
         ).add_field(
             name="What not to do?",
-            value="- Do not speak in this channel\n- Do not send images in this channel\n- Do not send files in this channel\n-Invite others to this channel",
+            value="- Do not speak in this channel\n- Do not send images in this channel\n- Do not send files in this channel\n- Invite others to this channel",
             inline=False,
         ).add_field(
             name="What will happen?",
@@ -140,7 +140,6 @@ class Honeypot(commands.Cog, name="Honeypot"):
         ).set_footer(text=ctx.guild.name, icon_url=ctx.guild.icon.url).set_image(url="attachment://do_not_post_here.png")
 
         await honeypot_channel.send(
-            content="## ⚠️ WARNING ⚠️",
             embed=embed,
             files=[discord.File(os.path.join(os.path.dirname(__file__), "do_not_post_here.png"))],
         )
