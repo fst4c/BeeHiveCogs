@@ -327,7 +327,7 @@ class InviteFilter(commands.Cog):
         embed.add_field(name="Current timeout setting", value=f"{timeout_duration} minutes" + (" (disabled)" if timeout_duration == 0 else ""), inline=False)
 
         # Global Stats
-        embed.add_field(name="Invites Deleted Across All Servers", value=total_invites_deleted, inline=False)
+        embed.add_field(name="Invites deleted across all servers", value=f"{total_invites_deleted} invites", inline=False)
 
         await ctx.send(embed=embed)
 
