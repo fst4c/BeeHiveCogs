@@ -1015,7 +1015,7 @@ class EventMixin:
         channel_type = str(old_channel.type).replace("_", " ").title()
         embed = discord.Embed(
             title=_("{chan_type} channel deleted").format(chan_type=channel_type),
-            description=_(">>> {channel_name}").format(channel_name=f"#{old_channel.name}"),
+            description=_(">>> {channel_name}").format(channel_name=f"{old_channel.name}"),
             timestamp=time,
             colour=await self.get_event_colour(guild, "channel_delete"),
         )
