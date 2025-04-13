@@ -980,7 +980,7 @@ class Omni(commands.Cog):
 
     @whitelist.command(name="nsfw")
     async def whitelist_nsfw(self, ctx):
-        """Toggle bypassing channels marked as NSFW on or off."""
+        """Auto bypass/unbypass channels marked as NSFW"""
         try:
             guild = ctx.guild
             current_status = await self.config.guild(guild).bypass_nsfw()
