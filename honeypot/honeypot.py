@@ -173,3 +173,10 @@ class Honeypot(commands.Cog, name="Honeypot"):
             return
         self.config["action"] = action
         await ctx.send(f"Action has been set to {action}.")
+
+    @commands.admin_or_permissions()
+    @sethoneypot.command()
+    async def setlogchannel(self, ctx: commands.Context, channel: discord.TextChannel) -> None:
+        """Set the channel where logs will be sent."""
+        self.config["logs_channel"] = channel.id
+        await ctx.send(f"Logs channel has been set to {channel.mention}.")
