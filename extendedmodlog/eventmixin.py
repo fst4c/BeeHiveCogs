@@ -1174,8 +1174,8 @@ class EventMixin:
                 if after_attr == "":
                     after_attr = "None"
                 if attr == "bitrate":
-                    before_attr = f"{before_attr // 1000} kbps" if before_attr != "None" else before_attr
-                    after_attr = f"{after_attr // 1000} kbps" if after_attr != "None" else after_attr
+                    before_attr = f"{before_attr // 1000}kbps" if before_attr != "None" else before_attr
+                    after_attr = f"{after_attr // 1000}kbps" if after_attr != "None" else after_attr
                 msg += _("Before ") + f"{name} {before_attr}\n"
                 msg += _("After ") + f"{name} {after_attr}\n"
                 before_text += f"- {name} {before_attr}\n"
