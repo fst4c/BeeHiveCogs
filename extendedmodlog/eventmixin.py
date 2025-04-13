@@ -509,7 +509,6 @@ class EventMixin:
             if replying:
                 embed.add_field(name=_("Replying to:"), value=replying)
 
-            embed.add_field(name=_("Message ID"), value=box(str(message.id)))
             await channel.send(embed=embed, allowed_mentions=self.allowed_mentions)
         else:
             clean_msg = message.clean_content[: (1990 - len(infomessage))]
