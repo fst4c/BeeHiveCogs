@@ -318,13 +318,13 @@ class InviteFilter(commands.Cog):
         timeout_duration = await self.config.guild(guild).timeout_duration() # Current setting
         total_invites_deleted = await self.config.total_invites_deleted()
 
-        embed = discord.Embed(title="📊 Invite Filter Stats", color=discord.Color.blurple()) # Use standard color
+        embed = discord.Embed(title="Invite filter statistics", color=0xfffffe) # Use standard color
 
         # Guild Stats
-        embed.add_field(name="Invites Deleted", value=invites_deleted, inline=False)
-        embed.add_field(name="Timeouts Issued", value=timeouts_issued, inline=False)
-        embed.add_field(name="Total Timeout Minutes Applied", value=total_timeout_minutes, inline=False)
-        embed.add_field(name="Current Timeout Setting", value=f"{timeout_duration} minutes" + (" (disabled)" if timeout_duration == 0 else ""), inline=False)
+        embed.add_field(name="Invites deleted", value=invites_deleted, inline=False)
+        embed.add_field(name="Timeouts issued", value=timeouts_issued, inline=False)
+        embed.add_field(name="Timeout minutes applied", value=total_timeout_minutes, inline=False)
+        embed.add_field(name="Current timeout setting", value=f"{timeout_duration} minutes" + (" (disabled)" if timeout_duration == 0 else ""), inline=False)
 
         # Global Stats
         embed.add_field(name="Total Invites Deleted Across All Servers", value=total_invites_deleted, inline=False)
