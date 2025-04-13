@@ -147,7 +147,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
         embed = discord.Embed(
             title="Shhhhh - this is a security honeypot",
-            description="A honeypot is a piece of security tooling used by cybersecurity experts to attract cybercriminals to fake targets. Attackers are baited to target fake targets, so defenders can study their attack mannerisms and craft defenses ahead of time.\n\nIn the same way, this channel is a honeypot. Placed in an obvious place, the instruction is made clear not to speak in this channel. Automated and low quality bots will send messages in this channel, like nitro scams and porn advertisements, not knowing it is a honeypot.",
+            description="A honeypot is a security mechanism designed to lure cybercriminals into interacting with decoy targets. By doing so, cybersecurity experts can observe and analyze the attackers' methods, allowing them to develop effective countermeasures.\n\nSimilarly, this channel serves as a honeypot. It is intentionally placed in a conspicuous location with clear instructions not to engage in conversation here. Unsuspecting automated bots and low-quality spammers, such as those promoting nitro scams or explicit content, will likely post messages in this channel, unaware of its true purpose.",
             color=0xff4545,
         ).add_field(
             name="What not to do?",
