@@ -90,13 +90,13 @@ class Honeypot(commands.Cog, name="Honeypot"):
         await logs_channel.send(content=ping_role.mention if ping_role else None, embed=embed)
 
     @commands.guild_only()
-    @commands.has_permissions(administrator=True)
+    @commands.admin_or_permissions()
     @commands.group()
     async def sethoneypot(self, ctx: commands.Context) -> None:
         """Set the honeypot settings. Only administrators can use this command for security reasons."""
         pass
 
-    @commands.has_guild_permissions(manage_channels=True)
+    @commands.admin_or_permissions()
     @sethoneypot.command(aliases=["makechannel"])
     async def createchannel(self, ctx: commands.Context) -> None:
         """Create the honeypot channel."""
@@ -149,3 +149,27 @@ class Honeypot(commands.Cog, name="Honeypot"):
             f"The honeypot channel has been set to {honeypot_channel.mention} ({honeypot_channel.id}). You can now start attracting self bots/scammers!\n"
             "Please make sure to enable the cog and set the logs channel, the action to take, the role to ping (and the mute role) if you haven't already."
         )
+
+    @commands.admin_or_permissions()
+    @sethoneypot.command()
+    async def enable(self, ctx: commands.Context) -> None:
+        """Enable the honeypot functionality."""
+        self.config["enabled"] = True
+        await ctx.send("Honeypot functionality has been enabled.")
+
+    @commands.admin_or_permissions()
+    @sethoneypot.command()
+    async def disable(self, ctx: commands.Context) -> None:
+        """Disable the honeypot functionality."""
+        self.config["enabled"] = False
+        await ctx.send("Honeypot functionality has been disabled.")
+
+    @commands.admin_or_permissions()
+    @sethoneypot.command()
+    async def setaction(self, ctx: commands.Context, action: str) -> None:
+        """Set the action to take when a user is detected in the honeypot channel."""
+        if action not in ["mute", "kick", "ban", "timeout"]:
+            await ctx.send("Invalid action. Please choose from: mute, kick, ban, timeout.")
+            return
+        self.config["action"] = action
+        await ctx.send(f"Action has been set to {action}.")
