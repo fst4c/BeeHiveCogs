@@ -142,11 +142,11 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
         embed = discord.Embed(
             title="This channel is a security honeypot",
-            description="A honeypot is a piece of security tooling used by cybersecurity experts to attract cybercriminals to fake targets. In the same way, this channel is a honeypot. Placed in an obvious place, the instruction is made clear not to speak in this channel. Automated and low quality bots will send messages in this channel, not knowing it is a honeypot, and they'll be automatically dealt with as a result.",
+            description="A honeypot is a piece of security tooling used by cybersecurity experts to attract cybercriminals to fake targets. In the same way, this channel is a honeypot. Placed in an obvious place, the instruction is made clear not to speak in this channel. Automated and low quality bots will send messages in this channel, like nitro scams and porn advertisements, not knowing it is a honeypot.",
             color=0xff4545,
         ).add_field(
             name="What not to do?",
-            value="- Do not speak in this channel\n- Do not send images in this channel\n- Do not send files in this channel\n- Invite others to this channel",
+            value="- Do not speak in this channel\n- Do not send images in this channel\n- Do not send files in this channel",
             inline=False,
         ).add_field(
             name="What will happen?",
