@@ -55,7 +55,10 @@ class Honeypot(commands.Cog, name="Honeypot"):
                         "ar", "mixed-reality", "haptic-feedback", "game-economy", "microtransactions", 
                         "in-game-currency", "loot-crate", "battle-pass", "season-pass", "skins", "cosmetics", 
                         "emotes", "dance", "taunt", "clan", "faction", "alliance", "team", "co-op", 
-                        "competitive", "ranked", "casual", "hardcore", "permadeath", "roguelike", "metroidvania"
+                        "competitive", "ranked", "casual", "hardcore", "permadeath", "roguelike", "metroidvania",
+                        "tourist", "sightseeing", "landmark", "itinerary", "excursion", "souvenir", 
+                        "travel-guide", "backpacking", "adventure", "resort", "cruise", "destination", 
+                        "vacation", "holiday", "tour", "expedition", "journey", "exploration", "getaway"
                     ]
                     random_name = random.choice(dictionary_words)
                     try:
