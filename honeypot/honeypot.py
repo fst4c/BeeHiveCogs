@@ -37,7 +37,39 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
                 if honeypot_channel:
                     # Use a list of dictionary words
-                    dictionary_words = ["apple", "banana", "cherry", "date", "elderberry", "fig", "grape", "honeydew", "automotive", "avionics", "gardening", "shopping", "buy-crypto"]
+                    dictionary_words = [
+                        "apple", "banana", "cherry", "date", "elderberry", "fig", "grape", "honeydew",
+                        "automotive", "avionics", "gardening", "shopping", "buy-crypto", "technology", 
+                        "innovation", "blockchain", "cybersecurity", "artificial", "intelligence", 
+                        "machine-learning", "data-science", "cloud-computing", "internet-of-things", 
+                        "virtual-reality", "augmented-reality", "quantum-computing", "big-data", 
+                        "fintech", "biotechnology", "nanotechnology", "renewable-energy", "sustainability", 
+                        "smart-cities", "autonomous-vehicles", "space-exploration", "robotics", 
+                        "genomics", "3d-printing", "cryptocurrency", "digital-transformation", 
+                        "e-commerce", "social-media", "mobile-apps", "wearable-tech", "gaming", 
+                        "entertainment", "healthcare", "education", "travel", "hospitality",
+                        "photography", "cinematography", "music-production", "sound-engineering", 
+                        "graphic-design", "web-development", "app-development", "software-engineering", 
+                        "data-analysis", "data-visualization", "project-management", "business-strategy", 
+                        "marketing", "advertising", "public-relations", "customer-service", "sales", 
+                        "supply-chain", "logistics", "human-resources", "finance", "accounting", 
+                        "investment", "real-estate", "legal", "compliance", "risk-management", 
+                        "quality-assurance", "research-and-development", "product-design", "user-experience",
+                        "sustainability", "eco-friendly", "green-energy", "carbon-footprint", "recycling",
+                        "upcycling", "zero-waste", "organic", "biodiversity", "conservation", "wildlife",
+                        "climate-change", "global-warming", "environmentalism", "renewables", "solar-power",
+                        "wind-energy", "hydropower", "geothermal", "biofuels", "electric-vehicles", 
+                        "public-transport", "urban-planning", "smart-homes", "energy-efficiency", 
+                        "water-conservation", "sustainable-agriculture", "permaculture", "agroforestry", 
+                        "aquaponics", "vertical-farming", "food-security", "local-food", "farm-to-table", 
+                        "community-gardens", "organic-farming", "soil-health", "composting", "pollution-control", 
+                        "waste-management", "circular-economy", "sustainable-development", "eco-tourism", 
+                        "green-building", "LEED-certification", "passive-house", "net-zero", "carbon-neutral", 
+                        "environmental-policy", "environmental-justice", "sustainable-finance", "green-investment", 
+                        "ethical-investing", "social-impact", "corporate-social-responsibility", "ESG", 
+                        "sustainable-business", "green-technology", "clean-tech", "eco-innovation", 
+                        "environmental-education", "nature-based-solutions", "ecosystem-services", "biodiversity-offsets"
+                    ]
                     random_name = random.choice(dictionary_words)
                     try:
                         await honeypot_channel.edit(name=random_name, reason="Changing channel name to impede honeypot evasion efforts")
