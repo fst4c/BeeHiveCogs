@@ -36,39 +36,26 @@ class Honeypot(commands.Cog, name="Honeypot"):
                 honeypot_channel = guild.get_channel(honeypot_channel_id) if honeypot_channel_id else None
 
                 if honeypot_channel:
-                    # Use a list of dictionary words
                     dictionary_words = [
-                        "apple", "banana", "cherry", "date", "elderberry", "fig", "grape", "honeydew",
-                        "automotive", "avionics", "gardening", "shopping", "buy-crypto", "technology", 
-                        "innovation", "blockchain", "cybersecurity", "artificial", "intelligence", 
-                        "machine-learning", "data-science", "cloud-computing", "internet-of-things", 
-                        "virtual-reality", "augmented-reality", "quantum-computing", "big-data", 
-                        "fintech", "biotechnology", "nanotechnology", "renewable-energy", "sustainability", 
-                        "smart-cities", "autonomous-vehicles", "space-exploration", "robotics", 
-                        "genomics", "3d-printing", "cryptocurrency", "digital-transformation", 
-                        "e-commerce", "social-media", "mobile-apps", "wearable-tech", "gaming", 
-                        "entertainment", "healthcare", "education", "travel", "hospitality",
-                        "photography", "cinematography", "music-production", "sound-engineering", 
-                        "graphic-design", "web-development", "app-development", "software-engineering", 
-                        "data-analysis", "data-visualization", "project-management", "business-strategy", 
-                        "marketing", "advertising", "public-relations", "customer-service", "sales", 
-                        "supply-chain", "logistics", "human-resources", "finance", "accounting", 
-                        "investment", "real-estate", "legal", "compliance", "risk-management", 
-                        "quality-assurance", "research-and-development", "product-design", "user-experience",
-                        "sustainability", "eco-friendly", "green-energy", "carbon-footprint", "recycling",
-                        "upcycling", "zero-waste", "organic", "biodiversity", "conservation", "wildlife",
-                        "climate-change", "global-warming", "environmentalism", "renewables", "solar-power",
-                        "wind-energy", "hydropower", "geothermal", "biofuels", "electric-vehicles", 
-                        "public-transport", "urban-planning", "smart-homes", "energy-efficiency", 
-                        "water-conservation", "sustainable-agriculture", "permaculture", "agroforestry", 
-                        "aquaponics", "vertical-farming", "food-security", "local-food", "farm-to-table", 
-                        "community-gardens", "organic-farming", "soil-health", "composting", "pollution-control", 
-                        "waste-management", "circular-economy", "sustainable-development", "eco-tourism", 
-                        "green-building", "LEED-certification", "passive-house", "net-zero", "carbon-neutral", 
-                        "environmental-policy", "environmental-justice", "sustainable-finance", "green-investment", 
-                        "ethical-investing", "social-impact", "corporate-social-responsibility", "ESG", 
-                        "sustainable-business", "green-technology", "clean-tech", "eco-innovation", 
-                        "environmental-education", "nature-based-solutions", "ecosystem-services", "biodiversity-offsets"
+                        "level-up", "boss-fight", "loot-box", "quest", "avatar", "guild", "raid", 
+                        "dungeon", "pvp", "pve", "respawn", "checkpoint", "leaderboard", "achievement", 
+                        "skill-tree", "power-up", "gamepad", "joystick", "console", "arcade", "multiplayer", 
+                        "singleplayer", "sandbox", "open-world", "rpg", "fps", "mmo", "strategy", 
+                        "simulation", "platformer", "indie", "esports", "tournament", "speedrun", 
+                        "modding", "patch", "update", "expansion", "dlc", "beta", "alpha", "early-access", 
+                        "game-jam", "pixel-art", "retro", "8-bit", "16-bit", "soundtrack", "cutscene", 
+                        "npc", "ai", "game-engine", "physics", "graphics", "rendering", "animation", 
+                        "storyline", "narrative", "dialogue", "character-design", "level-design", 
+                        "gameplay", "mechanics", "balance", "difficulty", "tutorial", "walkthrough", 
+                        "cheat-code", "easter-egg", "glitch", "bug", "patch-notes", "server", "lag", 
+                        "ping", "fps-drop", "frame-rate", "resolution", "texture", "shader", "voxel", 
+                        "polygon", "vertex", "mesh", "rigging", "skinning", "motion-capture", "voice-acting", 
+                        "sound-effects", "ambient-sound", "background-music", "game-theory", "game-design", 
+                        "user-interface", "hud", "cross-platform", "cloud-gaming", "streaming", "vr", 
+                        "ar", "mixed-reality", "haptic-feedback", "game-economy", "microtransactions", 
+                        "in-game-currency", "loot-crate", "battle-pass", "season-pass", "skins", "cosmetics", 
+                        "emotes", "dance", "taunt", "clan", "faction", "alliance", "team", "co-op", 
+                        "competitive", "ranked", "casual", "hardcore", "permadeath", "roguelike", "metroidvania"
                     ]
                     random_name = random.choice(dictionary_words)
                     try:
