@@ -3,6 +3,8 @@ from redbot.core import commands, Config
 import typing
 import os
 from datetime import timedelta
+import asyncio
+import random
 
 class Honeypot(commands.Cog, name="Honeypot"):
     """Create a channel at the top of the server to attract self bots/scammers and notify/mute/kick/ban them immediately!"""
@@ -23,6 +25,26 @@ class Honeypot(commands.Cog, name="Honeypot"):
         }
         self.config.register_guild(**default_guild)
         self.global_scam_stats = {"nitro": 0, "steam": 0, "other": 0, "csam": 0}
+        self.bot.loop.create_task(self.randomize_honeypot_name())
+
+    async def randomize_honeypot_name(self):
+        await self.bot.wait_until_ready()
+        while not self.bot.is_closed():
+            for guild in self.bot.guilds:
+                config = await self.config.guild(guild).all()
+                honeypot_channel_id = config.get("honeypot_channel")
+                honeypot_channel = guild.get_channel(honeypot_channel_id) if honeypot_channel_id else None
+
+                if honeypot_channel:
+                    # Use a list of dictionary words
+                    dictionary_words = ["apple", "banana", "cherry", "date", "elderberry", "fig", "grape", "honeydew", "automotive", "avionics", "gardening", "shopping", "buy-crypto"]
+                    random_name = random.choice(dictionary_words)
+                    try:
+                        await honeypot_channel.edit(name=random_name, reason="Changing channel name to impede honeypot evasion efforts")
+                    except discord.HTTPException:
+                        pass
+
+            await asyncio.sleep(4 * 60 * 60)  # Wait for 4 hours
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
