@@ -119,13 +119,13 @@ class Honeypot(commands.Cog, name="Honeypot"):
                 print(f"Action {action} taken against {message.author}")
 
             action_result = {
-                "mute": "The member has been muted.",
-                "kick": "The member has been kicked.",
-                "ban": "The member has been banned.",
-                "timeout": "The member has been timed out for 7 days."
+                "mute": "I assigned the user the configured mute/suppress role",
+                "kick": "The user was kicked from the server",
+                "ban": "The user was banned from the server",
+                "timeout": "The user was timed out for a week"
             }.get(action, "No action taken.")
 
-            embed.add_field(name="Action:", value=failed or action_result, inline=False)
+            embed.add_field(name="Action taken", value=failed or action_result, inline=False)
 
         embed.set_footer(text=message.guild.name, icon_url=message.guild.icon.url)
         ping_role_id = config.get("ping_role")
