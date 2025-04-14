@@ -58,7 +58,13 @@ class Honeypot(commands.Cog, name="Honeypot"):
                         "competitive", "ranked", "casual", "hardcore", "permadeath", "roguelike", "metroidvania",
                         "tourist", "sightseeing", "landmark", "itinerary", "excursion", "souvenir", 
                         "travel-guide", "backpacking", "adventure", "resort", "cruise", "destination", 
-                        "vacation", "holiday", "tour", "expedition", "journey", "exploration", "getaway"
+                        "vacation", "holiday", "tour", "expedition", "journey", "exploration", "getaway",
+                        "passport", "visa", "airfare", "luggage", "hostel", "hotel", "motel", "bed-and-breakfast",
+                        "road-trip", "car-rental", "flight", "layover", "stopover", "jetlag", "travel-agency",
+                        "tour-operator", "safari", "trekking", "hiking", "camping", "beach", "island", 
+                        "mountain", "valley", "canyon", "waterfall", "national-park", "wildlife", "culture",
+                        "heritage", "festival", "cuisine", "local", "tradition", "custom", "language", 
+                        "currency-exchange", "travel-insurance", "backpacker", "globetrotter", "wanderlust"
                     ]
                     random_name = random.choice(dictionary_words)
                     try:
