@@ -113,7 +113,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
         action = config["action"]
         embed = discord.Embed(
-            title="Honeypot was triggered by a suspicious user",
+            title="Honeypot detected a threat",
             description=f">>> {message.content}",
             color=0xff4545,
             timestamp=message.created_at,
