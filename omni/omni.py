@@ -291,7 +291,7 @@ class Omni(commands.Cog):
             if log_channel_id:
                 log_channel = guild.get_channel(log_channel_id)
                 if log_channel:
-                    embed = await self._create_moderation_embed(message, category_scores, "AI moderator action")
+                    embed = await self._create_moderation_embed(message, category_scores, "AI moderator detected potential misbehavior")
                     if message_deleted and timeout_issued:
                         embed.description += "\nThe **message was deleted** and the **user was issued a timeout**."
                     elif message_deleted:
