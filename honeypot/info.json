@@ -2,8 +2,8 @@
     "author": ["adminelevation"],
     "name": "honeypot",
     "install_msg": "",
-    "short": "Create a channel at the top of the server to attract self bots/scammers and notify/mute/kick/ban them immediately!",
-    "description": "Create a channel at the top of the server to attract self bots/scammers and notify/mute/kick/ban them immediately!",
+    "short": "Honeypot-based spammer and bot defenses",
+    "description": "Use bait channels to detect and automatically punish bots, advertisers, and hacked Discord accounts.",
     "tags": [
         "channel",
         "bots",
