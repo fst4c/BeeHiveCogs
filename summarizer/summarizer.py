@@ -877,7 +877,6 @@ class ChatSummary(commands.Cog):
             "o1": ("🧠", "$0.000015 per token in / $0.00006 per token out"),
             "gpt-4": ("💬", "$0.00003 per token in / $0.00006 per token out"),
             "gpt-4.1": ("💬", "$0.000002 per token in / $0.000008 per token out"),
-            "gpt-4.1-mini": ("💬", "$0.0000004 per token in / $0.0000016 per token out"),
         }
 
         # Create a dropdown menu for model selection
