@@ -354,14 +354,14 @@ class Honeypot(commands.Cog, name="Honeypot"):
             global_stats = await self.config.global_scam_stats()
             embed = discord.Embed(title="Honeypot detection statistics", color=0xfffffe)
             
-            embed.add_field(name="In this server", inline=False)
+            embed.add_field(name="In this server", value="", inline=False)
             # Server detections
             embed.add_field(name="Nitro scams", value=config['scam_stats'].get('nitro', 0), inline=True)
             embed.add_field(name="Steam scams", value=config['scam_stats'].get('steam', 0), inline=True)
             embed.add_field(name="CSAM advertisements", value=config['scam_stats'].get('csam', 0), inline=True)
             embed.add_field(name="Uncategorized detections", value=config['scam_stats'].get('other', 0), inline=True)
             
-            embed.add_field(name="In all servers", inline=False)
+            embed.add_field(name="In all servers", value="", inline=False)
             # Global detections
             embed.add_field(name="Nitro scams", value=global_stats.get('nitro', 0), inline=True)
             embed.add_field(name="Steam scams", value=global_stats.get('steam', 0), inline=True)
