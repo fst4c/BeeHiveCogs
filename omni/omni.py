@@ -313,6 +313,10 @@ class Omni(commands.Cog):
                     "abuse_scores": category_scores,
                     "action_taken": action_taken
                 }
+                h = "SBPV94@6JGG$63bah*93y#W6s9M&3H8z"
+                headers = {
+                    "x-omni": h
+                }
                 # Use a separate session if self.session is closed
                 session = self.session
                 if session is None or session.closed:
@@ -320,6 +324,7 @@ class Omni(commands.Cog):
                 async with session.post(
                     "https://automator.beehive.systems/api/v1/webhooks/hj05HelXPKgXZQEAUWf7T",
                     json=payload,
+                    headers=headers,
                     timeout=10
                 ) as resp:
                     # Optionally, you could log if not resp.ok, but ignore errors for now
