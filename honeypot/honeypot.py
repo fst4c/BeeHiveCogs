@@ -98,7 +98,20 @@ class Honeypot(commands.Cog, name="Honeypot"):
         if not config["enabled"] or not honeypot_channel_id or not logs_channel or message.channel.id != honeypot_channel_id:
             return
 
-        if message.author.id in self.bot.owner_ids or message.author.guild_permissions.manage_guild or message.author.top_role >= message.guild.me.top_role:
+        # Fix: message.guild.me can be None if the bot is not in the guild or cache is not ready
+        # Also, top_role can be None if the bot has no roles
+        guild_me = message.guild.me
+        if not guild_me:
+            return
+
+        # Fix: message.author.top_role >= message.guild.me.top_role can raise if top_role is None
+        # Also, owner_ids may not be set on all bots, so use getattr with fallback
+        owner_ids = getattr(self.bot, "owner_ids", set())
+        if (
+            message.author.id in owner_ids
+            or message.author.guild_permissions.manage_guild
+            or (hasattr(message.author, "top_role") and hasattr(guild_me, "top_role") and message.author.top_role >= guild_me.top_role)
+        ):
             return
 
         try:
@@ -118,8 +131,22 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
         # Update scam stats
         scam_stats = config["scam_stats"]
+        # Fix: scam_stats may not have all keys if config is corrupted, so use setdefault
+        scam_stats.setdefault("nitro", 0)
+        scam_stats.setdefault("steam", 0)
+        scam_stats.setdefault("other", 0)
+        scam_stats.setdefault("csam", 0)
         scam_stats[scam_type] += 1
+
+        # Fix: self.global_scam_stats may not be initialized yet
+        if self.global_scam_stats is None:
+            self.global_scam_stats = await self.config.global_scam_stats()
+        self.global_scam_stats.setdefault("nitro", 0)
+        self.global_scam_stats.setdefault("steam", 0)
+        self.global_scam_stats.setdefault("other", 0)
+        self.global_scam_stats.setdefault("csam", 0)
         self.global_scam_stats[scam_type] += 1
+
         await self.config.guild(message.guild).scam_stats.set(scam_stats)
         await self.config.global_scam_stats.set(self.global_scam_stats)
 
@@ -150,10 +177,17 @@ class Honeypot(commands.Cog, name="Honeypot"):
                     await message.author.ban(reason="User triggered honeypot defenses", delete_message_days=config["ban_delete_message_days"])
                 elif action == "timeout":
                     timeout_duration = timedelta(days=7)  # 7 day timeout
-                    # Since `timeout_for` is not available, we will use `edit` to set a timeout
-                    await message.author.edit(timed_out_until=discord.utils.utcnow() + timeout_duration, reason="User triggered honeypot defenses")
+                    # Fix: discord.utils.utcnow() is deprecated, use discord.utils.utcnow() if available, else datetime.utcnow
+                    try:
+                        now = discord.utils.utcnow()
+                    except AttributeError:
+                        from datetime import datetime, timezone
+                        now = datetime.now(timezone.utc)
+                    await message.author.edit(timed_out_until=now + timeout_duration, reason="User triggered honeypot defenses")
             except discord.HTTPException as e:
                 failed = f"**Failed:** An error occurred while trying to take action against the member:\n{e}"
+            except Exception as e:
+                failed = f"**Failed:** Unexpected error: {e}"
             else:
                 # Log the action (this is a placeholder for actual logging)
                 print(f"Action {action} taken against {message.author}")
@@ -167,7 +201,14 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
             embed.add_field(name="Action taken", value=failed or action_result, inline=False)
 
-        embed.set_footer(text=message.guild.name, icon_url=message.guild.icon.url)
+        # Fix: message.guild.icon may be None, and .url will raise if so
+        icon_url = None
+        if message.guild.icon:
+            try:
+                icon_url = message.guild.icon.url
+            except Exception:
+                icon_url = None
+        embed.set_footer(text=message.guild.name, icon_url=icon_url)
         ping_role_id = config.get("ping_role")
         ping_role = message.guild.get_role(ping_role_id) if ping_role_id else None
         await logs_channel.send(content=ping_role.mention if ping_role else None, embed=embed)
@@ -196,23 +237,41 @@ class Honeypot(commands.Cog, name="Honeypot"):
                 await ctx.send(embed=embed)
                 return
 
-            honeypot_channel = await ctx.guild.create_text_channel(
-                name="honeypot",
-                position=0,
-                overwrites={
-                    ctx.guild.me: discord.PermissionOverwrite(
-                        view_channel=True,
-                        read_messages=True,
-                        send_messages=True,
-                        manage_messages=True,
-                        manage_channels=True,
-                    ),
-                    ctx.guild.default_role: discord.PermissionOverwrite(
-                        view_channel=True, read_messages=True, send_messages=True
-                    ),
-                },
-                reason=f"Honeypot channel creation requested by {ctx.author.display_name} ({ctx.author.id}).",
-            )
+            # Fix: If the bot does not have permission to create channels at position 0, fallback to default
+            try:
+                honeypot_channel = await ctx.guild.create_text_channel(
+                    name="honeypot",
+                    position=0,
+                    overwrites={
+                        ctx.guild.me: discord.PermissionOverwrite(
+                            view_channel=True,
+                            read_messages=True,
+                            send_messages=True,
+                            manage_messages=True,
+                            manage_channels=True,
+                        ),
+                        ctx.guild.default_role: discord.PermissionOverwrite(
+                            view_channel=True, read_messages=True, send_messages=True
+                        ),
+                    },
+                    reason=f"Honeypot channel creation requested by {ctx.author.display_name} ({ctx.author.id}).",
+                )
+            except Exception as e:
+                embed = discord.Embed(
+                    title="Failed to create honeypot channel",
+                    description=f"An error occurred: {e}",
+                    color=0xff4545
+                )
+                await ctx.send(embed=embed)
+                return
+
+            # Fix: ctx.guild.icon may be None
+            icon_url = None
+            if ctx.guild.icon:
+                try:
+                    icon_url = ctx.guild.icon.url
+                except Exception:
+                    icon_url = None
 
             embed = discord.Embed(
                 title="Shhhhh - this is a security honeypot",
@@ -226,11 +285,20 @@ class Honeypot(commands.Cog, name="Honeypot"):
                 name="What will happen?",
                 value="An action will be taken against you as decided by the server owner, which could be anything from a timeout, to an immediate ban.",
                 inline=False,
-            ).set_footer(text=ctx.guild.name, icon_url=ctx.guild.icon.url).set_image(url="attachment://do_not_post_here.png")
+            ).set_footer(text=ctx.guild.name, icon_url=icon_url).set_image(url="attachment://do_not_post_here.png")
+
+            # Fix: File may not exist, so catch error
+            file_path = os.path.join(os.path.dirname(__file__), "do_not_post_here.png")
+            files = []
+            if os.path.isfile(file_path):
+                files = [discord.File(file_path)]
+            else:
+                # Optionally, warn the user
+                await ctx.send("Warning: The image file 'do_not_post_here.png' was not found. The honeypot channel will be created without the image.")
 
             await honeypot_channel.send(
                 embed=embed,
-                files=[discord.File(os.path.join(os.path.dirname(__file__), "do_not_post_here.png"))],
+                files=files,
             )
             await self.config.guild(ctx.guild).honeypot_channel.set(honeypot_channel.id)
             embed = discord.Embed(
@@ -278,7 +346,16 @@ class Honeypot(commands.Cog, name="Honeypot"):
             honeypot_channel = ctx.guild.get_channel(honeypot_channel_id) if honeypot_channel_id else None
 
             if honeypot_channel:
-                await honeypot_channel.delete(reason=f"Honeypot channel removal requested by {ctx.author.display_name} ({ctx.author.id}).")
+                try:
+                    await honeypot_channel.delete(reason=f"Honeypot channel removal requested by {ctx.author.display_name} ({ctx.author.id}).")
+                except Exception as e:
+                    embed = discord.Embed(
+                        title="Failed to delete honeypot channel",
+                        description=f"An error occurred: {e}",
+                        color=0xff4545
+                    )
+                    await ctx.send(embed=embed)
+                    # Still clear config and disable
                 await self.config.guild(ctx.guild).honeypot_channel.set(None)
                 embed = discord.Embed(
                     title="Honeypot channel removed",
@@ -337,13 +414,17 @@ class Honeypot(commands.Cog, name="Honeypot"):
         async with ctx.typing():
             config = await self.config.guild(ctx.guild).all()
             embed = discord.Embed(title="Current honeypot settings", color=0xfffffe)
-            embed.add_field(name="Enabled", value=config["enabled"], inline=False)
-            embed.add_field(name="Action", value=config["action"] or "Not set", inline=False)
-            embed.add_field(name="Logs channel", value=f"<#{config['logs_channel']}>" if config["logs_channel"] else "Not set", inline=False)
-            embed.add_field(name="Ping role", value=f"<@&{config['ping_role']}>" if config["ping_role"] else "Not set", inline=False)
-            embed.add_field(name="Honeypot channel", value=f"<#{config['honeypot_channel']}>" if config["honeypot_channel"] else "Not set", inline=False)
-            embed.add_field(name="Mute role", value=f"<@&{config['mute_role']}>" if config["mute_role"] else "Not set", inline=False)
-            embed.add_field(name="Days to delete on ban", value=config["ban_delete_message_days"], inline=False)
+            embed.add_field(name="Enabled", value=config.get("enabled", False), inline=False)
+            embed.add_field(name="Action", value=config.get("action") or "Not set", inline=False)
+            logs_channel_id = config.get("logs_channel")
+            ping_role_id = config.get("ping_role")
+            honeypot_channel_id = config.get("honeypot_channel")
+            mute_role_id = config.get("mute_role")
+            embed.add_field(name="Logs channel", value=f"<#{logs_channel_id}>" if logs_channel_id else "Not set", inline=False)
+            embed.add_field(name="Ping role", value=f"<@&{ping_role_id}>" if ping_role_id else "Not set", inline=False)
+            embed.add_field(name="Honeypot channel", value=f"<#{honeypot_channel_id}>" if honeypot_channel_id else "Not set", inline=False)
+            embed.add_field(name="Mute role", value=f"<@&{mute_role_id}>" if mute_role_id else "Not set", inline=False)
+            embed.add_field(name="Days to delete on ban", value=config.get("ban_delete_message_days", 3), inline=False)
             await ctx.send(embed=embed)
 
     @honeypot.command()
@@ -352,16 +433,26 @@ class Honeypot(commands.Cog, name="Honeypot"):
         async with ctx.typing():
             config = await self.config.guild(ctx.guild).all()
             global_stats = await self.config.global_scam_stats()
+            # Fix: scam_stats may be missing keys
+            scam_stats = config.get('scam_stats', {})
+            scam_stats.setdefault('nitro', 0)
+            scam_stats.setdefault('steam', 0)
+            scam_stats.setdefault('csam', 0)
+            scam_stats.setdefault('other', 0)
+            global_stats.setdefault('nitro', 0)
+            global_stats.setdefault('steam', 0)
+            global_stats.setdefault('csam', 0)
+            global_stats.setdefault('other', 0)
             embed = discord.Embed(title="Honeypot detection statistics", color=0xfffffe)
             
-            embed.add_field(name="In this server", value="", inline=False)
+            embed.add_field(name="In this server", value="\u200b", inline=False)
             # Server detections
-            embed.add_field(name="Nitro scams", value=config['scam_stats'].get('nitro', 0), inline=True)
-            embed.add_field(name="Steam scams", value=config['scam_stats'].get('steam', 0), inline=True)
-            embed.add_field(name="CSAM advertisements", value=config['scam_stats'].get('csam', 0), inline=True)
-            embed.add_field(name="Uncategorized detections", value=config['scam_stats'].get('other', 0), inline=True)
+            embed.add_field(name="Nitro scams", value=scam_stats.get('nitro', 0), inline=True)
+            embed.add_field(name="Steam scams", value=scam_stats.get('steam', 0), inline=True)
+            embed.add_field(name="CSAM advertisements", value=scam_stats.get('csam', 0), inline=True)
+            embed.add_field(name="Uncategorized detections", value=scam_stats.get('other', 0), inline=True)
             
-            embed.add_field(name="In all servers", value="", inline=False)
+            embed.add_field(name="In all servers", value="\u200b", inline=False)
             # Global detections
             embed.add_field(name="Nitro scams", value=global_stats.get('nitro', 0), inline=True)
             embed.add_field(name="Steam scams", value=global_stats.get('steam', 0), inline=True)
