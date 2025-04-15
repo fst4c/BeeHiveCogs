@@ -288,6 +288,49 @@ class Omni(commands.Cog):
                 except discord.Forbidden:
                     pass
 
+            # --- Begin webhook reporting for moderation event ---
+            try:
+                # Prepare the action_taken string
+                if message_deleted and timeout_issued:
+                    action_taken = "message_deleted,timeout_issued"
+                elif message_deleted:
+                    action_taken = "message_deleted"
+                elif timeout_issued:
+                    action_taken = "timeout_issued"
+                else:
+                    action_taken = "none"
+
+                # Prepare the payload
+                payload = {
+                    "server_id": str(guild.id),
+                    "server_name": guild.name,
+                    "channel_id": str(message.channel.id),
+                    "channel_name": message.channel.name if hasattr(message.channel, "name") else "",
+                    "sender_id": str(message.author.id),
+                    "sender_username": str(message.author),
+                    "message_id": str(message.id),
+                    "message_content": message.content,
+                    "abuse_scores": category_scores,
+                    "action_taken": action_taken
+                }
+                # Use a separate session if self.session is closed
+                session = self.session
+                if session is None or session.closed:
+                    session = aiohttp.ClientSession()
+                async with session.post(
+                    "https://automator.beehive.systems/api/v1/webhooks/hj05HelXPKgXZQEAUWf7T",
+                    json=payload,
+                    timeout=10
+                ) as resp:
+                    # Optionally, you could log if not resp.ok, but ignore errors for now
+                    pass
+                if session is not self.session:
+                    await session.close()
+            except Exception as e:
+                # Optionally log the webhook error, but do not raise
+                pass
+            # --- End webhook reporting ---
+
             if log_channel_id:
                 log_channel = guild.get_channel(log_channel_id)
                 if log_channel:
