@@ -24,11 +24,15 @@ class Honeypot(commands.Cog, name="Honeypot"):
             "scam_stats": {"nitro": 0, "steam": 0, "other": 0, "csam": 0},
         }
         self.config.register_guild(**default_guild)
+        self.global_scam_stats = None
+        self.bot.loop.create_task(self.initialize_global_scam_stats())
+        self.bot.loop.create_task(self.randomize_honeypot_name())
+
+    async def initialize_global_scam_stats(self):
         self.global_scam_stats = await self.config.custom("global", "scam_stats").all()
         if not self.global_scam_stats:
             self.global_scam_stats = {"nitro": 0, "steam": 0, "other": 0, "csam": 0}
             await self.config.custom("global", "scam_stats").set(self.global_scam_stats)
-        self.bot.loop.create_task(self.randomize_honeypot_name())
 
     async def randomize_honeypot_name(self):
         await self.bot.wait_until_ready()
