@@ -164,7 +164,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @commands.admin_or_permissions()
     @commands.group()
     async def honeypot(self, ctx: commands.Context) -> None:
-        """Honeypots are channels that attracted automated scam bots to detect and remove them from your server before they can hurt you or your members."""
+        """Honeypots are channels that attract advertising bots and compromised Discord accounts to detect and remove them from your server before they can hurt you or your members."""
         pass
 
     @commands.admin_or_permissions()
