@@ -24,7 +24,10 @@ class Honeypot(commands.Cog, name="Honeypot"):
             "scam_stats": {"nitro": 0, "steam": 0, "other": 0, "csam": 0},
         }
         self.config.register_guild(**default_guild)
-        self.global_scam_stats = {"nitro": 0, "steam": 0, "other": 0, "csam": 0}
+        self.global_scam_stats = await self.config.custom("global", "scam_stats").all()
+        if not self.global_scam_stats:
+            self.global_scam_stats = {"nitro": 0, "steam": 0, "other": 0, "csam": 0}
+            await self.config.custom("global", "scam_stats").set(self.global_scam_stats)
         self.bot.loop.create_task(self.randomize_honeypot_name())
 
     async def randomize_honeypot_name(self):
@@ -110,6 +113,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         scam_stats[scam_type] += 1
         self.global_scam_stats[scam_type] += 1
         await self.config.guild(message.guild).scam_stats.set(scam_stats)
+        await self.config.custom("global", "scam_stats").set(self.global_scam_stats)
 
         action = config["action"]
         embed = discord.Embed(
@@ -339,7 +343,8 @@ class Honeypot(commands.Cog, name="Honeypot"):
         """View the current honeypot statistics."""
         async with ctx.typing():
             config = await self.config.guild(ctx.guild).all()
+            global_stats = await self.config.custom("global", "scam_stats").all()
             embed = discord.Embed(title="Honeypot statistics", color=0xfffffe)
             embed.add_field(name="Server detections", value=f"Nitro: {config['scam_stats'].get('nitro', 0)}\nSteam: {config['scam_stats'].get('steam', 0)}\nCSAM: {config['scam_stats'].get('csam', 0)}\nOther: {config['scam_stats'].get('other', 0)}", inline=False)
-            embed.add_field(name="Global detections", value=f"Nitro: {self.global_scam_stats.get('nitro', 0)}\nSteam: {self.global_scam_stats.get('steam', 0)}\nCSAM: {self.global_scam_stats.get('csam', 0)}\nOther: {self.global_scam_stats.get('other', 0)}", inline=False)
+            embed.add_field(name="Global detections", value=f"Nitro: {global_stats.get('nitro', 0)}\nSteam: {global_stats.get('steam', 0)}\nCSAM: {global_stats.get('csam', 0)}\nOther: {global_stats.get('other', 0)}", inline=False)
             await ctx.send(embed=embed)
