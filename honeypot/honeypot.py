@@ -27,16 +27,16 @@ class Honeypot(commands.Cog, name="Honeypot"):
             "scam_stats": {"nitro": 0, "steam": 0, "other": 0, "csam": 0},
         }
         self.config.register_guild(**default_guild)
-        self.config.register_custom("global", **default_global)
+        self.config.register_global(**default_global)
         self.global_scam_stats = None
         self.bot.loop.create_task(self.initialize_global_scam_stats())
         self.bot.loop.create_task(self.randomize_honeypot_name())
 
     async def initialize_global_scam_stats(self):
-        self.global_scam_stats = await self.config.custom("global", "scam_stats").all()
+        self.global_scam_stats = await self.config.global_scam_stats()
         if not self.global_scam_stats:
             self.global_scam_stats = {"nitro": 0, "steam": 0, "other": 0, "csam": 0}
-            await self.config.custom("global", "scam_stats").set(self.global_scam_stats)
+            await self.config.global_scam_stats.set(self.global_scam_stats)
 
     async def randomize_honeypot_name(self):
         await self.bot.wait_until_ready()
@@ -121,7 +121,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         scam_stats[scam_type] += 1
         self.global_scam_stats[scam_type] += 1
         await self.config.guild(message.guild).scam_stats.set(scam_stats)
-        await self.config.custom("global", "scam_stats").set(self.global_scam_stats)
+        await self.config.global_scam_stats.set(self.global_scam_stats)
 
         action = config["action"]
         embed = discord.Embed(
@@ -351,7 +351,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         """View the current honeypot statistics."""
         async with ctx.typing():
             config = await self.config.guild(ctx.guild).all()
-            global_stats = await self.config.custom("global", "scam_stats").all()
+            global_stats = await self.config.global_scam_stats()
             embed = discord.Embed(title="Honeypot statistics", color=0xfffffe)
             embed.add_field(name="Server detections", value=f"Nitro: {config['scam_stats'].get('nitro', 0)}\nSteam: {config['scam_stats'].get('steam', 0)}\nCSAM: {config['scam_stats'].get('csam', 0)}\nOther: {config['scam_stats'].get('other', 0)}", inline=False)
             embed.add_field(name="Global detections", value=f"Nitro: {global_stats.get('nitro', 0)}\nSteam: {global_stats.get('steam', 0)}\nCSAM: {global_stats.get('csam', 0)}\nOther: {global_stats.get('other', 0)}", inline=False)
