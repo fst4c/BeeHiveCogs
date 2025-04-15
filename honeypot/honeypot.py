@@ -24,7 +24,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
             "scam_stats": {"nitro": 0, "steam": 0, "other": 0, "csam": 0},
         }
         default_global = {
-            "scam_stats": {"nitro": 0, "steam": 0, "other": 0, "csam": 0},
+            "global_scam_stats": {"nitro": 0, "steam": 0, "other": 0, "csam": 0},
         }
         self.config.register_guild(**default_guild)
         self.config.register_global(**default_global)
