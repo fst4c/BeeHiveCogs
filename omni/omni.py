@@ -685,7 +685,7 @@ class Omni(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to reset statistics: {e}")
 
-
+    @commands.cooldown(1, 86400, commands.BucketType.user)
     @omni.command()
     async def vote(self, ctx):
         """Give feedback on the server's agentic moderation"""
