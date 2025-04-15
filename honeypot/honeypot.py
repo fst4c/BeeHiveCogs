@@ -23,7 +23,11 @@ class Honeypot(commands.Cog, name="Honeypot"):
             "ban_delete_message_days": 3,
             "scam_stats": {"nitro": 0, "steam": 0, "other": 0, "csam": 0},
         }
+        default_global = {
+            "scam_stats": {"nitro": 0, "steam": 0, "other": 0, "csam": 0},
+        }
         self.config.register_guild(**default_guild)
+        self.config.register_custom("global", **default_global)
         self.global_scam_stats = None
         self.bot.loop.create_task(self.initialize_global_scam_stats())
         self.bot.loop.create_task(self.randomize_honeypot_name())
