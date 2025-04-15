@@ -352,7 +352,20 @@ class Honeypot(commands.Cog, name="Honeypot"):
         async with ctx.typing():
             config = await self.config.guild(ctx.guild).all()
             global_stats = await self.config.global_scam_stats()
-            embed = discord.Embed(title="Honeypot statistics", color=0xfffffe)
-            embed.add_field(name="Server detections", value=f"Nitro: {config['scam_stats'].get('nitro', 0)}\nSteam: {config['scam_stats'].get('steam', 0)}\nCSAM: {config['scam_stats'].get('csam', 0)}\nOther: {config['scam_stats'].get('other', 0)}", inline=False)
-            embed.add_field(name="Global detections", value=f"Nitro: {global_stats.get('nitro', 0)}\nSteam: {global_stats.get('steam', 0)}\nCSAM: {global_stats.get('csam', 0)}\nOther: {global_stats.get('other', 0)}", inline=False)
+            embed = discord.Embed(title="Honeypot detection statistics", color=0xfffffe)
+            
+            embed.add_field(name="In this server", inline=False)
+            # Server detections
+            embed.add_field(name="Nitro scams", value=config['scam_stats'].get('nitro', 0), inline=True)
+            embed.add_field(name="Steam scams", value=config['scam_stats'].get('steam', 0), inline=True)
+            embed.add_field(name="CSAM advertisements", value=config['scam_stats'].get('csam', 0), inline=True)
+            embed.add_field(name="Uncategorized detections", value=config['scam_stats'].get('other', 0), inline=True)
+            
+            embed.add_field(name="In all servers", inline=False)
+            # Global detections
+            embed.add_field(name="Nitro scams", value=global_stats.get('nitro', 0), inline=True)
+            embed.add_field(name="Steam scams", value=global_stats.get('steam', 0), inline=True)
+            embed.add_field(name="CSAM advertisements", value=global_stats.get('csam', 0), inline=True)
+            embed.add_field(name="Uncategorized detections", value=global_stats.get('other', 0), inline=True)
+            
             await ctx.send(embed=embed)
