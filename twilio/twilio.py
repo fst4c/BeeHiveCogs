@@ -94,7 +94,9 @@ class TwilioLookup(commands.Cog):
                             if "name" in carrier_info:
                                 embed.add_field(name="Carrier name", value=carrier_info["name"], inline=True)
                             if "type" in carrier_info:
-                                embed.add_field(name="Carrier type", value=carrier_info["type"].upper(), inline=True)
+                                carrier_type = carrier_info.get("type")
+                                if carrier_type is not None:
+                                    embed.add_field(name="Carrier type", value=str(carrier_type).upper(), inline=True)
                             if "mobile_country_code" in carrier_info:
                                 embed.add_field(name="Mobile country code", value=carrier_info["mobile_country_code"], inline=True)
                             if "mobile_network_code" in carrier_info:
