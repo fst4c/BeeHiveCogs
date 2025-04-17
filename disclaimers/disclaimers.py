@@ -15,17 +15,25 @@ class Disclaimers(commands.Cog):
         }
 
     async def save_disclaimer(self, user_id: int, disclaimer: str):
+        # Defensive: ensure disclaimers is a list
         async with self.config.user_from_id(user_id).disclaimers() as disclaimers:
+            if not isinstance(disclaimers, list):
+                disclaimers = []
             if disclaimer not in disclaimers:
                 disclaimers.append(disclaimer)
 
     async def remove_disclaimer(self, user_id: int, disclaimer: str):
         async with self.config.user_from_id(user_id).disclaimers() as disclaimers:
+            if not isinstance(disclaimers, list):
+                return
             if disclaimer in disclaimers:
                 disclaimers.remove(disclaimer)
 
     async def get_disclaimers(self, user_id: int):
-        return await self.config.user_from_id(user_id).disclaimers()
+        disclaimers = await self.config.user_from_id(user_id).disclaimers()
+        if not isinstance(disclaimers, list):
+            return []
+        return disclaimers
 
     @commands.group(name="disclaimers", description="Manage user disclaimers.", invoke_without_command=True)
     @commands.has_permissions(manage_roles=True)
@@ -90,12 +98,20 @@ class Disclaimers(commands.Cog):
         current_page = 0
         message = await ctx.send(embed=get_embed(current_page))
 
-        await message.add_reaction("⬅️")
-        await message.add_reaction("➡️")
-        await message.add_reaction("❌")
+        try:
+            await message.add_reaction("⬅️")
+            await message.add_reaction("➡️")
+            await message.add_reaction("❌")
+        except discord.Forbidden:
+            await ctx.send("I do not have permission to add reactions to messages.")
+            return
 
         def check(reaction, user):
-            return user == ctx.author and str(reaction.emoji) in ["⬅️", "➡️", "❌"] and reaction.message.id == message.id
+            return (
+                user == ctx.author
+                and str(reaction.emoji) in ["⬅️", "➡️", "❌"]
+                and reaction.message.id == message.id
+            )
 
         while True:
             try:
@@ -109,13 +125,22 @@ class Disclaimers(commands.Cog):
                         current_page -= 1
                         await message.edit(embed=get_embed(current_page))
                 elif str(reaction.emoji) == "❌":
-                    await message.clear_reactions()
+                    try:
+                        await message.clear_reactions()
+                    except discord.Forbidden:
+                        pass
                     break
-                await message.remove_reaction(reaction, user)
+                try:
+                    await message.remove_reaction(reaction, user)
+                except discord.Forbidden:
+                    pass
             except asyncio.TimeoutError:
                 break
 
-        await message.clear_reactions()
+        try:
+            await message.clear_reactions()
+        except discord.Forbidden:
+            pass
 
     @disclaimers.command(name="stats", description="Show stats on how many users are assigned to each profession.")
     @commands.has_permissions(manage_roles=True)
@@ -150,10 +175,17 @@ class Disclaimers(commands.Cog):
         disclaimers = await self.get_disclaimers(user_id)
         if disclaimers:
             emoji = "⚠️"
-            await message.add_reaction(emoji)
+            try:
+                await message.add_reaction(emoji)
+            except discord.Forbidden:
+                return
 
             def check(reaction, user):
-                return user != message.author and str(reaction.emoji) == emoji and reaction.message.id == message.id
+                return (
+                    user != message.author
+                    and str(reaction.emoji) == emoji
+                    and reaction.message.id == message.id
+                )
 
             try:
                 reaction, user = await self.bot.wait_for('reaction_add', timeout=60.0, check=check)
@@ -165,7 +197,10 @@ class Disclaimers(commands.Cog):
                 )
                 await message.channel.send(embed=embed)
             except asyncio.TimeoutError:
-                return
+                pass
             finally:
-                await message.clear_reactions()
+                try:
+                    await message.clear_reactions()
+                except discord.Forbidden:
+                    pass
 
