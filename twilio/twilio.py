@@ -103,12 +103,12 @@ class TwilioLookup(commands.Cog):
                                 embed.add_field(name="Mobile network code", value=carrier_info["mobile_network_code"], inline=True)
                             if "error_code" in carrier_info:
                                 error_code = carrier_info["error_code"]
-                                error_description = self.twilio_error_codes.get(error_code, "Unknown error")
+                                error_description = self.twilio_error_codes.get(error_code, "")
                                 embed.add_field(name="Carrier error code", value=f"`{error_code}` - {error_description}", inline=True)
 
                             if "error_code" in caller_name_info:
                                 error_code = caller_name_info["error_code"]
-                                error_description = self.twilio_error_codes.get(error_code, "Unknown error")
+                                error_description = self.twilio_error_codes.get(error_code, "")
                                 embed.add_field(name="Caller error code", value=f"`{error_code}` - {error_description}", inline=True)
 
                             # Add SMS Pumping Risk Information
@@ -124,7 +124,7 @@ class TwilioLookup(commands.Cog):
                                 embed.add_field(name="Number blocked last 3mo", value=sms_pumping_risk_info["number_blocked_last_3_months"], inline=True)
                             if "error_code" in sms_pumping_risk_info:
                                 error_code = sms_pumping_risk_info["error_code"]
-                                error_description = self.twilio_error_codes.get(error_code, "Unknown error")
+                                error_description = self.twilio_error_codes.get(error_code, "")
                                 embed.add_field(name="SMS Pumping risk error code", value=f"`{error_code}` - {error_description}", inline=True)
 
                             await ctx.send(embed=embed)
