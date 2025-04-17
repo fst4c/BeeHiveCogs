@@ -137,7 +137,7 @@ class InviteFilter(commands.Cog):
                 if logging_channel and logging_channel.permissions_for(guild.me).send_messages and logging_channel.permissions_for(guild.me).embed_links:
                     embed = discord.Embed(
                         title="Unwanted invite detected",
-                        description="An invite link was detected and processed.",
+                        description="An invite link was detected",
                         color=0xff4545
                     )
                     embed.add_field(name="Channel", value=message.channel.mention, inline=True)
@@ -146,12 +146,29 @@ class InviteFilter(commands.Cog):
 
                     # Add invite details if fetched
                     for name, value in log_fields.items():
-                         embed.add_field(name=name, value=value, inline=True)
+                        embed.add_field(name=name, value=value, inline=True)
+
+                    # If the invite_info was fetched and has a guild with a description, show it
+                    invite_guild = None
+                    if "Server name" in log_fields and "Server ID" in log_fields:
+                        # Try to get the invite_info.guild.description if available
+                        try:
+                            invite_info = await self.bot.fetch_invite(invite_code)
+                            if invite_info.guild and getattr(invite_info.guild, "description", None):
+                                description = invite_info.guild.description
+                                if description:
+                                    embed.add_field(
+                                        name="Server description",
+                                        value=description[:1024],  # Discord embed field value limit
+                                        inline=False
+                                    )
+                        except Exception:
+                            pass  # Don't break logging if this fails
 
                     if actions_taken:
                         embed.add_field(name="Actions taken", value="\n".join(f"- {action}" for action in actions_taken), inline=False)
                     else:
-                         embed.add_field(name="Actions taken", value="None", inline=False)
+                        embed.add_field(name="Actions taken", value="None", inline=False)
 
                     embed.set_footer(text=f"Message ID: {message.id}")
                     embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
@@ -162,7 +179,7 @@ class InviteFilter(commands.Cog):
                         # Log failure to send log message (e.g., to console or another fallback)
                         print(f"Failed to send invite filter log to channel {logging_channel_id} in guild {guild.id}")
                 elif logging_channel:
-                     print(f"Missing Send/Embed permissions for invite filter log channel {logging_channel_id} in guild {guild.id}")
+                    print(f"Missing Send/Embed permissions for invite filter log channel {logging_channel_id} in guild {guild.id}")
 
 
     @commands.guild_only()
