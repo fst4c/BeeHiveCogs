@@ -1,5 +1,5 @@
 import discord
-from redbot.core import commands, Config # type: ignore
+from redbot.core import commands, Config  # type: ignore
 import re
 import datetime  # Added for timedelta
 
@@ -21,8 +21,8 @@ class InviteFilter(commands.Cog):
             logging_channel=None,
             timeout_duration=1,  # Default to 1 minute timeout
             invites_deleted=0,
-            timeouts_issued=0, # Track number of timeouts
-            total_timeout_minutes=0 # Track total minutes applied
+            timeouts_issued=0,  # Track number of timeouts
+            total_timeout_minutes=0  # Track total minutes applied
         )
         self.config.register_global(
             total_invites_deleted=0
@@ -35,60 +35,61 @@ class InviteFilter(commands.Cog):
             return
 
         guild = message.guild
-        member = message.author # Use member object for timeout
+        member = message.author  # Use member object for timeout
 
         # Check if filtering is enabled
         if not await self.config.guild(guild).delete_invites():
             return
 
         # Check channel whitelist
-        if message.channel.id in await self.config.guild(guild).whitelisted_channels():
+        whitelisted_channels = await self.config.guild(guild).whitelisted_channels()
+        if message.channel.id in whitelisted_channels:
             return
 
         # Check category whitelist
-        if message.channel.category_id in await self.config.guild(guild).whitelisted_categories():
+        whitelisted_categories = await self.config.guild(guild).whitelisted_categories()
+        if message.channel.category_id and message.channel.category_id in whitelisted_categories:
             return
 
         # Check role whitelist (ensure member object is used)
-        if isinstance(member, discord.Member): # Ensure it's a member object before checking roles
+        if isinstance(member, discord.Member):  # Ensure it's a member object before checking roles
             whitelisted_roles = await self.config.guild(guild).whitelisted_roles()
             # Use member.roles directly
             if any(role.id in whitelisted_roles for role in member.roles):
                 return
         else:
-             # This case should ideally not happen in guilds, but safety check
-             return
-
+            # This case should ideally not happen in guilds, but safety check
+            return
 
         # Enhanced invite pattern to catch variations like ".gg/server"
         # Regex needs to capture the code part for fetch_invite if the full URL isn't present
         # Using a more robust regex to capture various forms and extract the code
         invite_pattern = r"(?:discord\.(?:gg|io|me|li)|discordapp\.com/invite|dsc\.gg|invite\.gg)[/](?P<code>[a-zA-Z0-9\-]+)"
-        full_url_pattern = r"(?:https?://)?(?:www\.)?" + invite_pattern # For logging the full match
+        full_url_pattern = r"(?:https?://)?(?:www\.)?" + invite_pattern  # For logging the full match
 
         match = re.search(invite_pattern, message.content, re.IGNORECASE)
         full_match = re.search(full_url_pattern, message.content, re.IGNORECASE)
 
         if match:
             invite_code = match.group("code")
-            log_invite_url = full_match.group(0) if full_match else f"discord.gg/{invite_code}" # Log the matched URL or construct one
+            log_invite_url = full_match.group(0) if full_match else f"discord.gg/{invite_code}"  # Log the matched URL or construct one
 
             actions_taken = []
             log_fields = {}
-            invite_info = None # Store invite info for logging
+            invite_info = None  # Store invite info for logging
 
             # Fetch invite details first (if possible) to log them even if deletion/timeout fails
             try:
                 # Use the extracted code which is more reliable for fetch_invite
                 invite_info = await self.bot.fetch_invite(invite_code)
-                log_fields["Server name"] = invite_info.guild.name if invite_info.guild else "Unknown (Group DM or Deleted Server)"
-                log_fields["Server ID"] = invite_info.guild.id if invite_info.guild else "N/A"
-                log_fields["Member count"] = getattr(invite_info, 'approximate_member_count', 'N/A') # Use getattr for safety
+                log_fields["Server name"] = invite_info.guild.name if getattr(invite_info, "guild", None) else "Unknown (Group DM or Deleted Server)"
+                log_fields["Server ID"] = invite_info.guild.id if getattr(invite_info, "guild", None) else "N/A"
+                log_fields["Member count"] = getattr(invite_info, 'approximate_member_count', 'N/A')  # Use getattr for safety
                 log_fields["Online now"] = getattr(invite_info, 'approximate_presence_count', 'N/A')
             except discord.NotFound:
                 log_fields["Invite Status"] = "Invalid or Expired"
             except discord.HTTPException as e:
-                log_fields["Invite Fetch Error"] = f"HTTP Error: {e.status}"
+                log_fields["Invite Fetch Error"] = f"HTTP Error: {getattr(e, 'status', 'Unknown')}"
             # No except discord.Forbidden here, handle below for specific actions
 
             # --- Action: Delete Message ---
@@ -105,14 +106,13 @@ class InviteFilter(commands.Cog):
             except discord.NotFound:
                 actions_taken.append("Deletion failed (Message already deleted)")
             except discord.HTTPException as e:
-                 actions_taken.append(f"Deletion failed (HTTP Error: {e.status})")
-
+                actions_taken.append(f"Deletion failed (HTTP Error: {getattr(e, 'status', 'Unknown')})")
 
             # --- Action: Timeout User ---
             timeout_duration_minutes = await self.config.guild(guild).timeout_duration()
-            if timeout_duration_minutes > 0 and isinstance(member, discord.Member): # Check if timeout is enabled and we have a member object
+            if timeout_duration_minutes > 0 and isinstance(member, discord.Member):  # Check if timeout is enabled and we have a member object
                 # Ensure the bot has permissions higher than the target user
-                if guild.me.top_role > member.top_role:
+                if guild.me and guild.me.top_role > member.top_role:
                     timeout_delta = datetime.timedelta(minutes=timeout_duration_minutes)
                     try:
                         await member.timeout(timeout_delta, reason="Sent Discord invite link")
@@ -125,16 +125,19 @@ class InviteFilter(commands.Cog):
                     except discord.Forbidden:
                         actions_taken.append(f"Timeout failed (Missing Permissions or Role Hierarchy)")
                     except discord.HTTPException as e:
-                        actions_taken.append(f"Timeout failed (HTTP Error: {e.status})")
+                        actions_taken.append(f"Timeout failed (HTTP Error: {getattr(e, 'status', 'Unknown')})")
                 else:
                     actions_taken.append(f"Timeout skipped (Bot role not high enough)")
-
 
             # --- Action: Log Event ---
             logging_channel_id = await self.config.guild(guild).logging_channel()
             if logging_channel_id:
                 logging_channel = guild.get_channel(logging_channel_id)
-                if logging_channel and logging_channel.permissions_for(guild.me).send_messages and logging_channel.permissions_for(guild.me).embed_links:
+                if (
+                    logging_channel
+                    and logging_channel.permissions_for(guild.me).send_messages
+                    and logging_channel.permissions_for(guild.me).embed_links
+                ):
                     embed = discord.Embed(
                         title="Unwanted invite detected",
                         description="An invite link was detected",
@@ -142,20 +145,19 @@ class InviteFilter(commands.Cog):
                     )
                     embed.add_field(name="Channel", value=message.channel.mention, inline=True)
                     embed.add_field(name="User", value=f"{member.mention} ({member.id})", inline=True)
-                    embed.add_field(name="Detected invite", value=f"`{log_invite_url}`", inline=False) # Use the matched URL
+                    embed.add_field(name="Detected invite", value=f"`{log_invite_url}`", inline=False)  # Use the matched URL
 
                     # Add invite details if fetched
                     for name, value in log_fields.items():
                         embed.add_field(name=name, value=value, inline=True)
 
                     # If the invite_info was fetched and has a guild with a description, show it
-                    invite_guild = None
                     if "Server name" in log_fields and "Server ID" in log_fields:
                         # Try to get the invite_info.guild.description if available
                         try:
-                            invite_info = await self.bot.fetch_invite(invite_code)
-                            if invite_info.guild and getattr(invite_info.guild, "description", None):
-                                description = invite_info.guild.description
+                            invite_info2 = await self.bot.fetch_invite(invite_code)
+                            if getattr(invite_info2, "guild", None) and getattr(invite_info2.guild, "description", None):
+                                description = invite_info2.guild.description
                                 if description:
                                     embed.add_field(
                                         name="Server description",
@@ -180,7 +182,6 @@ class InviteFilter(commands.Cog):
                         print(f"Failed to send invite filter log to channel {logging_channel_id} in guild {guild.id}")
                 elif logging_channel:
                     print(f"Missing Send/Embed permissions for invite filter log channel {logging_channel_id} in guild {guild.id}")
-
 
     @commands.guild_only()
     @commands.admin_or_permissions(manage_guild=True)
@@ -226,9 +227,9 @@ class InviteFilter(commands.Cog):
                     whitelisted_channels.remove(channel.id)
                     changelog.append(f"➖ Removed channel: {channel.mention}")
                 except ValueError:
-                     # Should not happen with the 'in' check, but safety first
-                     await ctx.send("Error removing channel, it might have already been removed.")
-                     return
+                    # Should not happen with the 'in' check, but safety first
+                    await ctx.send("Error removing channel, it might have already been removed.")
+                    return
             else:
                 whitelisted_channels.append(channel.id)
                 changelog.append(f"➕ Added channel: {channel.mention}")
@@ -238,7 +239,7 @@ class InviteFilter(commands.Cog):
             embed = discord.Embed(title="Whitelist Channel Updated", description=changelog_message, color=discord.Color.blue())
             await ctx.send(embed=embed)
         else:
-             await ctx.send("No changes made to the channel whitelist.") # Should not happen based on logic, but good practice
+            await ctx.send("No changes made to the channel whitelist.")  # Should not happen based on logic, but good practice
 
     @whitelist.command(name="category")
     async def whitelist_category(self, ctx, category: discord.CategoryChannel):
@@ -275,7 +276,7 @@ class InviteFilter(commands.Cog):
             if role.id in whitelisted_roles:
                 try:
                     whitelisted_roles.remove(role.id)
-                    changelog.append(f"➖ Removed role: {role.mention}") # Use mention for roles too
+                    changelog.append(f"➖ Removed role: {role.mention}")  # Use mention for roles too
                 except ValueError:
                     await ctx.send("Error removing role, it might have already been removed.")
                     return
@@ -301,8 +302,8 @@ class InviteFilter(commands.Cog):
         if channel:
             # Check bot permissions in the target channel
             if not channel.permissions_for(guild.me).send_messages or not channel.permissions_for(guild.me).embed_links:
-                 await ctx.send(f"⚠️ I lack `Send Messages` or `Embed Links` permissions in {channel.mention}. Please grant them for logging to work.")
-                 return
+                await ctx.send(f"⚠️ I lack `Send Messages` or `Embed Links` permissions in {channel.mention}. Please grant them for logging to work.")
+                return
             await self.config.guild(guild).logging_channel.set(channel.id)
             await ctx.send(f"✅ Logging channel set to {channel.mention}.")
         else:
@@ -319,8 +320,8 @@ class InviteFilter(commands.Cog):
         guild = ctx.guild
         # Discord timeout limit is 28 days (28 * 24 * 60 = 40320 minutes)
         if not 0 <= minutes <= 40320:
-             await ctx.send("⚠️ Timeout duration must be between 0 and 40320 minutes (28 days).")
-             return
+            await ctx.send("⚠️ Timeout duration must be between 0 and 40320 minutes (28 days).")
+            return
 
         await self.config.guild(guild).timeout_duration.set(minutes)
         if minutes > 0:
@@ -335,10 +336,10 @@ class InviteFilter(commands.Cog):
         invites_deleted = await self.config.guild(guild).invites_deleted()
         timeouts_issued = await self.config.guild(guild).timeouts_issued()
         total_timeout_minutes = await self.config.guild(guild).total_timeout_minutes()
-        timeout_duration = await self.config.guild(guild).timeout_duration() # Current setting
+        timeout_duration = await self.config.guild(guild).timeout_duration()  # Current setting
         total_invites_deleted = await self.config.total_invites_deleted()
 
-        embed = discord.Embed(title="Invite filter statistics", color=0xfffffe) # Use standard color
+        embed = discord.Embed(title="Invite filter statistics", color=0xfffffe)  # Use standard color
 
         # Guild Stats
         embed.add_field(name="Invites deleted", value=f"{invites_deleted} invites", inline=True)
@@ -367,11 +368,11 @@ class InviteFilter(commands.Cog):
 
         # Fetch mentions/names safely
         whitelisted_channels_mentions = [c.mention for i in whitelisted_channels_ids if (c := guild.get_channel(i))]
-        whitelisted_roles_mentions = [r.mention for i in whitelisted_roles_ids if (r := guild.get_role(i))] # Use mention for roles
-        whitelisted_categories_names = [cat.name for i in whitelisted_categories_ids if (cat := guild.get_channel(i))]  # New: Fetch category names
+        whitelisted_roles_mentions = [r.mention for i in whitelisted_roles_ids if (r := guild.get_role(i))]  # Use mention for roles
+        whitelisted_categories_names = [cat.name for i in whitelisted_categories_ids if (cat := guild.get_channel(i)) and isinstance(cat, discord.CategoryChannel)]  # Only include categories
         logging_channel_mention = (c.mention if (c := guild.get_channel(logging_channel_id)) else "None") if logging_channel_id else "None"
 
-        embed = discord.Embed(title="Invite filter settings", color=0xfffffe) # Use a different color
+        embed = discord.Embed(title="Invite filter settings", color=0xfffffe)  # Use a different color
 
         embed.add_field(name="Filter status", value="✅ Enabled" if delete_invites else "❌ Disabled", inline=True)
         embed.add_field(name="Whitelisted channels", value=", ".join(whitelisted_channels_mentions) or "None", inline=True)
