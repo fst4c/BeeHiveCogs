@@ -1,6 +1,6 @@
-import discord #type: ignore
-from redbot.core import commands, Config #type: ignore
-import aiohttp #type: ignore
+import discord  # type: ignore
+from redbot.core import commands, Config  # type: ignore
+import aiohttp  # type: ignore
 import asyncio
 import ipaddress
 from datetime import datetime, timedelta
@@ -24,7 +24,7 @@ class AbuseIPDB(commands.Cog):
     async def setapikey(self, ctx, api_key: str):
         await self.config.guild(ctx.guild).api_key.set(api_key)
         await ctx.send("API key set successfully.")
-    
+
     @commands.group(name="abuseipdb")
     async def abuseipdb(self, ctx):
         """
@@ -32,7 +32,7 @@ class AbuseIPDB(commands.Cog):
 
         Learn more at [abuseipdb.com](<https://www.abuseipdb.com>)
         """
-    
+
     @abuseipdb.command(name="report", description="Report an IP address to AbuseIPDB.")
     async def report(self, ctx):
         """Create a new IP abuse report"""
@@ -60,11 +60,23 @@ class AbuseIPDB(commands.Cog):
                         color=0xff4545
                     )
                     await ctx.send(embed=cancel_embed)
-                    await message.delete()
-                    await msg.delete()
+                    try:
+                        await message.delete()
+                    except Exception:
+                        pass
+                    try:
+                        await msg.delete()
+                    except Exception:
+                        pass
                     return None
-                await message.delete()
-                await msg.delete()
+                try:
+                    await message.delete()
+                except Exception:
+                    pass
+                try:
+                    await msg.delete()
+                except Exception:
+                    pass
                 return msg.content
             except asyncio.TimeoutError:
                 timeout_embed = discord.Embed(
@@ -73,7 +85,10 @@ class AbuseIPDB(commands.Cog):
                     color=0xff4545
                 )
                 await ctx.send(embed=timeout_embed)
-                await message.delete()
+                try:
+                    await message.delete()
+                except Exception:
+                    pass
                 return None
 
         embed = discord.Embed(
@@ -95,7 +110,21 @@ class AbuseIPDB(commands.Cog):
 
         ip = await get_user_input("Please respond in chat with the IPv4 or IPv6 that you'd like to create a report for.")
         if ip is None:
-            await message.delete()
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            return
+
+        # Validate IP address before proceeding
+        try:
+            ipaddress.ip_address(ip)
+        except ValueError:
+            await ctx.send("Invalid IP address. Please provide a valid IPv4 or IPv6 address.")
+            try:
+                await message.delete()
+            except Exception:
+                pass
             return
 
         categories_table = (
@@ -125,15 +154,37 @@ class AbuseIPDB(commands.Cog):
         )
         categories = await get_user_input(f"Please enter the categories (comma-separated) for the report\n\n{categories_table}")
         if categories is None:
-            await message.delete()
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            return
+
+        # Validate categories: must be comma-separated numbers between 1 and 23
+        try:
+            cat_list = [int(c.strip()) for c in categories.split(",")]
+            if not all(1 <= c <= 23 for c in cat_list):
+                raise ValueError
+        except Exception:
+            await ctx.send("Invalid categories. Please enter comma-separated numbers between 1 and 23.")
+            try:
+                await message.delete()
+            except Exception:
+                pass
             return
 
         comment = await get_user_input("Please enter a comment for the report")
         if comment is None:
-            await message.delete()
+            try:
+                await message.delete()
+            except Exception:
+                pass
             return
 
-        await message.delete()
+        try:
+            await message.delete()
+        except Exception:
+            pass
 
         abuseipdb_url = "https://api.abuseipdb.com/api/v2/report"
         headers = {
@@ -142,7 +193,7 @@ class AbuseIPDB(commands.Cog):
         }
         data = {
             "ip": ip,
-            "categories": categories,
+            "categories": ",".join(str(c) for c in cat_list),
             "comment": comment,
         }
 
@@ -150,17 +201,21 @@ class AbuseIPDB(commands.Cog):
             async with ctx.typing():
                 try:
                     async with session.post(abuseipdb_url, headers=headers, data=data) as response:
-                        response_data = await response.json()
+                        try:
+                            response_data = await response.json()
+                        except Exception:
+                            await ctx.send("Failed to parse AbuseIPDB response.")
+                            return
                         if response.status == 200:
-                            ip_address = response_data["data"]["ipAddress"]
-                            abuse_confidence_score = response_data["data"]["abuseConfidenceScore"]
+                            ip_address = response_data.get("data", {}).get("ipAddress")
+                            abuse_confidence_score = response_data.get("data", {}).get("abuseConfidenceScore")
                             embed = discord.Embed(
                                 title="Your report was successfully processed",
                                 description="Reports like yours help assist security analysts and sysadmins around the world who rely on AbuseIPDB",
                                 color=0x2bbd8e
                             )
-                            embed.add_field(name="IP address reported", value=ip_address, inline=True)
-                            embed.add_field(name="Updated abuse score", value=abuse_confidence_score, inline=True)
+                            embed.add_field(name="IP address reported", value=ip_address or "Unknown", inline=True)
+                            embed.add_field(name="Updated abuse score", value=abuse_confidence_score if abuse_confidence_score is not None else "Unknown", inline=True)
                             await ctx.send(embed=embed)
 
                             # Track the report
@@ -172,7 +227,12 @@ class AbuseIPDB(commands.Cog):
                                 reports[user_id].append(now)
 
                         else:
-                            error_detail = response_data["errors"][0]["detail"]
+                            # Defensive: check for errors in response
+                            error_detail = None
+                            if "errors" in response_data and response_data["errors"]:
+                                error_detail = response_data["errors"][0].get("detail", "Unknown error.")
+                            else:
+                                error_detail = "Unknown error."
                             embed = discord.Embed(
                                 title="Something went wrong",
                                 description=error_detail,
@@ -221,7 +281,10 @@ class AbuseIPDB(commands.Cog):
         )
 
         for rank, (user_id, count) in enumerate(top_reporters, start=1):
-            user = self.bot.get_user(int(user_id))
+            try:
+                user = self.bot.get_user(int(user_id))
+            except Exception:
+                user = None
             username = f"<@{user_id}>" if user else "Unknown User"
             report_word = "report" if count == 1 else "reports"
             leaderboard_embed.add_field(name=f"Rank {rank}", value=f"{username}, with {count} {report_word}", inline=True)
@@ -234,6 +297,13 @@ class AbuseIPDB(commands.Cog):
         api_key = await self.config.guild(ctx.guild).api_key()
         if not api_key:
             await ctx.send("API key not set. Use the setapikey command to set it.")
+            return
+
+        # Validate IP address before proceeding
+        try:
+            ipaddress.ip_address(ip)
+        except ValueError:
+            await ctx.send("Invalid IP address. Please provide a valid IPv4 or IPv6 address.")
             return
 
         abuseipdb_url = "https://api.abuseipdb.com/api/v2/reports"
@@ -276,25 +346,42 @@ class AbuseIPDB(commands.Cog):
         all_reports = []
         async with aiohttp.ClientSession() as session:
             async with ctx.typing():
-                async with session.get(abuseipdb_url, headers=headers, params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        report_data = data['data']
-                        total_reports = report_data['total']
-                        pages = (total_reports // params["perPage"]) + (1 if total_reports % params["perPage"] != 0 else 0)
-                        
-                        for page in range(1, pages + 1):
-                            params["page"] = page
-                            async with session.get(abuseipdb_url, headers=headers, params=params) as page_response:
-                                if page_response.status == 200:
-                                    page_data = await page_response.json()
-                                    all_reports.extend(page_data['data']['results'])
-                                else:
-                                    await ctx.send("Failed to fetch data from AbuseIPDB.")
-                                    return
-                    else:
-                        await ctx.send("Failed to fetch data from AbuseIPDB.")
-                        return
+                try:
+                    async with session.get(abuseipdb_url, headers=headers, params=params) as response:
+                        if response.status == 200:
+                            try:
+                                data = await response.json()
+                            except Exception:
+                                await ctx.send("Failed to parse AbuseIPDB response.")
+                                return
+                            report_data = data.get('data', {})
+                            total_reports = report_data.get('total', 0)
+                            if not isinstance(total_reports, int):
+                                total_reports = 0
+                            pages = (total_reports // params["perPage"]) + (1 if total_reports % params["perPage"] != 0 else 0)
+
+                            for page in range(1, pages + 1):
+                                params["page"] = page
+                                async with session.get(abuseipdb_url, headers=headers, params=params) as page_response:
+                                    if page_response.status == 200:
+                                        try:
+                                            page_data = await page_response.json()
+                                        except Exception:
+                                            await ctx.send("Failed to parse AbuseIPDB response.")
+                                            return
+                                        all_reports.extend(page_data.get('data', {}).get('results', []))
+                                    else:
+                                        await ctx.send("Failed to fetch data from AbuseIPDB.")
+                                        return
+                        else:
+                            await ctx.send("Failed to fetch data from AbuseIPDB.")
+                            return
+                except aiohttp.ClientError as e:
+                    await ctx.send(f"Client error while fetching data from AbuseIPDB: {e}")
+                    return
+                except Exception as e:
+                    await ctx.send(f"Unexpected error while fetching data from AbuseIPDB: {e}")
+                    return
 
         if not all_reports:
             await ctx.send(f"No reports found for IP address {ip}.")
@@ -302,14 +389,29 @@ class AbuseIPDB(commands.Cog):
 
         embeds = []
         for i, rep in enumerate(all_reports):
-            categories = [reason_map.get(cat, f"Unknown ({cat})") for cat in rep["categories"]]
+            # Defensive: ensure keys exist
+            categories = [reason_map.get(cat, f"Unknown ({cat})") for cat in rep.get("categories", [])]
             embed = discord.Embed(title=f"AbuseIPDB reports for {ip}", color=0xfffffe)
             embed.set_footer(text=f"Total reports: {len(all_reports)}")
+            # Defensive: parse_time may not exist, use fromisoformat fallback
+            reported_at = rep.get("reportedAt")
+            try:
+                if hasattr(discord.utils, "parse_time"):
+                    dt = discord.utils.parse_time(reported_at)
+                else:
+                    dt = datetime.fromisoformat(reported_at.replace("Z", "+00:00"))
+                timestamp = int(dt.timestamp())
+                time_str = f"**<t:{timestamp}:R>**"
+            except Exception:
+                time_str = reported_at or "Unknown time"
+            comment = rep.get("comment", "")
+            reporter_id = rep.get("reporterId", "Unknown")
+            reporter_country = rep.get("reporterCountryName", "Unknown")
             embed.add_field(
                 name=f"Report {i+1}",
-                value=f'**<t:{int(discord.utils.parse_time(rep["reportedAt"]).timestamp())}:R>** for {", ".join(categories)}\n'
-                      f'Report says "{rep["comment"]}"\n'
-                      f'Reported by user `{rep["reporterId"]}` in **{rep["reporterCountryName"]}**',
+                value=f'{time_str} for {", ".join(categories)}\n'
+                      f'Report says "{comment}"\n'
+                      f'Reported by user `{reporter_id}` in **{reporter_country}**',
                 inline=False
             )
             embeds.append(embed)
@@ -317,9 +419,12 @@ class AbuseIPDB(commands.Cog):
         message = await ctx.send(embed=embeds[0])
 
         if len(embeds) > 1:
-            await message.add_reaction("⬅️")
-            await message.add_reaction("❌")
-            await message.add_reaction("➡️")
+            try:
+                await message.add_reaction("⬅️")
+                await message.add_reaction("❌")
+                await message.add_reaction("➡️")
+            except Exception:
+                pass
 
             def check(reaction, user):
                 return user == ctx.author and str(reaction.emoji) in ["⬅️", "➡️", "❌"] and reaction.message.id == message.id
@@ -336,10 +441,16 @@ class AbuseIPDB(commands.Cog):
                         await message.edit(embed=embeds[current_page])
                     elif str(reaction.emoji) == "❌":
                         break
-                    await message.remove_reaction(reaction, user)
+                    try:
+                        await message.remove_reaction(reaction, user)
+                    except Exception:
+                        pass
                 except asyncio.TimeoutError:
                     break
-            await message.clear_reactions()
+            try:
+                await message.clear_reactions()
+            except Exception:
+                pass
 
     @abuseipdb.command(name="check", description="Check an IP address against AbuseIPDB.")
     async def checkip(self, ctx, ip: str):
@@ -368,33 +479,64 @@ class AbuseIPDB(commands.Cog):
         }
 
         async with aiohttp.ClientSession() as session:
-            async with session.get(abuseipdb_url, headers=headers, params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    report = data['data']
-                    embed = discord.Embed(title=f"AbuseIPDB report for {ip}", color=0xfffffe)
-                    embed.add_field(name="IP address", value=report['ipAddress'], inline=True)
-                    embed.add_field(name="Abuse confidence score", value=report['abuseConfidenceScore'], inline=True)
-                    embed.add_field(name="Country", value=f"{report['countryName']} ({report['countryCode']})", inline=True)
-                    embed.add_field(name="ISP", value=report['isp'], inline=True)
-                    embed.add_field(name="Domain", value=report['domain'], inline=True)
-                    embed.add_field(name="Total reports", value=report['totalReports'], inline=True)
-                    
-                    last_reported_at = report.get('lastReportedAt')
-                    if last_reported_at:
-                        embed.add_field(name="Last reported", value=f"**<t:{int(discord.utils.parse_time(last_reported_at).timestamp())}:R>**", inline=True)
+            try:
+                async with session.get(abuseipdb_url, headers=headers, params=params) as response:
+                    if response.status == 200:
+                        try:
+                            data = await response.json()
+                        except Exception:
+                            await ctx.send("Failed to parse AbuseIPDB response.")
+                            return
+                        report = data.get('data', {})
+                        embed = discord.Embed(title=f"AbuseIPDB report for {ip}", color=0xfffffe)
+                        embed.add_field(name="IP address", value=report.get('ipAddress', 'Unknown'), inline=True)
+                        embed.add_field(name="Abuse confidence score", value=report.get('abuseConfidenceScore', 'Unknown'), inline=True)
+                        embed.add_field(name="Country", value=f"{report.get('countryName', 'Unknown')} ({report.get('countryCode', '??')})", inline=True)
+                        embed.add_field(name="ISP", value=report.get('isp', 'Unknown'), inline=True)
+                        embed.add_field(name="Domain", value=report.get('domain', 'Unknown'), inline=True)
+                        embed.add_field(name="Total reports", value=report.get('totalReports', 'Unknown'), inline=True)
+
+                        last_reported_at = report.get('lastReportedAt')
+                        if last_reported_at:
+                            try:
+                                if hasattr(discord.utils, "parse_time"):
+                                    dt = discord.utils.parse_time(last_reported_at)
+                                else:
+                                    dt = datetime.fromisoformat(last_reported_at.replace("Z", "+00:00"))
+                                timestamp = int(dt.timestamp())
+                                time_str = f"**<t:{timestamp}:R>**"
+                            except Exception:
+                                time_str = last_reported_at
+                            embed.add_field(name="Last reported", value=time_str, inline=True)
+                        else:
+                            embed.add_field(name="Last reported", value="No reports available", inline=True)
+
+                        # Defensive: check if 'reports' exists and is a list
+                        reports_list = report.get('reports', [])
+                        if isinstance(reports_list, list) and reports_list:
+                            for i, rep in enumerate(reports_list[:5]):
+                                rep_reported_at = rep.get("reportedAt")
+                                try:
+                                    if hasattr(discord.utils, "parse_time"):
+                                        dt = discord.utils.parse_time(rep_reported_at)
+                                    else:
+                                        dt = datetime.fromisoformat(rep_reported_at.replace("Z", "+00:00"))
+                                    timestamp = int(dt.timestamp())
+                                    rep_time_str = f"**<t:{timestamp}:R>**"
+                                except Exception:
+                                    rep_time_str = rep_reported_at or "Unknown time"
+                                comment = rep.get("comment", "")
+                                embed.add_field(
+                                    name=f"Report {i+1}",
+                                    value=f'{rep_time_str}, "{comment}"',
+                                    inline=False
+                                )
+                        await ctx.send(embed=embed)
                     else:
-                        embed.add_field(name="Last reported", value="No reports available", inline=True)
-                    
-                    if report['reports']:
-                        for i, rep in enumerate(report['reports'][:5]):
-                            embed.add_field(
-                                name=f"Report {i+1}",
-                                value=f'**<t:{int(discord.utils.parse_time(rep["reportedAt"]).timestamp())}:R>**, "{rep["comment"]}"',
-                                inline=False
-                            )
-                    await ctx.send(embed=embed)
-                else:
-                    await ctx.send("Failed to fetch data from AbuseIPDB.")
+                        await ctx.send("Failed to fetch data from AbuseIPDB.")
+            except aiohttp.ClientError as e:
+                await ctx.send(f"Client error while fetching data from AbuseIPDB: {e}")
+            except Exception as e:
+                await ctx.send(f"Unexpected error while fetching data from AbuseIPDB: {e}")
 
 
