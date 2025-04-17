@@ -102,10 +102,33 @@ class Omni(commands.Cog):
         guild = message.guild
         channel = message.channel
 
+        # Check all whitelist conditions before incrementing or sending reminder
+        whitelisted_channels = await self.config.guild(guild).whitelisted_channels()
+        whitelisted_categories = await self.config.guild(guild).whitelisted_categories()
+        whitelisted_roles = await self.config.guild(guild).whitelisted_roles()
+        whitelisted_users = await self.config.guild(guild).whitelisted_users()
+        bypass_nsfw = await self.config.guild(guild).bypass_nsfw()
+
+        # Check if channel is whitelisted by channel ID
+        if channel.id in whitelisted_channels:
+            return
+        # Check if channel's category is whitelisted
+        if channel.category_id in whitelisted_categories:
+            return
+        # Check if any of the author's roles are whitelisted
+        if hasattr(message.author, "roles") and any(role.id in whitelisted_roles for role in message.author.roles):
+            return
+        # Check if author is whitelisted
+        if message.author.id in whitelisted_users:
+            return
+        # Check if NSFW bypass is enabled and channel is NSFW
+        if hasattr(channel, "is_nsfw") and channel.is_nsfw() and bypass_nsfw:
+            return
+
         # Increment the message count for the channel
         self.memory_user_message_counts[guild.id][channel.id] += 1
 
-        # Check if the message count has reached 50
+        # Check if the message count has reached 75
         if self.memory_user_message_counts[guild.id][channel.id] >= 75:
             await self.send_monitoring_reminder(channel)
             # Reset the message count for the channel
