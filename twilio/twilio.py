@@ -78,51 +78,51 @@ class TwilioLookup(commands.Cog):
                     async with session.get(twilio_url, auth=auth) as response:
                         if response.status == 200:
                             data = await response.json()
-                            carrier_info = data.get("carrier", {})
-                            caller_name_info = data.get("caller_name", {})
-                            sms_pumping_risk_info = data.get("sms_pumping_risk", {})
+                            carrier_info = data.get("carrier") or {}
+                            caller_name_info = data.get("caller_name") or {}
+                            sms_pumping_risk_info = data.get("sms_pumping_risk") or {}
                             formatted_number = data.get("national_format", phone_number)
 
                             embed = discord.Embed(title="Phone number lookup", color=0xfffffe)
                             embed.add_field(name="Phone number", value=formatted_number, inline=False)
 
-                            if "caller_name" in caller_name_info:
+                            if isinstance(caller_name_info, dict) and "caller_name" in caller_name_info:
                                 embed.add_field(name="Caller name", value=caller_name_info["caller_name"].title(), inline=True)
-                            if "caller_type" in caller_name_info:
+                            if isinstance(caller_name_info, dict) and "caller_type" in caller_name_info:
                                 embed.add_field(name="Caller type", value=caller_name_info["caller_type"].title(), inline=True)
 
-                            if "name" in carrier_info:
+                            if isinstance(carrier_info, dict) and "name" in carrier_info:
                                 embed.add_field(name="Carrier name", value=carrier_info["name"], inline=True)
-                            if "type" in carrier_info:
+                            if isinstance(carrier_info, dict) and "type" in carrier_info:
                                 carrier_type = carrier_info.get("type")
                                 if carrier_type is not None:
                                     embed.add_field(name="Carrier type", value=str(carrier_type).upper(), inline=True)
-                            if "mobile_country_code" in carrier_info:
+                            if isinstance(carrier_info, dict) and "mobile_country_code" in carrier_info:
                                 embed.add_field(name="Mobile country code", value=carrier_info["mobile_country_code"], inline=True)
-                            if "mobile_network_code" in carrier_info:
+                            if isinstance(carrier_info, dict) and "mobile_network_code" in carrier_info:
                                 embed.add_field(name="Mobile network code", value=carrier_info["mobile_network_code"], inline=True)
-                            if "error_code" in carrier_info:
+                            if isinstance(carrier_info, dict) and "error_code" in carrier_info:
                                 error_code = carrier_info["error_code"]
                                 error_description = self.twilio_error_codes.get(error_code, "")
                                 embed.add_field(name="Carrier error code", value=f"`{error_code}` - {error_description}", inline=True)
 
-                            if "error_code" in caller_name_info:
+                            if isinstance(caller_name_info, dict) and "error_code" in caller_name_info:
                                 error_code = caller_name_info["error_code"]
                                 error_description = self.twilio_error_codes.get(error_code, "")
                                 embed.add_field(name="Caller error code", value=f"`{error_code}` - {error_description}", inline=True)
 
                             # Add SMS Pumping Risk Information
-                            if "carrier_risk_category" in sms_pumping_risk_info:
+                            if isinstance(sms_pumping_risk_info, dict) and "carrier_risk_category" in sms_pumping_risk_info:
                                 embed.add_field(name="SMS Pumping risk category", value=sms_pumping_risk_info["carrier_risk_category"].title(), inline=True)
-                            if "sms_pumping_risk_score" in sms_pumping_risk_info:
+                            if isinstance(sms_pumping_risk_info, dict) and "sms_pumping_risk_score" in sms_pumping_risk_info:
                                 embed.add_field(name="SMS Pumping risk score", value=sms_pumping_risk_info["sms_pumping_risk_score"], inline=True)
-                            if "number_blocked" in sms_pumping_risk_info:
+                            if isinstance(sms_pumping_risk_info, dict) and "number_blocked" in sms_pumping_risk_info:
                                 embed.add_field(name="Number blocked", value=sms_pumping_risk_info["number_blocked"], inline=True)
-                            if "number_blocked_date" in sms_pumping_risk_info:
+                            if isinstance(sms_pumping_risk_info, dict) and "number_blocked_date" in sms_pumping_risk_info:
                                 embed.add_field(name="Number blocked date", value=sms_pumping_risk_info["number_blocked_date"], inline=True)
-                            if "number_blocked_last_3_months" in sms_pumping_risk_info:
+                            if isinstance(sms_pumping_risk_info, dict) and "number_blocked_last_3_months" in sms_pumping_risk_info:
                                 embed.add_field(name="Number blocked last 3mo", value=sms_pumping_risk_info["number_blocked_last_3_months"], inline=True)
-                            if "error_code" in sms_pumping_risk_info:
+                            if isinstance(sms_pumping_risk_info, dict) and "error_code" in sms_pumping_risk_info:
                                 error_code = sms_pumping_risk_info["error_code"]
                                 error_description = self.twilio_error_codes.get(error_code, "")
                                 embed.add_field(name="SMS Pumping risk error code", value=f"`{error_code}` - {error_description}", inline=True)
