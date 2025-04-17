@@ -114,7 +114,7 @@ class Omni(commands.Cog):
     async def send_monitoring_reminder(self, channel):
         """Send a monitoring reminder to the specified channel."""
         try:
-            command_prefix = (await self.bot.get_valid_prefixes())[0]  # Get the first valid prefix
+            command_prefix = (await self.bot.get_valid_prefixes())[0]
             embed = discord.Embed(
                 title="Omni is monitoring the conversation",
                 description=(
