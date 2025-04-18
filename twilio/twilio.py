@@ -86,10 +86,15 @@ class TwilioLookup(commands.Cog):
                             embed = discord.Embed(title="Phone number lookup", color=0xfffffe)
                             embed.add_field(name="Phone number", value=formatted_number, inline=False)
 
+                            # Safely handle None values for caller_name and caller_type
                             if isinstance(caller_name_info, dict) and "caller_name" in caller_name_info:
-                                embed.add_field(name="Caller name", value=caller_name_info["caller_name"].title(), inline=True)
+                                caller_name_val = caller_name_info["caller_name"]
+                                if caller_name_val is not None:
+                                    embed.add_field(name="Caller name", value=str(caller_name_val).title(), inline=True)
                             if isinstance(caller_name_info, dict) and "caller_type" in caller_name_info:
-                                embed.add_field(name="Caller type", value=caller_name_info["caller_type"].title(), inline=True)
+                                caller_type_val = caller_name_info["caller_type"]
+                                if caller_type_val is not None:
+                                    embed.add_field(name="Caller type", value=str(caller_type_val).title(), inline=True)
 
                             if isinstance(carrier_info, dict) and "name" in carrier_info:
                                 embed.add_field(name="Carrier name", value=carrier_info["name"], inline=True)
@@ -113,7 +118,9 @@ class TwilioLookup(commands.Cog):
 
                             # Add SMS Pumping Risk Information
                             if isinstance(sms_pumping_risk_info, dict) and "carrier_risk_category" in sms_pumping_risk_info:
-                                embed.add_field(name="SMS Pumping risk category", value=sms_pumping_risk_info["carrier_risk_category"].title(), inline=True)
+                                carrier_risk_category_val = sms_pumping_risk_info["carrier_risk_category"]
+                                if carrier_risk_category_val is not None:
+                                    embed.add_field(name="SMS Pumping risk category", value=str(carrier_risk_category_val).title(), inline=True)
                             if isinstance(sms_pumping_risk_info, dict) and "sms_pumping_risk_score" in sms_pumping_risk_info:
                                 embed.add_field(name="SMS Pumping risk score", value=sms_pumping_risk_info["sms_pumping_risk_score"], inline=True)
                             if isinstance(sms_pumping_risk_info, dict) and "number_blocked" in sms_pumping_risk_info:
