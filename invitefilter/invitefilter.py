@@ -113,15 +113,36 @@ class InviteFilter(commands.Cog):
             if timeout_duration_minutes > 0 and isinstance(member, discord.Member):  # Check if timeout is enabled and we have a member object
                 # Ensure the bot has permissions higher than the target user
                 if guild.me and guild.me.top_role > member.top_role:
-                    timeout_delta = datetime.timedelta(minutes=timeout_duration_minutes)
                     try:
-                        await member.timeout(timeout_delta, reason="Sent Discord invite link")
-                        actions_taken.append(f"Timeout issued for {timeout_duration_minutes} minutes")
-                        # Increment timeout stats on success
-                        current_timeouts = await self.config.guild(guild).timeouts_issued()
-                        await self.config.guild(guild).timeouts_issued.set(current_timeouts + 1)
-                        current_total_minutes = await self.config.guild(guild).total_timeout_minutes()
-                        await self.config.guild(guild).total_timeout_minutes.set(current_total_minutes + timeout_duration_minutes)
+                        # Check if the user is already timed out
+                        # member.timed_out_until is a datetime.datetime or None
+                        now_utc = datetime.datetime.now(datetime.timezone.utc)
+                        timed_out_until = getattr(member, "timed_out_until", None)
+                        if timed_out_until and timed_out_until > now_utc:
+                            # User is already timed out, so extend the timeout by the additional duration
+                            new_timeout_until = timed_out_until + datetime.timedelta(minutes=timeout_duration_minutes)
+                            # Discord's max timeout is 28 days from now
+                            max_timeout_until = now_utc + datetime.timedelta(days=28)
+                            if new_timeout_until > max_timeout_until:
+                                new_timeout_until = max_timeout_until
+                            await member.edit(timeout=new_timeout_until, reason="Sent Discord invite link (timeout extended)")
+                            actions_taken.append(f"Timeout extended by {timeout_duration_minutes} minutes (new expiry: <t:{int(new_timeout_until.timestamp())}:R>)")
+                            # Increment timeout stats on success
+                            current_timeouts = await self.config.guild(guild).timeouts_issued()
+                            await self.config.guild(guild).timeouts_issued.set(current_timeouts + 1)
+                            current_total_minutes = await self.config.guild(guild).total_timeout_minutes()
+                            # Only add the additional minutes, not the full new timeout
+                            await self.config.guild(guild).total_timeout_minutes.set(current_total_minutes + timeout_duration_minutes)
+                        else:
+                            # User is not currently timed out, apply a new timeout
+                            timeout_delta = datetime.timedelta(minutes=timeout_duration_minutes)
+                            await member.timeout(timeout_delta, reason="Sent Discord invite link")
+                            actions_taken.append(f"Timeout issued for {timeout_duration_minutes} minutes")
+                            # Increment timeout stats on success
+                            current_timeouts = await self.config.guild(guild).timeouts_issued()
+                            await self.config.guild(guild).timeouts_issued.set(current_timeouts + 1)
+                            current_total_minutes = await self.config.guild(guild).total_timeout_minutes()
+                            await self.config.guild(guild).total_timeout_minutes.set(current_total_minutes + timeout_duration_minutes)
                     except discord.Forbidden:
                         actions_taken.append(f"Timeout failed (Missing Permissions or Role Hierarchy)")
                     except discord.HTTPException as e:
