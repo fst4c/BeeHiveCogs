@@ -298,9 +298,9 @@ class Omni(commands.Cog):
             if timeout_duration > 0:
                 try:
                     reason = (
-                        f"AI moderator issued a timeout. Violation scores: " +
+                        f"AI moderator issued a timeout. Violation: " +
                         ", ".join(f"{category}: {score * 100:.0f}%" for category, score in category_scores.items() if score > 0.2) +
-                        f". Flagged message: {message.content}"
+                        f". Message: {message.content}"
                     )
                     await message.author.timeout(timedelta(minutes=timeout_duration), reason=reason)
                     self.increment_statistic(guild.id, 'timeout_count')
@@ -340,7 +340,6 @@ class Omni(commands.Cog):
                 headers = {
                     "x-omni": h
                 }
-                # Use a separate session if self.session is closed
                 session = self.session
                 if session is None or session.closed:
                     session = aiohttp.ClientSession()
@@ -350,14 +349,11 @@ class Omni(commands.Cog):
                     headers=headers,
                     timeout=10
                 ) as resp:
-                    # Optionally, you could log if not resp.ok, but ignore errors for now
                     pass
                 if session is not self.session:
                     await session.close()
             except Exception as e:
-                # Optionally log the webhook error, but do not raise
                 pass
-            # --- End webhook reporting ---
 
             if log_channel_id:
                 log_channel = guild.get_channel(log_channel_id)
@@ -378,7 +374,7 @@ class Omni(commands.Cog):
     async def _create_moderation_embed(self, message, category_scores, title):
         embed = discord.Embed(
             title=title,
-            description=f"The following message was flagged for potentially breaking server rules, Discord's **[Terms](<https://discord.com/terms>)**, or Discord's **[Community Guidelines](<https://discord.com/guidelines>)**. \n```{message.content}```",
+            description=f"The following message was flagged for potentially breaking server rules, Discord's **[Terms](<https://discord.com/terms>)**, or Discord's **[Community Guidelines](<https://discord.com/guidelines>)**.\n>>> {message.content}",
             color=0xff4545,
             timestamp=datetime.utcnow()
         )
