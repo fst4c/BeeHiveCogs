@@ -287,11 +287,33 @@ class AntiPhishing(commands.Cog):
     async def lookup(self, ctx: Context, domain: str):
         """
         Lookup a domain in the blocklistv2 and show its details if it exists.
+        Only show fields that are unique (i.e., whose value is not shared by all entries).
         """
         domain = domain.lower()
         if domain in self.domains_v2:
             additional_info = self.domains_v2[domain]
-            formatted_info = "\n".join(f"**{key.replace('_', ' ').title()}**: {value}" for key, value in additional_info.items())
+
+            # Find unique fields by comparing values across all domains
+            # Build a dict: field -> set of all values for that field
+            field_values = {}
+            for entry in self.domains_v2.values():
+                for key, value in entry.items():
+                    field_values.setdefault(key, set()).add(str(value))
+
+            # Unique fields: those whose value for this domain is not shared by all entries
+            unique_fields = []
+            for key, value in additional_info.items():
+                # If this value is unique among all values for this field, or if the field has >1 possible value
+                if len(field_values[key]) > 1:
+                    unique_fields.append((key, value))
+
+            if unique_fields:
+                formatted_info = "\n".join(
+                    f"**{key.replace('_', ' ').title()}**: {value}" for key, value in unique_fields
+                )
+            else:
+                formatted_info = "No unique information found for this domain."
+
             embed = discord.Embed(
                 title=f"Domain Lookup: {domain}",
                 description=formatted_info,
