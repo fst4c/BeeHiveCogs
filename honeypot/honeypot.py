@@ -125,6 +125,17 @@ class Honeypot(commands.Cog, name="Honeypot"):
                     except Exception:
                         icon_url = None
 
+                # Determine the configured action for this guild
+                action = config.get("action")
+                action_descriptions = {
+                    "mute": "You will be assigned the server's mute role and lose the ability to speak.",
+                    "kick": "You will be kicked from the server immediately.",
+                    "ban": "You will be banned from the server immediately.",
+                    "timeout": "You will be timed out and unable to interact for 7 days.",
+                    None: "An action will be taken against you as decided by the server owner."
+                }
+                action_text = action_descriptions.get(action, "An action will be taken against you as decided by the server owner.")
+
                 embed = discord.Embed(
                     title="Shhhhh - this is a security honeypot",
                     description="A honeypot is a security mechanism designed to lure cybercriminals into interacting with decoy targets. By doing so, cybersecurity experts can observe and analyze the attackers' methods, allowing them to develop effective countermeasures.\n\nSimilarly, this channel serves as a honeypot. It is intentionally placed in a conspicuous location with clear instructions not to engage in conversation here. Unsuspecting automated bots and low-quality spammers, such as those promoting nitro scams or explicit content, will likely post messages in this channel, unaware of its true purpose.",
@@ -135,7 +146,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
                     inline=False,
                 ).add_field(
                     name="What will happen?",
-                    value="An action will be taken against you as decided by the server owner, which could be anything from a timeout, to an immediate ban.",
+                    value=action_text,
                     inline=False,
                 ).set_footer(text=guild.name, icon_url=icon_url).set_image(url="attachment://do_not_post_here.png")
 
@@ -342,6 +353,18 @@ class Honeypot(commands.Cog, name="Honeypot"):
                 except Exception:
                     icon_url = None
 
+            # Determine the configured action for this guild
+            config = await self.config.guild(ctx.guild).all()
+            action = config.get("action")
+            action_descriptions = {
+                "mute": "You will be assigned the server's mute role and lose the ability to speak.",
+                "kick": "You will be kicked from the server immediately.",
+                "ban": "You will be banned from the server immediately.",
+                "timeout": "You will be timed out and unable to interact for 7 days.",
+                None: "An action will be taken against you as decided by the server owner."
+            }
+            action_text = action_descriptions.get(action, "An action will be taken against you as decided by the server owner.")
+
             embed = discord.Embed(
                 title="Shhhhh - this is a security honeypot",
                 description="A honeypot is a security mechanism designed to lure cybercriminals into interacting with decoy targets. By doing so, cybersecurity experts can observe and analyze the attackers' methods, allowing them to develop effective countermeasures.\n\nSimilarly, this channel serves as a honeypot. It is intentionally placed in a conspicuous location with clear instructions not to engage in conversation here. Unsuspecting automated bots and low-quality spammers, such as those promoting nitro scams or explicit content, will likely post messages in this channel, unaware of its true purpose.",
@@ -352,7 +375,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
                 inline=False,
             ).add_field(
                 name="What will happen?",
-                value="An action will be taken against you as decided by the server owner, which could be anything from a timeout, to an immediate ban.",
+                value=action_text,
                 inline=False,
             ).set_footer(text=ctx.guild.name, icon_url=icon_url).set_image(url="attachment://do_not_post_here.png")
 
