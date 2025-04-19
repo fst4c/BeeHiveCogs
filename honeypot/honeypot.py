@@ -31,6 +31,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         self.global_scam_stats = None
         self.bot.loop.create_task(self.initialize_global_scam_stats())
         self.bot.loop.create_task(self.randomize_honeypot_name())
+        self.bot.loop.create_task(self.refresh_honeypot_warning_messages())
 
     async def initialize_global_scam_stats(self):
         self.global_scam_stats = await self.config.global_scam_stats()
@@ -84,6 +85,74 @@ class Honeypot(commands.Cog, name="Honeypot"):
                         pass
 
             await asyncio.sleep(4 * 60 * 60)  # Wait for 4 hours
+
+    async def refresh_honeypot_warning_messages(self):
+        """On cog load, delete the pre-existing honeypot warning message and send a fresh copy. Do this slowly to avoid rate limits."""
+        await self.bot.wait_until_ready()
+        await asyncio.sleep(10)  # Give a little time for cache to warm up
+        for guild in self.bot.guilds:
+            try:
+                config = await self.config.guild(guild).all()
+                honeypot_channel_id = config.get("honeypot_channel")
+                if not honeypot_channel_id:
+                    continue
+                honeypot_channel = guild.get_channel(honeypot_channel_id)
+                if not honeypot_channel:
+                    continue
+
+                # Try to find the bot's own honeypot warning message (by embed title or image)
+                async for msg in honeypot_channel.history(limit=10, oldest_first=True):
+                    if (
+                        msg.author == guild.me
+                        and msg.embeds
+                        and (
+                            (msg.embeds[0].title and "Shhhhh - this is a security honeypot" in msg.embeds[0].title)
+                            or (msg.embeds[0].image and msg.embeds[0].image.url and "do_not_post_here" in msg.embeds[0].image.url)
+                        )
+                    ):
+                        try:
+                            await msg.delete()
+                            await asyncio.sleep(2)  # Slow down to avoid rate limits
+                        except Exception:
+                            pass
+                        break  # Only delete one warning message
+
+                # Now send a fresh warning message
+                icon_url = None
+                if guild.icon:
+                    try:
+                        icon_url = guild.icon.url
+                    except Exception:
+                        icon_url = None
+
+                embed = discord.Embed(
+                    title="Shhhhh - this is a security honeypot",
+                    description="A honeypot is a security mechanism designed to lure cybercriminals into interacting with decoy targets. By doing so, cybersecurity experts can observe and analyze the attackers' methods, allowing them to develop effective countermeasures.\n\nSimilarly, this channel serves as a honeypot. It is intentionally placed in a conspicuous location with clear instructions not to engage in conversation here. Unsuspecting automated bots and low-quality spammers, such as those promoting nitro scams or explicit content, will likely post messages in this channel, unaware of its true purpose.",
+                    color=0xff4545,
+                ).add_field(
+                    name="What do I do?",
+                    value="- **Do not speak in this channel**\n- **Do not send images in this channel**\n- **Do not send files in this channel**",
+                    inline=False,
+                ).add_field(
+                    name="What will happen?",
+                    value="An action will be taken against you as decided by the server owner, which could be anything from a timeout, to an immediate ban.",
+                    inline=False,
+                ).set_footer(text=guild.name, icon_url=icon_url).set_image(url="attachment://do_not_post_here.png")
+
+                file_path = os.path.join(os.path.dirname(__file__), "do_not_post_here.png")
+                files = []
+                if os.path.isfile(file_path):
+                    files = [discord.File(file_path)]
+                else:
+                    files = []
+                try:
+                    await honeypot_channel.send(embed=embed, files=files)
+                    await asyncio.sleep(2)
+                except Exception:
+                    pass
+            except Exception:
+                continue
+            await asyncio.sleep(2)  # Slow down between guilds
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
