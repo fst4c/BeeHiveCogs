@@ -799,7 +799,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
                     server_lines.append(f"**Uncategorized detections:** {scam_stats.get(stype, 0)}")
                 else:
                     pretty = stype.replace("_", " ").capitalize()
-                    server_lines.append(f"**{pretty} scams:** {scam_stats.get(stype, 0)}")
+                    server_lines.append(f"**{pretty} flags:** {scam_stats.get(stype, 0)}")
 
             # Prepare global stats lines
             global_lines = []
@@ -808,7 +808,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
                     global_lines.append(f"**Uncategorized detections:** {global_stats.get(stype, 0)}")
                 else:
                     pretty = stype.replace("_", " ").capitalize()
-                    global_lines.append(f"**{pretty} scams:** {global_stats.get(stype, 0)}")
+                    global_lines.append(f"**{pretty} flags:** {global_stats.get(stype, 0)}")
 
             embed = discord.Embed(title="Honeypot detection statistics", color=0xfffffe)
             embed.add_field(
