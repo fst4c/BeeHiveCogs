@@ -1199,9 +1199,14 @@ class EventMixin:
             reason = getattr(entry, "reason", None)
         if before_text and after_text:
             for page in pagify(before_text, page_length=1024):
-                embed.add_field(name=_("Before"), value=page, inline=False)
+                embed.add_field(name=_("Before"), value=page, inline=True)
             for page in pagify(after_text, page_length=1024):
-                embed.add_field(name=_("After"), value=page, inline=False)
+                embed.add_field(name=_("After"), value=page, inline=True)
+            
+        if perp:
+            msg += _("Updated by ") + str(perp) + "\n"
+            embed.add_field(name=_("Updated by"), value=perp.mention, inline=True)
+            
         p_msg = await self.get_permission_change(before, after, embed_links)
         if p_msg != "":
             worth_updating = True
@@ -1209,9 +1214,6 @@ class EventMixin:
             for page in pagify(p_msg, page_length=1024):
                 embed.add_field(name=_("Permissions"), value=page, inline=False)
 
-        if perp:
-            msg += _("Updated by ") + str(perp) + "\n"
-            embed.add_field(name=_("Updated by"), value=perp.mention, inline=True)
         if reason:
             msg += _("Reason ") + reason + "\n"
             embed.add_field(name=_("Reason"), value=reason, inline=True)
