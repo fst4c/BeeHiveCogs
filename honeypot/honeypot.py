@@ -787,29 +787,39 @@ class Honeypot(commands.Cog, name="Honeypot"):
         async with ctx.typing():
             config = await self.config.guild(ctx.guild).all()
             global_stats = await self.config.global_scam_stats()
-            # Fix: scam_stats may be missing keys
             scam_stats = config.get('scam_stats', {})
             for stype in self.SCAM_TYPES:
                 scam_stats.setdefault(stype, 0)
                 global_stats.setdefault(stype, 0)
+
+            # Prepare server stats lines
+            server_lines = []
+            for stype in self.SCAM_TYPES:
+                if stype == "other":
+                    server_lines.append(f"**Uncategorized detections:** {scam_stats.get(stype, 0)}")
+                else:
+                    pretty = stype.replace("_", " ").capitalize()
+                    server_lines.append(f"**{pretty} scams:** {scam_stats.get(stype, 0)}")
+
+            # Prepare global stats lines
+            global_lines = []
+            for stype in self.SCAM_TYPES:
+                if stype == "other":
+                    global_lines.append(f"**Uncategorized detections:** {global_stats.get(stype, 0)}")
+                else:
+                    pretty = stype.replace("_", " ").capitalize()
+                    global_lines.append(f"**{pretty} scams:** {global_stats.get(stype, 0)}")
+
             embed = discord.Embed(title="Honeypot detection statistics", color=0xfffffe)
-            
-            embed.add_field(name="In this server", value="\u200b", inline=False)
-            # Server detections
-            for stype in self.SCAM_TYPES:
-                if stype == "other":
-                    embed.add_field(name="Uncategorized detections", value=scam_stats.get(stype, 0), inline=True)
-                else:
-                    pretty = stype.replace("_", " ").capitalize()
-                    embed.add_field(name=f"{pretty} scams", value=scam_stats.get(stype, 0), inline=True)
-            
-            embed.add_field(name="In all servers", value="\u200b", inline=False)
-            # Global detections
-            for stype in self.SCAM_TYPES:
-                if stype == "other":
-                    embed.add_field(name="Uncategorized detections", value=global_stats.get(stype, 0), inline=True)
-                else:
-                    pretty = stype.replace("_", " ").capitalize()
-                    embed.add_field(name=f"{pretty} scams", value=global_stats.get(stype, 0), inline=True)
-            
+            embed.add_field(
+                name="In this server",
+                value="\n".join(server_lines) or "No detections.",
+                inline=False
+            )
+            embed.add_field(
+                name="In all servers",
+                value="\n".join(global_lines) or "No detections.",
+                inline=False
+            )
+
             await ctx.send(embed=embed)
