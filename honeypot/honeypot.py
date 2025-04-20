@@ -267,7 +267,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
                     color=0xff4545,
                 ).add_field(
                     name="What not to do?",
-                    value="- **Do not speak in this channel**\n- **Do not send images in this channel**\n- **Do not send files in this channel**\n- **Do not react to the honeypot warning message**",
+                    value="- **Do not speak in this channel**\n- **Do not send images in this channel**\n- **Do not send files in this channel**\n- **Do not react to this message**",
                     inline=False,
                 ).add_field(
                     name="What will happen if I do?",
@@ -612,7 +612,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
                 color=0xff4545,
             ).add_field(
                 name="What not to do?",
-                value="- **Do not speak in this channel**\n- **Do not send images in this channel**\n- **Do not send files in this channel**\n- **Do not react to the honeypot warning message**",
+                value="- **Do not speak in this channel**\n- **Do not send images in this channel**\n- **Do not send files in this channel**\n- **Do not react to this message**",
                 inline=False,
             ).add_field(
                 name="What will happen if I do?",
