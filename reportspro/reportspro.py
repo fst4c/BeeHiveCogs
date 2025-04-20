@@ -54,11 +54,11 @@ class ReportsPro(commands.Cog):
     async def view_settings(self, ctx):
         """View the current settings for the guild."""
         reports_channel_id = await self.config.guild(ctx.guild).reports_channel()
-        reports_channel = ctx.guild.get_channel(reports_channel_id)
+        reports_channel = ctx.guild.get_channel(reports_channel_id) if reports_channel_id else None
         channel_mention = reports_channel.mention if reports_channel else "Not Set"
 
         mention_role_id = await self.config.guild(ctx.guild).mention_role()
-        mention_role = ctx.guild.get_role(mention_role_id)
+        mention_role = ctx.guild.get_role(mention_role_id) if mention_role_id else None
         role_mention = mention_role.mention if mention_role else "Not Set"
         
         embed = discord.Embed(title="Current Reporting Settings", color=discord.Color.from_rgb(255, 255, 254))
@@ -141,9 +141,20 @@ class ReportsPro(commands.Cog):
                 # Generate a unique report ID
                 reports = await self.config.guild(self.ctx.guild).reports()
                 report_id = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
-                while report_id in reports:
+                # Prevent infinite loop if all IDs are taken (very unlikely, but for safety)
+                attempts = 0
+                while report_id in reports and attempts < 10000:
                     report_id = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
-                
+                    attempts += 1
+                if report_id in reports:
+                    embed = discord.Embed(
+                        title="Error",
+                        description="Could not generate a unique report ID. Please try again.",
+                        color=discord.Color.red()
+                    )
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    return
+
                 embed = discord.Embed(
                     title="Report created",
                     color=0xfffffe,
@@ -156,7 +167,10 @@ class ReportsPro(commands.Cog):
 
                 # Deactivate the dropdown
                 self.disabled = True
-                await interaction.message.edit(view=self.view)
+                try:
+                    await interaction.message.edit(view=self.view)
+                except Exception:
+                    pass  # In case the message is already gone or can't be edited
 
                 # Store the report in the config
                 try:
@@ -174,7 +188,7 @@ class ReportsPro(commands.Cog):
                         description=f"Something went wrong while saving the report: {e}",
                         color=discord.Color.red()
                     )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    await interaction.followup.send(embed=embed, ephemeral=True)
                     return
 
                 # Capture chat history
@@ -186,7 +200,7 @@ class ReportsPro(commands.Cog):
                         description=f"Something went wrong while capturing chat history: {e}",
                         color=discord.Color.red()
                     )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    await interaction.followup.send(embed=embed, ephemeral=True)
                     return
 
                 # Count existing reports against the user by reason
@@ -213,7 +227,7 @@ class ReportsPro(commands.Cog):
                         report_message.add_field(name="Previous reports", value=summary, inline=False)
 
                     mention_role_id = await self.config.guild(self.ctx.guild).mention_role()
-                    mention_role = ctx.guild.get_role(mention_role_id)
+                    mention_role = self.ctx.guild.get_role(mention_role_id) if mention_role_id else None
                     mention_text = mention_role.mention if mention_role else ""
 
                     try:
@@ -227,21 +241,21 @@ class ReportsPro(commands.Cog):
                             description="I can't send messages in the reports channel. Please check my permissions.",
                             color=discord.Color.red()
                         )
-                        await interaction.response.send_message(embed=embed, ephemeral=True)
+                        await interaction.followup.send(embed=embed, ephemeral=True)
                     except Exception as e:
                         embed = discord.Embed(
                             title="Error",
                             description=f"Something went wrong while sending the report: {e}",
                             color=discord.Color.red()
                         )
-                        await interaction.response.send_message(embed=embed, ephemeral=True)
+                        await interaction.followup.send(embed=embed, ephemeral=True)
                 else:
                     embed = discord.Embed(
                         title="Error",
                         description="I can't access the reports channel. Please contact an admin.",
                         color=discord.Color.red()
                     )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    await interaction.followup.send(embed=embed, ephemeral=True)
 
         # Create a view and add the dropdown
         view = discord.ui.View()
@@ -270,7 +284,7 @@ class ReportsPro(commands.Cog):
         for channel in guild.text_channels:
             try:
                 async for message in channel.history(limit=100, oldest_first=False):
-                    if message.author == member:
+                    if message.author.id == member.id:
                         chat_history.append(f"[{message.created_at}] {message.author}: {message.content}")
             except discord.Forbidden:
                 continue
@@ -325,28 +339,36 @@ class ReportsPro(commands.Cog):
         # Create a list of embeds, one for each report
         embeds = []
         for report_id, report_info in filtered_reports:
-            reported_user = ctx.guild.get_member(int(report_info['reported_user']))
-            reporter = ctx.guild.get_member(int(report_info['reporter']))
+            reported_user = ctx.guild.get_member(int(report_info['reported_user'])) if report_info.get('reported_user') else None
+            reporter = ctx.guild.get_member(int(report_info['reporter'])) if report_info.get('reporter') else None
 
             embed = discord.Embed(title=f"Report {report_id}", color=discord.Color.from_rgb(255, 255, 254))
             embed.add_field(
                 name="Reported User",
-                value=reported_user.mention if reported_user else 'Unknown User',
+                value=reported_user.mention if reported_user else f"Unknown User ({report_info.get('reported_user', 'N/A')})",
                 inline=False
             )
             embed.add_field(
                 name="Reported By",
-                value=reporter.mention if reporter else 'Unknown Reporter',
+                value=reporter.mention if reporter else f"Unknown Reporter ({report_info.get('reporter', 'N/A')})",
                 inline=False
             )
             embed.add_field(
                 name="Reason",
-                value=f"{report_info['reason']}: {report_info.get('description', 'No description available')}",
+                value=f"{report_info.get('reason', 'Unknown')}: {report_info.get('description', 'No description available')}",
                 inline=False
             )
+            # Defensive: handle missing or malformed timestamp
+            try:
+                ts = report_info.get('timestamp', '1970-01-01T00:00:00+00:00')
+                dt = datetime.fromisoformat(ts)
+                unix_ts = int(dt.timestamp())
+                time_str = f"<t:{unix_ts}:R>"
+            except Exception:
+                time_str = "Unknown"
             embed.add_field(
                 name="Timestamp",
-                value=f"<t:{int(datetime.fromisoformat(report_info.get('timestamp', '1970-01-01T00:00:00+00:00')).timestamp())}:R>",
+                value=time_str,
                 inline=False
             )
             embeds.append(embed)
@@ -357,8 +379,9 @@ class ReportsPro(commands.Cog):
             message = await ctx.send(embed=embeds[current_page])
 
             # Add reaction controls
-            await message.add_reaction("⬅️")
-            await message.add_reaction("➡️")
+            if len(embeds) > 1:
+                await message.add_reaction("⬅️")
+                await message.add_reaction("➡️")
             await message.add_reaction("❌")  # Add close emoji
 
             def check(reaction, user):
@@ -378,9 +401,15 @@ class ReportsPro(commands.Cog):
                         await message.delete()
                         break
 
-                    await message.remove_reaction(reaction, user)
+                    try:
+                        await message.remove_reaction(reaction, user)
+                    except Exception:
+                        pass
                 except asyncio.TimeoutError:
-                    await message.clear_reactions()
+                    try:
+                        await message.clear_reactions()
+                    except Exception:
+                        pass
                     break
 
         await send_paginated_embeds(ctx, embeds)
@@ -434,7 +463,7 @@ class ReportsPro(commands.Cog):
             return
 
         total_reports = len(reports)
-        reason_counts = Counter(report['reason'] for report in reports.values())
+        reason_counts = Counter(report.get('reason', 'Unknown') for report in reports.values())
         most_common_reason = reason_counts.most_common(1)[0] if reason_counts else ("None", 0)
 
         embed = discord.Embed(
@@ -452,9 +481,12 @@ class ReportsPro(commands.Cog):
         if not timestamp:
             return False
         try:
-            report_time = datetime.fromisoformat(timestamp).replace(tzinfo=timezone.utc)
+            report_time = datetime.fromisoformat(timestamp)
+            # If timestamp is naive, assume UTC
+            if report_time.tzinfo is None:
+                report_time = report_time.replace(tzinfo=timezone.utc)
             return (datetime.now(timezone.utc) - report_time).days < 30
-        except ValueError:
+        except Exception:
             return False
 
     @reports.command(name="handle")
@@ -473,8 +505,15 @@ class ReportsPro(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-        reported_user = ctx.guild.get_member(int(report['reported_user']))
-        reporter = ctx.guild.get_member(int(report['reporter']))
+        # Defensive: handle missing or malformed IDs
+        try:
+            reported_user = ctx.guild.get_member(int(report['reported_user'])) if report.get('reported_user') else None
+        except Exception:
+            reported_user = None
+        try:
+            reporter = ctx.guild.get_member(int(report['reporter'])) if report.get('reporter') else None
+        except Exception:
+            reporter = None
 
         # Create a view for handling the report
         class HandleReportView(discord.ui.View):
@@ -496,12 +535,15 @@ class ReportsPro(commands.Cog):
                 embed.add_field(name="Options", value=emoji_list, inline=False)
                 message = await ctx.send(embed=embed)
                 for emoji in emoji_meanings.keys():
-                    await message.add_reaction(emoji)
+                    try:
+                        await message.add_reaction(emoji)
+                    except Exception:
+                        pass
                 return message
 
             async def handle_reaction(self, message, emoji_meanings):
                 def check(reaction, user):
-                    return user == self.ctx.author and str(reaction.emoji) in emoji_meanings
+                    return user == self.ctx.author and str(reaction.emoji) in emoji_meanings and reaction.message.id == message.id
 
                 try:
                     reaction, _ = await self.ctx.bot.wait_for('reaction_add', timeout=60.0, check=check)
@@ -573,7 +615,15 @@ class ReportsPro(commands.Cog):
                         await self.ctx.send(embed=embed)
                 elif action == "Timeout" and self.reported_user:
                     try:
-                        await self.reported_user.timeout(duration=86400)  # Timeout for 24 hours
+                        # discord.Member.timeout expects a timedelta or int (seconds) in discord.py 2.x
+                        # But in Redbot, it may be .timeout_for or .edit(timeout=...)
+                        # We'll use .timeout if available, else fallback
+                        if hasattr(self.reported_user, "timeout"):
+                            await self.reported_user.timeout(duration=86400)  # 24 hours
+                        elif hasattr(self.reported_user, "edit"):
+                            await self.reported_user.edit(timeout_until=datetime.now(timezone.utc) + timedelta(seconds=86400))
+                        else:
+                            raise Exception("Timeout not supported on this bot version.")
                         embed = discord.Embed(
                             title="User Timed Out",
                             description=f"{self.reported_user.mention} has been timed out for 24 hours.",
@@ -584,6 +634,13 @@ class ReportsPro(commands.Cog):
                         embed = discord.Embed(
                             title="Timeout Error",
                             description="I couldn't timeout the reported user.",
+                            color=discord.Color.red()
+                        )
+                        await self.ctx.send(embed=embed)
+                    except Exception as e:
+                        embed = discord.Embed(
+                            title="Timeout Error",
+                            description=f"An error occurred while timing out the user: {e}",
                             color=discord.Color.red()
                         )
                         await self.ctx.send(embed=embed)
@@ -600,6 +657,13 @@ class ReportsPro(commands.Cog):
                         embed = discord.Embed(
                             title="Ban Error",
                             description="I couldn't ban the reported user.",
+                            color=discord.Color.red()
+                        )
+                        await self.ctx.send(embed=embed)
+                    except Exception as e:
+                        embed = discord.Embed(
+                            title="Ban Error",
+                            description=f"An error occurred while banning the user: {e}",
                             color=discord.Color.red()
                         )
                         await self.ctx.send(embed=embed)
@@ -621,6 +685,13 @@ class ReportsPro(commands.Cog):
                         embed = discord.Embed(
                             title="Couldn't send report update",
                             description="I couldn't send a DM to the reporter to update them on this report, you may need to reach out manually to the user if you're inclined.",
+                            color=discord.Color.red()
+                        )
+                        await self.ctx.send(embed=embed)
+                    except Exception as e:
+                        embed = discord.Embed(
+                            title="Couldn't send report update",
+                            description=f"An error occurred while DMing the reporter: {e}",
                             color=discord.Color.red()
                         )
                         await self.ctx.send(embed=embed)
