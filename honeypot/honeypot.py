@@ -76,7 +76,17 @@ class Honeypot(commands.Cog, name="Honeypot"):
                         "tour-operator", "safari", "trekking", "hiking", "camping", "beach", "island", 
                         "mountain", "valley", "canyon", "waterfall", "national-park", "wildlife", "culture",
                         "heritage", "festival", "cuisine", "local", "tradition", "custom", "language", 
-                        "currency-exchange", "travel-insurance", "backpacker", "globetrotter", "wanderlust"
+                        "currency-exchange", "travel-insurance", "backpacker", "globetrotter", "wanderlust",
+                        "classroom", "homework", "assignment", "teacher", "student", "principal", "vice-principal", "counselor", "nurse", "janitor",
+                        "cafeteria", "lunchbox", "recess", "playground", "blackboard", "whiteboard", "chalk", "marker", "eraser", "desk",
+                        "chair", "locker", "hallway", "bell", "schedule", "timetable", "subject", "math", "science", "history",
+                        "geography", "english", "literature", "reading", "writing", "spelling", "grammar", "vocabulary", "quiz", "test",
+                        "exam", "midterm", "finals", "report-card", "grade", "score", "pass", "fail", "study", "notebook",
+                        "textbook", "worksheet", "project", "presentation", "group-work", "partner", "classmate", "friend", "bully", "detention",
+                        "library", "librarian", "computer-lab", "science-lab", "experiment", "field-trip", "bus", "uniform", "dress-code", "assembly",
+                        "auditorium", "gym", "gymnasium", "coach", "sports", "soccer", "basketball", "baseball", "track", "swimming",
+                        "music", "band", "choir", "art", "painting", "drawing", "sculpture", "theater", "drama", "performance",
+                        "club", "debate", "student-council", "yearbook", "graduation", "cap-and-gown", "valedictorian", "honor-roll", "scholarship", "tuition"
                     ]
                     random_name = random.choice(dictionary_words)
                     try:
@@ -106,7 +116,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
                         msg.author == guild.me
                         and msg.embeds
                         and (
-                            (msg.embeds[0].title and "Shhhhh - this is a security honeypot" in msg.embeds[0].title)
+                            (msg.embeds[0].title and "This channel is a security honeypot" in msg.embeds[0].title)
                             or (msg.embeds[0].image and msg.embeds[0].image.url and "do_not_post_here" in msg.embeds[0].image.url)
                         )
                     ):
@@ -357,16 +367,16 @@ class Honeypot(commands.Cog, name="Honeypot"):
             config = await self.config.guild(ctx.guild).all()
             action = config.get("action")
             action_descriptions = {
-                "mute": "You will be assigned the server's mute role and lose the ability to speak.",
+                "mute": "You will be assigned the server's suppression role and lose the ability to speak in this server until a staff member removes the role.",
                 "kick": "You will be kicked from the server immediately.",
                 "ban": "You will be banned from the server immediately.",
-                "timeout": "You will be timed out and unable to interact for 7 days.",
-                None: "An action will be taken against you as decided by the server owner."
+                "timeout": "You will be timed out and unable to interact with text or voice channels for 7 days.",
+                None: "Server staff will be notified of your suspicious activity."
             }
-            action_text = action_descriptions.get(action, "An action will be taken against you as decided by the server owner.")
+            action_text = action_descriptions.get(action, "Server staff will be notified of your suspicious activity.")
 
             embed = discord.Embed(
-                title="Shhhhh - this is a security honeypot",
+                title="This channel is a security honeypot",
                 description="A honeypot is a security mechanism designed to lure cybercriminals into interacting with decoy targets. By doing so, cybersecurity experts can observe and analyze the attackers' methods, allowing them to develop effective countermeasures.\n\nSimilarly, this channel serves as a honeypot. It is intentionally placed in a conspicuous location with clear instructions not to engage in conversation here. Unsuspecting automated bots and low-quality spammers, such as those promoting nitro scams or explicit content, will likely post messages in this channel, unaware of its true purpose.",
                 color=0xff4545,
             ).add_field(
