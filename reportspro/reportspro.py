@@ -295,14 +295,18 @@ class ReportsPro(commands.Cog):
                     color=0x2bbd8e
                 )
                 # --- Begin fix for ephemeral message update ---
+                # The following block is rewritten to always respond to the interaction
                 try:
-                    if interaction.response.is_done():
-                        # If already responded, use followup
+                    # Always respond to the interaction, and always remove the view
+                    await interaction.response.edit_message(embed=thank_you_embed, view=None)
+                except discord.InteractionResponded:
+                    # If already responded, use followup
+                    try:
                         await interaction.followup.send(embed=thank_you_embed, ephemeral=True)
-                    else:
-                        await interaction.response.edit_message(embed=thank_you_embed, view=None)
+                    except Exception:
+                        pass
                 except Exception:
-                    # Try to edit the original response directly (discord.py 2.x+)
+                    # As a last resort, try to edit the original response (discord.py 2.x+)
                     try:
                         await interaction.edit_original_response(embed=thank_you_embed, view=None)
                     except Exception:
@@ -311,6 +315,16 @@ class ReportsPro(commands.Cog):
                         except Exception:
                             pass
                 # --- End fix ---
+
+                # Disable the dropdown after use to prevent "This interaction failed"
+                self.disabled = True
+                if self.view:
+                    for item in self.view.children:
+                        item.disabled = True
+                    try:
+                        await interaction.message.edit(view=self.view)
+                    except Exception:
+                        pass
 
         # Create a view and add the dropdown
         class ReportView(discord.ui.View):
