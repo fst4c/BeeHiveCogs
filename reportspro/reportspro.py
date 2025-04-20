@@ -1,6 +1,6 @@
 from redbot.core import commands, Config, checks
 import discord
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import os
 import tempfile
 import asyncio
@@ -167,11 +167,13 @@ class ReportsPro(commands.Cog):
                     return
 
                 # Deactivate the dropdown
-                self.disabled = True
-                try:
-                    await interaction.message.edit(view=self.view)
-                except Exception:
-                    pass  # In case the message is already gone or can't be edited
+                # Instead of disabling the select and editing the message (which can cause interaction failures
+                # if the message is ephemeral or the view is not properly attached), we will just remove the view
+                # by editing the message with view=None, and show a thank you embed.
+                thank_you_embed = discord.Embed(
+                    description="Report submitted, thank you for helping keep the server safer",
+                    color=0x2bbd8e
+                )
 
                 # Store the report in the config
                 try:
@@ -189,7 +191,7 @@ class ReportsPro(commands.Cog):
                         description=f"Something went wrong while saving the report: {e}",
                         color=discord.Color.red()
                     )
-                    await interaction.followup.send(embed=embed, ephemeral=True)
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
                     return
 
                 # Capture chat history
@@ -201,7 +203,7 @@ class ReportsPro(commands.Cog):
                         description=f"Something went wrong while capturing chat history: {e}",
                         color=discord.Color.red()
                     )
-                    await interaction.followup.send(embed=embed, ephemeral=True)
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
                     return
 
                 # Count existing reports against the user by reason
@@ -242,27 +244,26 @@ class ReportsPro(commands.Cog):
                             description="I can't send messages in the reports channel. Please check my permissions.",
                             color=discord.Color.red()
                         )
-                        await interaction.followup.send(embed=embed, ephemeral=True)
+                        await interaction.response.send_message(embed=embed, ephemeral=True)
+                        return
                     except Exception as e:
                         embed = discord.Embed(
                             title="Error",
                             description=f"Something went wrong while sending the report: {e}",
                             color=discord.Color.red()
                         )
-                        await interaction.followup.send(embed=embed, ephemeral=True)
+                        await interaction.response.send_message(embed=embed, ephemeral=True)
+                        return
                 else:
                     embed = discord.Embed(
                         title="Error",
                         description="I can't access the reports channel. Please contact an admin.",
                         color=discord.Color.red()
                     )
-                    await interaction.followup.send(embed=embed, ephemeral=True)
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    return
 
-                # --- NEW: Update the user's ephemeral message to a green border "thank you" embed ---
-                thank_you_embed = discord.Embed(
-                    description="Report submitted, thank you for helping keep the server safer",
-                    color=0x2bbd8e
-                )
+                # Try to update the ephemeral message to a thank you embed and remove the view
                 try:
                     await interaction.response.edit_message(embed=thank_you_embed, view=None)
                 except Exception:
@@ -273,7 +274,7 @@ class ReportsPro(commands.Cog):
                         pass
 
         # Create a view and add the dropdown
-        view = discord.ui.View()
+        view = discord.ui.View(timeout=180)
         view.add_item(ReportDropdown(self.config, ctx, member, reports_channel, self.capture_chat_history))
 
         try:
