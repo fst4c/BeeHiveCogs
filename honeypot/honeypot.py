@@ -203,10 +203,12 @@ class Honeypot(commands.Cog, name="Honeypot"):
                         "club", "debate", "student-council", "yearbook", "graduation", "cap-and-gown", "valedictorian", "honor-roll", "scholarship", "tuition"
                     ]
                     random_name = random.choice(dictionary_words)
-                    try:
-                        await honeypot_channel.edit(name=random_name, reason="Changing channel name to impede honeypot evasion efforts")
-                    except discord.HTTPException:
-                        pass
+                    # Only change the name if it's different to avoid double API calls
+                    if honeypot_channel.name != random_name:
+                        try:
+                            await honeypot_channel.edit(name=random_name, reason="Changing channel name to impede honeypot evasion efforts")
+                        except discord.HTTPException:
+                            pass
 
             await asyncio.sleep(4 * 60 * 60)  # Wait for 4 hours
 
