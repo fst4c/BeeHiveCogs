@@ -146,6 +146,13 @@ class ReportsPro(commands.Cog):
                     await interaction.response.send_message(embed=embed, ephemeral=True)
                     return
 
+                # Defer the interaction immediately to avoid interaction failure
+                try:
+                    await interaction.response.defer(thinking=True, ephemeral=True)
+                except Exception:
+                    # If already responded, ignore
+                    pass
+
                 selected_reason = self.values[0]
                 selected_description = next(description for reason, description in report_reasons if reason == selected_reason)
                 
@@ -163,7 +170,10 @@ class ReportsPro(commands.Cog):
                         description="Could not generate a unique report ID. Please try again.",
                         color=discord.Color.red()
                     )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    try:
+                        await interaction.followup.send(embed=embed, ephemeral=True)
+                    except Exception:
+                        pass
                     return
 
                 # Store the report in the config
@@ -182,7 +192,10 @@ class ReportsPro(commands.Cog):
                         description=f"Something went wrong while saving the report: {e}",
                         color=discord.Color.red()
                     )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    try:
+                        await interaction.followup.send(embed=embed, ephemeral=True)
+                    except Exception:
+                        pass
                     return
 
                 # Capture chat history
@@ -194,7 +207,10 @@ class ReportsPro(commands.Cog):
                         description=f"Something went wrong while capturing chat history: {e}",
                         color=discord.Color.red()
                     )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    try:
+                        await interaction.followup.send(embed=embed, ephemeral=True)
+                    except Exception:
+                        pass
                     return
 
                 # Count existing reports against the user by reason
@@ -235,7 +251,10 @@ class ReportsPro(commands.Cog):
                             description="I can't send messages in the reports channel. Please check my permissions.",
                             color=discord.Color.red()
                         )
-                        await interaction.response.send_message(embed=embed, ephemeral=True)
+                        try:
+                            await interaction.followup.send(embed=embed, ephemeral=True)
+                        except Exception:
+                            pass
                         return
                     except Exception as e:
                         embed = discord.Embed(
@@ -243,7 +262,10 @@ class ReportsPro(commands.Cog):
                             description=f"Something went wrong while sending the report: {e}",
                             color=discord.Color.red()
                         )
-                        await interaction.response.send_message(embed=embed, ephemeral=True)
+                        try:
+                            await interaction.followup.send(embed=embed, ephemeral=True)
+                        except Exception:
+                            pass
                         return
                 else:
                     embed = discord.Embed(
@@ -251,7 +273,10 @@ class ReportsPro(commands.Cog):
                         description="I can't access the reports channel. Please contact an admin.",
                         color=discord.Color.red()
                     )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    try:
+                        await interaction.followup.send(embed=embed, ephemeral=True)
+                    except Exception:
+                        pass
                     return
 
                 # Try to update the ephemeral message to a thank you embed and remove the view
@@ -259,21 +284,11 @@ class ReportsPro(commands.Cog):
                 # We must ensure we only call one of interaction.response.edit_message or interaction.response.send_message,
                 # and if already responded, use interaction.followup.send.
                 try:
-                    await interaction.response.edit_message(embed=discord.Embed(
+                    await interaction.edit_original_response(embed=discord.Embed(
                         description="Report submitted, thank you for helping keep the server safer",
                         color=0x2bbd8e
                     ), view=None)
-                except discord.InteractionResponded:
-                    # Already responded, use followup
-                    try:
-                        await interaction.followup.send(embed=discord.Embed(
-                            description="Report submitted, thank you for helping keep the server safer",
-                            color=0x2bbd8e
-                        ), ephemeral=True)
-                    except Exception:
-                        pass
                 except Exception:
-                    # fallback: try to send a new ephemeral message if edit fails
                     try:
                         await interaction.followup.send(embed=discord.Embed(
                             description="Report submitted, thank you for helping keep the server safer",
