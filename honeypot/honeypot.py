@@ -214,7 +214,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         content_lower = message.content.lower()
         if "nitro" in content_lower:
             scam_type = "nitro"
-        elif any(word in content_lower for word in ["steam", "$50"]):
+        elif any(word in content_lower for word in ["steam", "$50", "50$"]):
             scam_type = "steam"
         elif any(word in content_lower for word in ["nude", "nudes", "teen", "teens"]):
             scam_type = "csam"
