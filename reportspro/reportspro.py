@@ -166,16 +166,6 @@ class ReportsPro(commands.Cog):
                     await interaction.response.send_message(embed=embed, ephemeral=True)
                     return
 
-                embed = discord.Embed(
-                    title="Report created",
-                    color=0xfffffe,
-                    description=(
-                        f"You have reported {self.member.mention} for **{selected_reason}**.\n\n"
-                        f"Your report ID is `{report_id}`. We'll use this ID for any updates on your report.\n\nPlease ensure your Direct Messages are open if you'd like updates on this report."
-                    )
-                )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
-
                 # Deactivate the dropdown
                 self.disabled = True
                 try:
@@ -267,6 +257,20 @@ class ReportsPro(commands.Cog):
                         color=discord.Color.red()
                     )
                     await interaction.followup.send(embed=embed, ephemeral=True)
+
+                # --- NEW: Update the user's ephemeral message to a green border "thank you" embed ---
+                thank_you_embed = discord.Embed(
+                    description="Report submitted, thank you for helping keep the server safer",
+                    color=0x2bbd8e
+                )
+                try:
+                    await interaction.response.edit_message(embed=thank_you_embed, view=None)
+                except Exception:
+                    # fallback: try to send a new ephemeral message if edit fails
+                    try:
+                        await interaction.followup.send(embed=thank_you_embed, ephemeral=True)
+                    except Exception:
+                        pass
 
         # Create a view and add the dropdown
         view = discord.ui.View()
