@@ -142,9 +142,9 @@ class Honeypot(commands.Cog, name="Honeypot"):
                     "kick": "You will be kicked from the server immediately.",
                     "ban": "You will be banned from the server immediately.",
                     "timeout": "You will be timed out and unable to interact for 7 days.",
-                    None: "An action will be taken against you as decided by the server owner."
+                    None: "Server staff will be notified of your suspicious activity."
                 }
-                action_text = action_descriptions.get(action, "An action will be taken against you as decided by the server owner.")
+                action_text = action_descriptions.get(action, "Server staff will be notified of your suspicious activity.")
 
                 embed = discord.Embed(
                     title="This channel is a security honeypot",
@@ -155,7 +155,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
                     value="- **Do not speak in this channel**\n- **Do not send images in this channel**\n- **Do not send files in this channel**",
                     inline=False,
                 ).add_field(
-                    name="What will happen?",
+                    name="What will happen if I do?",
                     value=action_text,
                     inline=False,
                 ).set_footer(text=guild.name, icon_url=icon_url).set_image(url="attachment://do_not_post_here.png")
@@ -384,7 +384,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
                 value="- **Do not speak in this channel**\n- **Do not send images in this channel**\n- **Do not send files in this channel**",
                 inline=False,
             ).add_field(
-                name="What will happen?",
+                name="What will happen if I do?",
                 value=action_text,
                 inline=False,
             ).set_footer(text=ctx.guild.name, icon_url=icon_url).set_image(url="attachment://do_not_post_here.png")
