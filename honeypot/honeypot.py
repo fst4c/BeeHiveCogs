@@ -11,37 +11,109 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
     SCAM_TYPES = {
         "nitro": [
-            "nitro", "free nitro", "discord nitro", "gift nitro", "nitro giveaway"
+            "nitro", "free nitro", "discord nitro", "gift nitro", "nitro giveaway", "nitro drop", "nitro for free", "nitro rewards", "nitro event", "nitro boost",
+            "nitro-promo", "nitro-promotion", "nitro code", "nitro claim", "nitro link", "nitro-discord", "discordnitro", "nitro_gift",
+            "discord.com/gifts", "discord.gift", "discordapp.com/gift", "discord.com/nitro", "discord.com/gift", "discord.com/claim", "discord.com/activate",
+            "discord.com/verify", "discord-nitro.com", "discordnitro.com", "nitro promo", "nitro scam", "nitro hack", "nitro generator", "nitro airdrop"
         ],
         "steam": [
-            "steam", "$50", "50$", "steam gift", "steam code", "steam wallet", "steamcommunity", "steam offer"
+            "steam", "steam gift", "steam code", "steam wallet", "steamcommunity", "steam offer", "steamcard", "steamcards", "steam-gift", "steam-cards",
+            "steamcommunity.com", "steam account", "steam scam", "steam trade", "steam redeem", "steam balance", "steamcredit", "steam credits", "steam $",
+            "steam voucher", "steam free", "steam promo", "steam bonus", "$50", "50$", "$100", "100$", "steam airdrop", "steam generator", "steam hack",
+            "steam giveaway", "steam event", "steamcommunity.com/gift", "steamcommunity.com/tradeoffer", "steamcommunity.com/id/", "steamcommunity.com/profiles/",
+            "steamcommunity.com/market"
         ],
         "csam": [
-            "nude", "nudes", "teen", "teens", "underage", "cp", "loli", "jailbait", "13yo", "14yo", "15yo", "16yo", "17yo"
+            "nude", "nudes", "teen", "teens", "underage", "cp", "loli", "jailbait", "13yo", "14yo", "15yo", "16yo", "17yo", "minor", "preteen", "child porn",
+            "childporn", "pedo", "pedophile", "underaged", "illegal content", "illegal pics", "illegal images", "illegal videos", "young girl", "young boy",
+            "under 18", "underage pics", "underage videos", "minor porn", "teen porn", "teen nudes", "teen sex", "teen cp", "teen loli", "teen jailbait"
         ],
         "crypto": [
-            "crypto", "bitcoin", "btc", "eth", "ethereum", "dogecoin", "solana", "airdrop", "wallet", "metamask", "binance", "exchange", "token", "coin", "blockchain"
+            "crypto", "cryptocurrency", "bitcoin", "btc", "eth", "ethereum", "dogecoin", "solana", "airdrop", "wallet", "metamask", "binance", "exchange",
+            "token", "coin", "blockchain", "crypto giveaway", "crypto airdrop", "crypto scam", "crypto offer", "crypto rewards", "crypto bonus", "crypto faucet",
+            "crypto mining", "crypto investment", "crypto trading", "crypto wallet", "crypto transfer", "crypto hack", "crypto pump", "crypto dump", "crypto free",
+            "crypto code", "crypto link", "bitcoin giveaway", "btc giveaway", "eth giveaway", "solana giveaway", "dogecoin giveaway", "metamask airdrop",
+            "binance airdrop", "binance bonus", "binance hack", "binance scam", "crypto event", "crypto drop", "crypto promo", "crypto generator", "crypto claim",
+            "cryptoapp", "cryptoapp.com", "cryptoscam", "cryptoscam.com"
         ],
         "phishing": [
-            "login", "verify", "verification", "password", "account locked", "reset your password", "security alert", "suspicious activity", "discordapp.com/gift", "discord-gift", "discord-app", "discordsecurity"
+            "login", "log in", "log-in", "sign in", "sign-in", "signin", "signon", "sign on", "sign-on",
+            "verify", "verification", "verified", "verifying", "validate", "validation", "auth", "authenticate", "authentication",
+            "password", "passcode", "security code", "security", "secure", "credentials", "account", "account locked", "locked", "unlock",
+            "reset", "reset your password", "reset password", "recover", "recovery", "restore", "restore account", "restore access",
+            "appeal", "confirm", "confirmation", "confirm your identity", "confirm account", "confirm email", "confirm now",
+            "suspicious", "suspicious activity", "unusual activity", "activity detected", "alert", "security alert", "notice", "important notice",
+            "update", "update your info", "update info", "update account", "update details",
+            "reactivate", "reactivation", "activate", "activation", "deactivate", "deactivation",
+            "violation", "terms violation", "policy violation", "breach", "compromised", "compromise",
+            "click here", "click the link", "follow this link", "visit this link", "access here", "access your account",
+            "instant access", "limited time", "expires soon", "expiring", "urgent", "immediately", "now", "today",
+            "log in to your account", "login to your account", "sign in to your account", "verify your account", "account suspended",
+            "reset your password", "recover your account", "restore your account", "confirm your identity", "confirm your account", "confirm email",
+            "suspicious activity", "security alert", "important notice", "update your info", "update account", "reactivate your account", "activate your account",
+            "deactivate your account", "policy violation", "terms violation", "breach detected", "compromised account", "click here to", "click the link below",
+            "follow this link", "visit this link", "access your account here", "instant access", "expires soon", "expiring soon", "urgent action required",
+            "immediate action required", "discordsecurity", "discord-app", "discord-gift", "discordapp.com/gift", "discord.com/login", "discord.com/verify",
+            "discord.com/claim", "discord.com/activate", "discord.com/restore", "discord.com/appeal", "discord.com/confirm", "discord.com/validate",
+            "discord.com/secure", "discord.com/alert", "discord.com/notice", "discord.com/verify-account", "discord.com/verifyuser", "discord.com/verifyemail",
+            "discord.com/verify-phone", "discord.com/verify-identity", "discord.com/verify-now", "discord.com/verifytoday", "discord.com/verifyme",
+            "discord.com/verifyyouraccount", "discord.com/verifyyouridentity", "discord.com/verifyyourself", "discord.com/verifythis", "discord.com/verifyhere",
+            "discord.com/verify-link", "discord.com/verify-code", "discord.com/verify-token", "discord.com/verify-password", "discord.com/verify-login",
+            "discord.com/verify-reset", "discord.com/verify-security", "discord.com/verify-alert", "discord.com/verify-notice", "discord.com/verify-locked",
+            "discord.com/verify-unlock", "discord.com/verify-appeal", "discord.com/verify-confirm", "discord.com/verify-validate", "discord.com/verify-activate",
+            "discord.com/verify-authorize", "discord.com/verify-secure", "discord.com/verify-restore", "discord.com/verify-recover", "discord.com/verify-claim",
+            "discordsecurity.com", "discordsafe.com", "discordprotect.com", "discord-verify.com", "discord-verification.com", "discordlogin.com",
+            "discordreset.com", "discordclaim.com", "discordgift.com", "discordnitro.com", "discordnitro.net", "discordnitro.org", "discordnitro.store",
+            "discordnitro.gift", "discordnitro.codes", "discordnitro.online", "discordnitro.site", "discordnitro.xyz", "discordnitro.club", "discordnitro.pro",
+            "discordnitro.top", "discordnitro.best", "discordnitro.vip", "discordnitro.today", "discordnitro.app", "discordnitro.page", "discordnitro.space",
+            "discordnitro.tech", "discordnitro.shop", "discordnitro.lol", "discordnitro.click", "discordnitro.link", "discordnitro.email", "discordnitro.info",
+            "discordnitro.co", "discordnitro.us", "discordnitro.uk", "validate your account", "validate your identity", "validate your email",
+            "security verification", "security validation", "security check", "security update", "security notice", "security warning"
         ],
         "roblox": [
-            "roblox", "robux", "free robux", "roblox.com", "roblox gift", "roblox code"
+            "roblox", "robux", "free robux", "roblox.com", "roblox gift", "roblox code", "roblox promo", "roblox event", "roblox win", "roblox prize",
+            "roblox generator", "roblox hack", "roblox exploit", "roblox admin", "roblox staff", "roblox support", "roblox scam", "roblox giveaway",
+            "robux generator", "robux hack", "robux giveaway", "robux event", "robux drop", "robux claim", "robux code", "robux promo",
+            "roblox.com/games", "roblox.com/gift", "roblox.com/redeem", "roblox.com/event", "roblox.com/win", "roblox.com/prize", "roblox.com/generator",
+            "roblox.com/hack", "roblox.com/exploit", "roblox.com/admin", "roblox.com/staff", "roblox.com/support", "roblox.com/scam", "roblox.com/giveaway"
         ],
         "giveaway": [
-            "giveaway", "win", "winner", "claim your prize", "congratulations", "you have won", "lucky winner"
+            "giveaway", "give away", "win", "winner", "winners", "claim your prize", "claim prize", "congratulations", "congrats", "you have won",
+            "lucky winner", "lucky winners", "prize", "reward", "rewards", "event", "drop", "airdrop", "loot", "jackpot", "draw", "raffle", "contest",
+            "competition", "sweepstakes", "free", "limited time", "exclusive", "special offer", "bonus", "gift", "gifted", "giftbox", "gift box",
+            "prize winner", "prize winners", "reward winner", "reward winners", "jackpot winner", "jackpot winners", "airdrop", "loot drop", "lootbox",
+            "jackpot", "draw winner", "raffle winner", "contest winner", "competition winner", "sweepstakes winner", "special offer", "exclusive offer",
+            "bonus reward", "gifted prize", "giftbox winner", "gift box winner", "limited time offer", "limited time bonus", "exclusive bonus", "special bonus"
         ],
         "adult": [
-            "sex", "porn", "xxx", "onlyfans", "camgirl", "cam girl", "adult", "escort", "18+", "nsfw", "hot girls", "sexting"
+            "sex", "porn", "xxx", "onlyfans", "only fans", "camgirl", "cam girl", "camgirls", "cam girls", "adult", "escort", "escorts", "18+", "nsfw",
+            "hot girls", "hot girl", "sexting", "nude", "nudes", "naked", "erotic", "fetish", "strip", "stripping", "stripper", "strip club", "webcam",
+            "web cam", "webcams", "web cams", "snapchat", "snap", "premium", "lewd", "spicy", "sugar daddy", "sugar baby", "sugarbabes", "sugarbabys",
+            "snapchat nudes", "snap nudes", "premium nudes", "premium snaps", "premium onlyfans", "premium content", "private nudes", "private snaps"
         ],
         "malware": [
-            "exe", "scr", "bat", "virus", "trojan", "malware", "download this", "infected", "keylogger", "stealer", "hack", "crack", "cheat", "mod menu"
+            "exe", ".exe", "scr", ".scr", "bat", ".bat", "com", ".com", "dll", ".dll", "virus", "trojan", "malware", "spyware", "adware", "worm",
+            "download this", "infected", "infected file", "infected attachment", "infected link", "infect", "keylogger", "key log", "key loggers", "stealer",
+            "steal", "stealing", "hack", "hack tool", "hacked", "hacked client", "hacker", "hacker tool", "crack", "cracked", "cheat", "cheats", "mod menu",
+            "modmenu", "injector", "inject", "payload", "exploit", "exploit kit", "exploitkit", "ransomware", "rootkit", "backdoor", "rat",
+            "remote access", "remote tool", "remote admin", "remote administration", "remote desktop", "remote access tool", "remote admin tool",
+            "remote desktop tool", "phishing", "phishing attachment", "spoof", "spoofed", "spoofing", "spoofed file", "spoofed link", "bypass", "bypasser",
+            "bypassing", "patch", "patcher", "patching", "malicious file", "malicious link", "malicious attachment", "malicious download"
         ],
         "giftcard": [
-            "gift card", "giftcard", "amazon gift", "itunes gift", "google play gift", "psn code", "xbox code", "gift code"
+            "gift card", "giftcard", "gift cards", "giftcards", "amazon gift", "amazon card", "itunes gift", "itunes card", "google play gift",
+            "google play card", "psn code", "psn card", "xbox code", "xbox card", "gift code", "giftcode", "gift codes", "giftcodes", "voucher",
+            "vouchers", "prepaid", "pre-paid", "pre paid", "redeem", "redeem code", "redeem gift", "redeem card", "claim code", "claim gift",
+            "amazon gift card", "itunes gift card", "google play gift card", "prepaid card", "pre-paid card", "pre paid card", "redeem gift card",
+            "claim gift card", "claim your gift card", "claim your code", "free gift card", "free giftcard", "free gift cards", "free amazon card",
+            "free itunes card", "free google play card", "free psn card", "free xbox card"
         ],
         "selfbot": [
-            "dm me", "direct message me", "add me", "friend me", "private message", "pm me"
+            "dm me", "dms open", "direct message me", "add me", "friend me", "private message", "pm me", "message me", "msg me", "contact me",
+            "send me a message", "send me dm", "send dm", "slide into my dms", "slide in my dms", "slide in dms", "slide into dms",
+            "dm me for", "dms open for", "direct message me for", "private message me for", "pm me for", "message me for", "msg me for", "send me a message for",
+            "send me dm for", "send dm for", "slide into my dms for", "slide in my dms for", "slide in dms for", "slide into dms for", "dm me if", "pm me if",
+            "message me if", "msg me if", "contact me for", "add me for", "friend me for", "private message for", "open dms for", "open dm for", "open pm for"
         ],
         "other": []
     }
