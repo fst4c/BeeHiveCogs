@@ -358,7 +358,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         action = config["action"]
         embed = discord.Embed(
             title="Honeypot trap triggered",
-            description=f">>> {message.content}",
+            description=f"> {message.content}\n",
             color=0xff4545,
             timestamp=message.created_at,
         )
