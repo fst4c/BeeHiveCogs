@@ -147,7 +147,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
                 action_text = action_descriptions.get(action, "An action will be taken against you as decided by the server owner.")
 
                 embed = discord.Embed(
-                    title="Shhhhh - this is a security honeypot",
+                    title="This channel is a security honeypot",
                     description="A honeypot is a security mechanism designed to lure cybercriminals into interacting with decoy targets. By doing so, cybersecurity experts can observe and analyze the attackers' methods, allowing them to develop effective countermeasures.\n\nSimilarly, this channel serves as a honeypot. It is intentionally placed in a conspicuous location with clear instructions not to engage in conversation here. Unsuspecting automated bots and low-quality spammers, such as those promoting nitro scams or explicit content, will likely post messages in this channel, unaware of its true purpose.",
                     color=0xff4545,
                 ).add_field(
