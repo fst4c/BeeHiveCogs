@@ -263,7 +263,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
                 embed = discord.Embed(
                     title="This channel is a security honeypot",
-                    description="A honeypot is a security mechanism designed to lure cybercriminals into interacting with decoy targets. By doing so, cybersecurity experts can observe and analyze the attackers' methods, allowing them to develop effective countermeasures.\n\nSimilarly, this channel serves as a honeypot. It is intentionally placed in a conspicuous location with clear instructions not to engage in conversation here. Unsuspecting automated bots and low-quality spammers, such as those promoting nitro scams or explicit content, will likely post messages in this channel, unaware of its true purpose.",
+                    description="A honeypot is a cybersecurity mechanism that uses a manufactured (fake) attack target to lure attackers away from legitimate, potentially vulnerable targets. In the same sense, this channel exists solely to bait spam, advertisements, and rule-breaking content from compromised and automated Discord accounts.\n- Real users (accounts not automated or stolen) are able to read the instructions below and follow them.\n- \"Fake\" users (stolen and automated accounts) won't be able to reliably recognize this isn't a real channel and will send messages in it, triggering the honeypot.",
                     color=0xff4545,
                 ).add_field(
                     name="What not to do?",
@@ -622,7 +622,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
             embed = discord.Embed(
                 title="This channel is a security honeypot",
-                description="A honeypot is a security mechanism designed to lure cybercriminals into interacting with decoy targets. By doing so, cybersecurity experts can observe and analyze the attackers' methods, allowing them to develop effective countermeasures.\n\nSimilarly, this channel serves as a honeypot. It is intentionally placed in a conspicuous location with clear instructions not to engage in conversation here. Unsuspecting automated bots and low-quality spammers, such as those promoting nitro scams or explicit content, will likely post messages in this channel, unaware of its true purpose.",
+                description="A honeypot is a cybersecurity mechanism that uses a manufactured (fake) attack target to lure attackers away from legitimate, potentially vulnerable targets. In the same sense, this channel exists solely to bait spam, advertisements, and rule-breaking content from compromised and automated Discord accounts.\n- Real users (accounts not automated or stolen) are able to read the instructions below and follow them.\n- \"Fake\" users (stolen and automated accounts) won't be able to reliably recognize this isn't a real channel and will send messages in it, triggering the honeypot.",
                 color=0xff4545,
             ).add_field(
                 name="What not to do?",
