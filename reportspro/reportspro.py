@@ -128,6 +128,7 @@ class ReportsPro(commands.Cog):
                 self.member = member
                 self.reports_channel = reports_channel
                 self.capture_chat_history = capture_chat_history
+                self.allowed_user_id = ctx.author.id  # Only allow the command invoker
                 options = [
                     discord.SelectOption(label=reason, description=description)
                     for reason, description in report_reasons
@@ -135,6 +136,16 @@ class ReportsPro(commands.Cog):
                 super().__init__(placeholder="Choose a report reason...", min_values=1, max_values=1, options=options)
 
             async def callback(self, interaction: discord.Interaction):
+                # Only allow the user who invoked the command to use the dropdown
+                if interaction.user.id != self.allowed_user_id:
+                    embed = discord.Embed(
+                        title="Not for you!",
+                        description="Only the user who started this report can select a reason.",
+                        color=discord.Color.red()
+                    )
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    return
+
                 selected_reason = self.values[0]
                 selected_description = next(description for reason, description in report_reasons if reason == selected_reason)
                 
