@@ -166,15 +166,6 @@ class ReportsPro(commands.Cog):
                     await interaction.response.send_message(embed=embed, ephemeral=True)
                     return
 
-                # Deactivate the dropdown
-                # Instead of disabling the select and editing the message (which can cause interaction failures
-                # if the message is ephemeral or the view is not properly attached), we will just remove the view
-                # by editing the message with view=None, and show a thank you embed.
-                thank_you_embed = discord.Embed(
-                    description="Report submitted, thank you for helping keep the server safer",
-                    color=0x2bbd8e
-                )
-
                 # Store the report in the config
                 try:
                     reports[report_id] = {
@@ -264,18 +255,40 @@ class ReportsPro(commands.Cog):
                     return
 
                 # Try to update the ephemeral message to a thank you embed and remove the view
+                # The bug is likely due to not responding to the interaction in time, or double-responding.
+                # We must ensure we only call one of interaction.response.edit_message or interaction.response.send_message,
+                # and if already responded, use interaction.followup.send.
                 try:
-                    await interaction.response.edit_message(embed=thank_you_embed, view=None)
+                    await interaction.response.edit_message(embed=discord.Embed(
+                        description="Report submitted, thank you for helping keep the server safer",
+                        color=0x2bbd8e
+                    ), view=None)
+                except discord.InteractionResponded:
+                    # Already responded, use followup
+                    try:
+                        await interaction.followup.send(embed=discord.Embed(
+                            description="Report submitted, thank you for helping keep the server safer",
+                            color=0x2bbd8e
+                        ), ephemeral=True)
+                    except Exception:
+                        pass
                 except Exception:
                     # fallback: try to send a new ephemeral message if edit fails
                     try:
-                        await interaction.followup.send(embed=thank_you_embed, ephemeral=True)
+                        await interaction.followup.send(embed=discord.Embed(
+                            description="Report submitted, thank you for helping keep the server safer",
+                            color=0x2bbd8e
+                        ), ephemeral=True)
                     except Exception:
                         pass
 
         # Create a view and add the dropdown
-        view = discord.ui.View(timeout=180)
-        view.add_item(ReportDropdown(self.config, ctx, member, reports_channel, self.capture_chat_history))
+        class ReportView(discord.ui.View):
+            def __init__(self, config, ctx, member, reports_channel, capture_chat_history):
+                super().__init__(timeout=180)
+                self.add_item(ReportDropdown(config, ctx, member, reports_channel, capture_chat_history))
+
+        view = ReportView(self.config, ctx, member, reports_channel, self.capture_chat_history)
 
         try:
             await ctx.send(embed=report_embed, view=view, ephemeral=True)
