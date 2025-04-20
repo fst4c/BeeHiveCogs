@@ -273,14 +273,16 @@ class Honeypot(commands.Cog, name="Honeypot"):
                     name="What will happen if I do?",
                     value=action_text,
                     inline=False,
-                ).set_footer(text=guild.name, icon_url=icon_url).set_image(url="attachment://do_not_post_here.png")
+                ).set_footer(text=guild.name, icon_url=icon_url).set_image(url="attachment://do_not_post_here.png").set_thumbnail(url="attachment://stop.png")
 
                 file_path = os.path.join(os.path.dirname(__file__), "do_not_post_here.png")
+                stop_file_path = os.path.join(os.path.dirname(__file__), "stop.png")
                 files = []
+                # Always try to send both images if they exist
                 if os.path.isfile(file_path):
-                    files = [discord.File(file_path)]
-                else:
-                    files = []
+                    files.append(discord.File(file_path))
+                if os.path.isfile(stop_file_path):
+                    files.append(discord.File(stop_file_path))
                 try:
                     sent_msg = await honeypot_channel.send(embed=embed, files=files)
                     honeypot_message_id = sent_msg.id
@@ -413,9 +415,15 @@ class Honeypot(commands.Cog, name="Honeypot"):
             except Exception:
                 icon_url = None
         embed.set_footer(text=message.guild.name, icon_url=icon_url)
+        # Add stop.png as thumbnail if available
+        stop_file_path = os.path.join(os.path.dirname(__file__), "stop.png")
+        files = []
+        if os.path.isfile(stop_file_path):
+            embed.set_thumbnail(url="attachment://stop.png")
+            files.append(discord.File(stop_file_path))
         ping_role_id = config.get("ping_role")
         ping_role = message.guild.get_role(ping_role_id) if ping_role_id else None
-        await logs_channel.send(content=ping_role.mention if ping_role else None, embed=embed)
+        await logs_channel.send(content=ping_role.mention if ping_role else None, embed=embed, files=files if files else None)
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
@@ -529,10 +537,16 @@ class Honeypot(commands.Cog, name="Honeypot"):
             except Exception:
                 icon_url = None
         embed.set_footer(text=guild.name, icon_url=icon_url)
+        # Add stop.png as thumbnail if available
+        stop_file_path = os.path.join(os.path.dirname(__file__), "stop.png")
+        files = []
+        if os.path.isfile(stop_file_path):
+            embed.set_thumbnail(url="attachment://stop.png")
+            files.append(discord.File(stop_file_path))
         ping_role_id = config.get("ping_role")
         ping_role = guild.get_role(ping_role_id) if ping_role_id else None
         if logs_channel:
-            await logs_channel.send(content=ping_role.mention if ping_role else None, embed=embed)
+            await logs_channel.send(content=ping_role.mention if ping_role else None, embed=embed, files=files if files else None)
 
     @commands.guild_only()
     @commands.admin_or_permissions()
@@ -618,16 +632,19 @@ class Honeypot(commands.Cog, name="Honeypot"):
                 name="What will happen if I do?",
                 value=action_text,
                 inline=False,
-            ).set_footer(text=ctx.guild.name, icon_url=icon_url).set_image(url="attachment://do_not_post_here.png")
+            ).set_footer(text=ctx.guild.name, icon_url=icon_url).set_image(url="attachment://do_not_post_here.png").set_thumbnail(url="attachment://stop.png")
 
             # Fix: File may not exist, so catch error
             file_path = os.path.join(os.path.dirname(__file__), "do_not_post_here.png")
+            stop_file_path = os.path.join(os.path.dirname(__file__), "stop.png")
             files = []
             if os.path.isfile(file_path):
-                files = [discord.File(file_path)]
-            else:
+                files.append(discord.File(file_path))
+            if os.path.isfile(stop_file_path):
+                files.append(discord.File(stop_file_path))
+            if not files:
                 # Optionally, warn the user
-                await ctx.send("Warning: The image file 'do_not_post_here.png' was not found. The honeypot channel will be created without the image.")
+                await ctx.send("Warning: Neither 'do_not_post_here.png' nor 'stop.png' was found. The honeypot channel will be created without the images.")
 
             sent_msg = await honeypot_channel.send(
                 embed=embed,
