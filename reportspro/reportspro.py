@@ -146,14 +146,12 @@ class ReportsPro(commands.Cog):
                     await interaction.response.send_message(embed=embed, ephemeral=True)
                     return
 
-                # Instead of deferring, we will edit the original response at the end
                 selected_reason = self.values[0]
                 selected_description = next(description for reason, description in report_reasons if reason == selected_reason)
                 
                 # Generate a unique report ID
                 reports = await self.config.guild(self.ctx.guild).reports()
                 report_id = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
-                # Prevent infinite loop if all IDs are taken (very unlikely, but for safety)
                 attempts = 0
                 while report_id in reports and attempts < 10000:
                     report_id = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
@@ -296,9 +294,15 @@ class ReportsPro(commands.Cog):
                     description="Report submitted, thank you for helping keep the server safer",
                     color=0x2bbd8e
                 )
+                # --- Begin fix for ephemeral message update ---
                 try:
-                    await interaction.response.edit_message(embed=thank_you_embed, view=None)
+                    if interaction.response.is_done():
+                        # If already responded, use followup
+                        await interaction.followup.send(embed=thank_you_embed, ephemeral=True)
+                    else:
+                        await interaction.response.edit_message(embed=thank_you_embed, view=None)
                 except Exception:
+                    # Try to edit the original response directly (discord.py 2.x+)
                     try:
                         await interaction.edit_original_response(embed=thank_you_embed, view=None)
                     except Exception:
@@ -306,6 +310,7 @@ class ReportsPro(commands.Cog):
                             await interaction.followup.send(embed=thank_you_embed, ephemeral=True)
                         except Exception:
                             pass
+                # --- End fix ---
 
         # Create a view and add the dropdown
         class ReportView(discord.ui.View):
