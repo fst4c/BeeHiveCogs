@@ -1296,22 +1296,27 @@ class EventMixin:
                 msg += _("After ") + f"{name} {after_attr}\n"
                 embed.add_field(name=_("Before ") + name, value=str(before_attr))
                 embed.add_field(name=_("After ") + name, value=str(after_attr))
+        def emoji_to_codepoints(emoji: str) -> str:
+            # Returns a dash-joined string of hex codepoints for the emoji
+            return '-'.join(f"{ord(char):x}" for char in emoji)
         if before.display_icon != after.display_icon:
             if isinstance(before.display_icon, discord.Asset):
                 embed.set_image(url=before.display_icon)
             elif isinstance(before.display_icon, str):
                 cdn_fmt = (
-                    "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/{codepoint:x}.png"
+                    "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/{codepoints}.png"
                 )
-                url = cdn_fmt.format(codepoint=ord(str(before.display_icon)))
+                codepoints = emoji_to_codepoints(str(before.display_icon))
+                url = cdn_fmt.format(codepoints=codepoints)
                 embed.set_image(url=url)
         if isinstance(after.display_icon, discord.Asset):
             embed.set_thumbnail(url=after.display_icon)
         elif isinstance(after.display_icon, str):
             cdn_fmt = (
-                "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/{codepoint:x}.png"
+                "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/{codepoints}.png"
             )
-            url = cdn_fmt.format(codepoint=ord(str(after.display_icon)))
+            codepoints = emoji_to_codepoints(str(after.display_icon))
+            url = cdn_fmt.format(codepoints=codepoints)
             embed.set_thumbnail(url=url)
 
         p_msg = await self.get_role_permission_change(before, after)
