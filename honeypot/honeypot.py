@@ -9,10 +9,48 @@ import random
 class Honeypot(commands.Cog, name="Honeypot"):
     """Create a channel at the top of the server to attract self bots/scammers and notify/mute/kick/ban them immediately!"""
 
+    SCAM_TYPES = {
+        "nitro": [
+            "nitro", "free nitro", "discord nitro", "gift nitro", "nitro giveaway"
+        ],
+        "steam": [
+            "steam", "$50", "50$", "steam gift", "steam code", "steam wallet", "steamcommunity", "steam offer"
+        ],
+        "csam": [
+            "nude", "nudes", "teen", "teens", "underage", "cp", "loli", "jailbait", "13yo", "14yo", "15yo", "16yo", "17yo"
+        ],
+        "crypto": [
+            "crypto", "bitcoin", "btc", "eth", "ethereum", "dogecoin", "solana", "airdrop", "wallet", "metamask", "binance", "exchange", "token", "coin", "blockchain"
+        ],
+        "phishing": [
+            "login", "verify", "verification", "password", "account locked", "reset your password", "security alert", "suspicious activity", "discordapp.com/gift", "discord-gift", "discord-app", "discordsecurity"
+        ],
+        "roblox": [
+            "roblox", "robux", "free robux", "roblox.com", "roblox gift", "roblox code"
+        ],
+        "giveaway": [
+            "giveaway", "win", "winner", "claim your prize", "congratulations", "you have won", "lucky winner"
+        ],
+        "adult": [
+            "sex", "porn", "xxx", "onlyfans", "camgirl", "cam girl", "adult", "escort", "18+", "nsfw", "hot girls", "sexting"
+        ],
+        "malware": [
+            "exe", "scr", "bat", "virus", "trojan", "malware", "download this", "infected", "keylogger", "stealer", "hack", "crack", "cheat", "mod menu"
+        ],
+        "giftcard": [
+            "gift card", "giftcard", "amazon gift", "itunes gift", "google play gift", "psn code", "xbox code", "gift code"
+        ],
+        "selfbot": [
+            "dm me", "direct message me", "add me", "friend me", "private message", "pm me"
+        ],
+        "other": []
+    }
+
     def __init__(self, bot: commands.Bot) -> None:
         super().__init__()
         self.bot = bot
-        self.config = Config.get_conf(self, identifier=1234567890, force_registration=True)
+        # Add all scam types to default stats
+        scam_stats_default = {k: 0 for k in self.SCAM_TYPES}
         default_guild = {
             "enabled": False,
             "action": None,
@@ -21,11 +59,12 @@ class Honeypot(commands.Cog, name="Honeypot"):
             "honeypot_channel": None,
             "mute_role": None,
             "ban_delete_message_days": 3,
-            "scam_stats": {"nitro": 0, "steam": 0, "other": 0, "csam": 0},
+            "scam_stats": scam_stats_default.copy(),
         }
         default_global = {
-            "global_scam_stats": {"nitro": 0, "steam": 0, "other": 0, "csam": 0},
+            "global_scam_stats": scam_stats_default.copy(),
         }
+        self.config = Config.get_conf(self, identifier=1234567890, force_registration=True)
         self.config.register_guild(**default_guild)
         self.config.register_global(**default_global)
         self.global_scam_stats = None
@@ -35,9 +74,11 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
     async def initialize_global_scam_stats(self):
         self.global_scam_stats = await self.config.global_scam_stats()
-        if not self.global_scam_stats:
-            self.global_scam_stats = {"nitro": 0, "steam": 0, "other": 0, "csam": 0}
-            await self.config.global_scam_stats.set(self.global_scam_stats)
+        # Ensure all scam types are present
+        for scam_type in self.SCAM_TYPES:
+            if scam_type not in self.global_scam_stats:
+                self.global_scam_stats[scam_type] = 0
+        await self.config.global_scam_stats.set(self.global_scam_stats)
 
     async def randomize_honeypot_name(self):
         await self.bot.wait_until_ready()
@@ -212,29 +253,25 @@ class Honeypot(commands.Cog, name="Honeypot"):
         # Track scam type based on message content
         scam_type = "other"
         content_lower = message.content.lower()
-        if "nitro" in content_lower:
-            scam_type = "nitro"
-        elif any(word in content_lower for word in ["steam", "$50", "50$"]):
-            scam_type = "steam"
-        elif any(word in content_lower for word in ["nude", "nudes", "teen", "teens"]):
-            scam_type = "csam"
+        for stype, keywords in self.SCAM_TYPES.items():
+            if stype == "other":
+                continue
+            if any(word in content_lower for word in keywords):
+                scam_type = stype
+                break
 
         # Update scam stats
-        scam_stats = config["scam_stats"]
-        # Fix: scam_stats may not have all keys if config is corrupted, so use setdefault
-        scam_stats.setdefault("nitro", 0)
-        scam_stats.setdefault("steam", 0)
-        scam_stats.setdefault("other", 0)
-        scam_stats.setdefault("csam", 0)
+        scam_stats = config.get("scam_stats", {})
+        # Ensure all scam types are present
+        for stype in self.SCAM_TYPES:
+            scam_stats.setdefault(stype, 0)
         scam_stats[scam_type] += 1
 
         # Fix: self.global_scam_stats may not be initialized yet
         if self.global_scam_stats is None:
             self.global_scam_stats = await self.config.global_scam_stats()
-        self.global_scam_stats.setdefault("nitro", 0)
-        self.global_scam_stats.setdefault("steam", 0)
-        self.global_scam_stats.setdefault("other", 0)
-        self.global_scam_stats.setdefault("csam", 0)
+        for stype in self.SCAM_TYPES:
+            self.global_scam_stats.setdefault(stype, 0)
         self.global_scam_stats[scam_type] += 1
 
         await self.config.guild(message.guild).scam_stats.set(scam_stats)
@@ -250,6 +287,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         embed.add_field(name="User display name", value=message.author.display_name, inline=True)
         embed.add_field(name="User mention", value=message.author.mention, inline=True)
         embed.add_field(name="User ID", value=message.author.id, inline=True)
+        embed.add_field(name="Scam type", value=scam_type, inline=True)
 
         failed = None
         if action:
@@ -537,28 +575,27 @@ class Honeypot(commands.Cog, name="Honeypot"):
             global_stats = await self.config.global_scam_stats()
             # Fix: scam_stats may be missing keys
             scam_stats = config.get('scam_stats', {})
-            scam_stats.setdefault('nitro', 0)
-            scam_stats.setdefault('steam', 0)
-            scam_stats.setdefault('csam', 0)
-            scam_stats.setdefault('other', 0)
-            global_stats.setdefault('nitro', 0)
-            global_stats.setdefault('steam', 0)
-            global_stats.setdefault('csam', 0)
-            global_stats.setdefault('other', 0)
+            for stype in self.SCAM_TYPES:
+                scam_stats.setdefault(stype, 0)
+                global_stats.setdefault(stype, 0)
             embed = discord.Embed(title="Honeypot detection statistics", color=0xfffffe)
             
             embed.add_field(name="In this server", value="\u200b", inline=False)
             # Server detections
-            embed.add_field(name="Nitro scams", value=scam_stats.get('nitro', 0), inline=True)
-            embed.add_field(name="Steam scams", value=scam_stats.get('steam', 0), inline=True)
-            embed.add_field(name="CSAM advertisements", value=scam_stats.get('csam', 0), inline=True)
-            embed.add_field(name="Uncategorized detections", value=scam_stats.get('other', 0), inline=True)
+            for stype in self.SCAM_TYPES:
+                if stype == "other":
+                    embed.add_field(name="Uncategorized detections", value=scam_stats.get(stype, 0), inline=True)
+                else:
+                    pretty = stype.replace("_", " ").capitalize()
+                    embed.add_field(name=f"{pretty} scams", value=scam_stats.get(stype, 0), inline=True)
             
             embed.add_field(name="In all servers", value="\u200b", inline=False)
             # Global detections
-            embed.add_field(name="Nitro scams", value=global_stats.get('nitro', 0), inline=True)
-            embed.add_field(name="Steam scams", value=global_stats.get('steam', 0), inline=True)
-            embed.add_field(name="CSAM advertisements", value=global_stats.get('csam', 0), inline=True)
-            embed.add_field(name="Uncategorized detections", value=global_stats.get('other', 0), inline=True)
+            for stype in self.SCAM_TYPES:
+                if stype == "other":
+                    embed.add_field(name="Uncategorized detections", value=global_stats.get(stype, 0), inline=True)
+                else:
+                    pretty = stype.replace("_", " ").capitalize()
+                    embed.add_field(name=f"{pretty} scams", value=global_stats.get(stype, 0), inline=True)
             
             await ctx.send(embed=embed)
