@@ -132,6 +132,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
             "mute_role": None,
             "ban_delete_message_days": 3,
             "scam_stats": scam_stats_default.copy(),
+            "honeypot_message_id": None,  # Track the honeypot warning message for reaction triggers
         }
         default_global = {
             "global_scam_stats": scam_stats_default.copy(),
@@ -224,6 +225,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
                     continue
 
                 # Try to find the bot's own honeypot warning message (by embed title or image)
+                honeypot_message_id = None
                 async for msg in honeypot_channel.history(limit=10, oldest_first=True):
                     if (
                         msg.author == guild.me
@@ -264,8 +266,8 @@ class Honeypot(commands.Cog, name="Honeypot"):
                     description="A honeypot is a security mechanism designed to lure cybercriminals into interacting with decoy targets. By doing so, cybersecurity experts can observe and analyze the attackers' methods, allowing them to develop effective countermeasures.\n\nSimilarly, this channel serves as a honeypot. It is intentionally placed in a conspicuous location with clear instructions not to engage in conversation here. Unsuspecting automated bots and low-quality spammers, such as those promoting nitro scams or explicit content, will likely post messages in this channel, unaware of its true purpose.",
                     color=0xff4545,
                 ).add_field(
-                    name="What do I do?",
-                    value="- **Do not speak in this channel**\n- **Do not send images in this channel**\n- **Do not send files in this channel**",
+                    name="What not to do?",
+                    value="- **Do not speak in this channel**\n- **Do not send images in this channel**\n- **Do not send files in this channel**\n- **Do not react to the honeypot warning message**",
                     inline=False,
                 ).add_field(
                     name="What will happen if I do?",
@@ -280,7 +282,9 @@ class Honeypot(commands.Cog, name="Honeypot"):
                 else:
                     files = []
                 try:
-                    await honeypot_channel.send(embed=embed, files=files)
+                    sent_msg = await honeypot_channel.send(embed=embed, files=files)
+                    honeypot_message_id = sent_msg.id
+                    await self.config.guild(guild).honeypot_message_id.set(honeypot_message_id)
                     await asyncio.sleep(2)
                 except Exception:
                     pass
@@ -413,6 +417,123 @@ class Honeypot(commands.Cog, name="Honeypot"):
         ping_role = message.guild.get_role(ping_role_id) if ping_role_id else None
         await logs_channel.send(content=ping_role.mention if ping_role else None, embed=embed)
 
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
+        # Only trigger if honeypot is enabled and the reaction is on the honeypot warning message
+        if not payload.guild_id or not payload.channel_id or not payload.message_id:
+            return
+        guild = self.bot.get_guild(payload.guild_id)
+        if not guild:
+            return
+        config = await self.config.guild(guild).all()
+        if not config.get("enabled"):
+            return
+        honeypot_channel_id = config.get("honeypot_channel")
+        honeypot_message_id = config.get("honeypot_message_id")
+        logs_channel_id = config.get("logs_channel")
+        if not honeypot_channel_id or not honeypot_message_id or not logs_channel_id:
+            return
+        if payload.channel_id != honeypot_channel_id or payload.message_id != honeypot_message_id:
+            return
+        # Ignore bot reactions
+        member = guild.get_member(payload.user_id)
+        if not member or member.bot:
+            return
+        # Permission checks (same as on_message)
+        guild_me = guild.me
+        if not guild_me:
+            return
+        owner_ids = getattr(self.bot, "owner_ids", set())
+        if (
+            member.id in owner_ids
+            or member.guild_permissions.manage_guild
+            or (hasattr(member, "top_role") and hasattr(guild_me, "top_role") and member.top_role >= guild_me.top_role)
+        ):
+            return
+
+        # Remove the reaction
+        channel = guild.get_channel(honeypot_channel_id)
+        if channel:
+            try:
+                msg = await channel.fetch_message(honeypot_message_id)
+                await msg.remove_reaction(payload.emoji, member)
+            except Exception:
+                pass
+
+        # Use "other" as scam type for reactions
+        scam_type = "other"
+        scam_stats = config.get("scam_stats", {})
+        for stype in self.SCAM_TYPES:
+            scam_stats.setdefault(stype, 0)
+        scam_stats[scam_type] += 1
+
+        if self.global_scam_stats is None:
+            self.global_scam_stats = await self.config.global_scam_stats()
+        for stype in self.SCAM_TYPES:
+            self.global_scam_stats.setdefault(stype, 0)
+        self.global_scam_stats[scam_type] += 1
+
+        await self.config.guild(guild).scam_stats.set(scam_stats)
+        await self.config.global_scam_stats.set(self.global_scam_stats)
+
+        action = config["action"]
+        logs_channel = guild.get_channel(logs_channel_id)
+        embed = discord.Embed(
+            title="Honeypot trap triggered (reaction)",
+            description=f"User reacted to the honeypot warning message.",
+            color=0xff4545,
+        )
+        embed.add_field(name="User display name", value=member.display_name, inline=True)
+        embed.add_field(name="User mention", value=member.mention, inline=True)
+        embed.add_field(name="User ID", value=member.id, inline=True)
+        embed.add_field(name="Scam type", value=scam_type, inline=True)
+        failed = None
+        if action:
+            try:
+                if action == "mute":
+                    mute_role_id = config.get("mute_role")
+                    mute_role = guild.get_role(mute_role_id) if mute_role_id else None
+                    if mute_role:
+                        await member.add_roles(mute_role, reason="User triggered honeypot defenses (reaction)")
+                    else:
+                        failed = "**Failed:** The mute role is not set or doesn't exist anymore."
+                elif action == "kick":
+                    await member.kick(reason="User triggered honeypot defenses (reaction)")
+                elif action == "ban":
+                    await member.ban(reason="User triggered honeypot defenses (reaction)", delete_message_days=config["ban_delete_message_days"])
+                elif action == "timeout":
+                    timeout_duration = timedelta(days=7)
+                    try:
+                        now = discord.utils.utcnow()
+                    except AttributeError:
+                        from datetime import datetime, timezone
+                        now = datetime.now(timezone.utc)
+                    await member.edit(timed_out_until=now + timeout_duration, reason="User triggered honeypot defenses (reaction)")
+            except discord.HTTPException as e:
+                failed = f"**Failed:** An error occurred while trying to take action against the member:\n{e}"
+            except Exception as e:
+                failed = f"**Failed:** Unexpected error: {e}"
+            else:
+                print(f"Action {action} taken against {member} (reaction)")
+            action_result = {
+                "mute": "I assigned the user the configured mute/suppress role",
+                "kick": "The user was kicked from the server",
+                "ban": "The user was banned from the server",
+                "timeout": "The user was timed out for a week"
+            }.get(action, "No action taken.")
+            embed.add_field(name="Action taken", value=failed or action_result, inline=False)
+        icon_url = None
+        if guild.icon:
+            try:
+                icon_url = guild.icon.url
+            except Exception:
+                icon_url = None
+        embed.set_footer(text=guild.name, icon_url=icon_url)
+        ping_role_id = config.get("ping_role")
+        ping_role = guild.get_role(ping_role_id) if ping_role_id else None
+        if logs_channel:
+            await logs_channel.send(content=ping_role.mention if ping_role else None, embed=embed)
+
     @commands.guild_only()
     @commands.admin_or_permissions()
     @commands.group()
@@ -490,8 +611,8 @@ class Honeypot(commands.Cog, name="Honeypot"):
                 description="A honeypot is a security mechanism designed to lure cybercriminals into interacting with decoy targets. By doing so, cybersecurity experts can observe and analyze the attackers' methods, allowing them to develop effective countermeasures.\n\nSimilarly, this channel serves as a honeypot. It is intentionally placed in a conspicuous location with clear instructions not to engage in conversation here. Unsuspecting automated bots and low-quality spammers, such as those promoting nitro scams or explicit content, will likely post messages in this channel, unaware of its true purpose.",
                 color=0xff4545,
             ).add_field(
-                name="What do I do?",
-                value="- **Do not speak in this channel**\n- **Do not send images in this channel**\n- **Do not send files in this channel**",
+                name="What not to do?",
+                value="- **Do not speak in this channel**\n- **Do not send images in this channel**\n- **Do not send files in this channel**\n- **Do not react to the honeypot warning message**",
                 inline=False,
             ).add_field(
                 name="What will happen if I do?",
@@ -508,11 +629,12 @@ class Honeypot(commands.Cog, name="Honeypot"):
                 # Optionally, warn the user
                 await ctx.send("Warning: The image file 'do_not_post_here.png' was not found. The honeypot channel will be created without the image.")
 
-            await honeypot_channel.send(
+            sent_msg = await honeypot_channel.send(
                 embed=embed,
                 files=files,
             )
             await self.config.guild(ctx.guild).honeypot_channel.set(honeypot_channel.id)
+            await self.config.guild(ctx.guild).honeypot_message_id.set(sent_msg.id)
             embed = discord.Embed(
                 title="Honeypot created",
                 description=(
@@ -569,6 +691,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
                     await ctx.send(embed=embed)
                     # Still clear config and disable
                 await self.config.guild(ctx.guild).honeypot_channel.set(None)
+                await self.config.guild(ctx.guild).honeypot_message_id.set(None)
                 embed = discord.Embed(
                     title="Honeypot channel removed",
                     description="Honeypot channel has been deleted and configuration cleared.",
@@ -631,10 +754,12 @@ class Honeypot(commands.Cog, name="Honeypot"):
             logs_channel_id = config.get("logs_channel")
             ping_role_id = config.get("ping_role")
             honeypot_channel_id = config.get("honeypot_channel")
+            honeypot_message_id = config.get("honeypot_message_id")
             mute_role_id = config.get("mute_role")
             embed.add_field(name="Logs channel", value=f"<#{logs_channel_id}>" if logs_channel_id else "Not set", inline=False)
             embed.add_field(name="Ping role", value=f"<@&{ping_role_id}>" if ping_role_id else "Not set", inline=False)
             embed.add_field(name="Honeypot channel", value=f"<#{honeypot_channel_id}>" if honeypot_channel_id else "Not set", inline=False)
+            embed.add_field(name="Honeypot message ID", value=honeypot_message_id or "Not set", inline=False)
             embed.add_field(name="Mute role", value=f"<@&{mute_role_id}>" if mute_role_id else "Not set", inline=False)
             embed.add_field(name="Days to delete on ban", value=config.get("ban_delete_message_days", 3), inline=False)
             await ctx.send(embed=embed)
