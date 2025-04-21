@@ -375,7 +375,7 @@ class Omni(commands.Cog):
     async def _create_moderation_embed(self, message, category_scores, title):
         embed = discord.Embed(
             title=title,
-            description=f"The following message was flagged for potentially breaking server rules, Discord's **[Terms](<https://discord.com/terms>)**, or Discord's **[Community Guidelines](<https://discord.com/guidelines>)**.\n>>> {message.content}\n",
+            description=f"The following message was flagged for potentially breaking server rules, Discord's **[Terms](<https://discord.com/terms>)**, or Discord's **[Community Guidelines](<https://discord.com/guidelines>)**.\n> {message.content}\n",
             color=0xff4545,
             timestamp=datetime.utcnow()
         )
