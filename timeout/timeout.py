@@ -164,25 +164,68 @@ class Timeout(commands.Cog):
         timestamp = int((utcnow() + time).timestamp())
         if isinstance(member_or_role, discord.Member):
             if member_or_role.is_timed_out():
-                return await ctx.send("This user is already timed out.")
+                embed = discord.Embed(
+                    title="Timeout Failed",
+                    description="This user is already timed out.",
+                    colour=discord.Colour.red(),
+                    timestamp=utcnow(),
+                )
+                return await ctx.send(embed=embed)
             if not await is_allowed_by_hierarchy(ctx.bot, ctx.author, member_or_role):
-                return await ctx.send("You cannot timeout this user due to hierarchy.")
+                embed = discord.Embed(
+                    title="Timeout Failed",
+                    description="You cannot timeout this user due to hierarchy.",
+                    colour=discord.Colour.red(),
+                    timestamp=utcnow(),
+                )
+                return await ctx.send(embed=embed)
             if ctx.channel.permissions_for(member_or_role).administrator:
-                return await ctx.send("You can't timeout an administrator.")
+                embed = discord.Embed(
+                    title="Timeout Failed",
+                    description="You can't timeout an administrator.",
+                    colour=discord.Colour.red(),
+                    timestamp=utcnow(),
+                )
+                return await ctx.send(embed=embed)
             await self.timeout_user(ctx, member_or_role, time, reason)
-            return await ctx.send(
-                f"{member_or_role.mention} has been timed out till <t:{timestamp}:f>."
+            embed = discord.Embed(
+                title="User Timed Out",
+                description=f"{member_or_role.mention} has been timed out.",
+                colour=discord.Colour.orange(),
+                timestamp=utcnow(),
             )
+            embed.add_field(name="Until", value=f"<t:{timestamp}:f>", inline=True)
+            embed.add_field(name="Duration", value=humanize.naturaldelta(time), inline=True)
+            if reason:
+                embed.add_field(name="Reason", value=reason, inline=False)
+            await ctx.send(embed=embed)
+            return
         if isinstance(member_or_role, discord.Role):
             enabled = await self.config.guild(ctx.guild).role_enabled()
             if not enabled:
-                return await ctx.send("Role (un)timeouts are not enabled.")
-            await ctx.send(
-                f"Timing out {len(member_or_role.members)} members till <t:{timestamp}:f>."
+                embed = discord.Embed(
+                    title="Timeout Failed",
+                    description="Role (un)timeouts are not enabled.",
+                    colour=discord.Colour.red(),
+                    timestamp=utcnow(),
+                )
+                return await ctx.send(embed=embed)
+            embed = discord.Embed(
+                title="Role Timeout",
+                description=f"Timing out {len(member_or_role.members)} members till <t:{timestamp}:f>.",
+                colour=discord.Colour.orange(),
+                timestamp=utcnow(),
             )
+            await ctx.send(embed=embed)
             failed = await self.timeout_role(ctx, member_or_role, time, reason)
             if failed:
-                return await ctx.send(f"Failed to timeout {len(failed)} members.")
+                embed = discord.Embed(
+                    title="Timeout Failed",
+                    description=f"Failed to timeout {len(failed)} members.",
+                    colour=discord.Colour.red(),
+                    timestamp=utcnow(),
+                )
+                await ctx.send(embed=embed)
 
     @commands.command(aliases=["utt"])
     @commands.guild_only()
@@ -207,21 +250,52 @@ class Timeout(commands.Cog):
         """
         if isinstance(member_or_role, discord.Member):
             if not member_or_role.is_timed_out():
-                return await ctx.send("This user is not timed out.")
+                embed = discord.Embed(
+                    title="User wasn't timed out",
+                    description="Are you sure you ran this command on the right user?",
+                    colour=0xff4545,
+                    timestamp=utcnow(),
+                )
+                return await ctx.send(embed=embed)
             await self.timeout_user(ctx, member_or_role, None, reason)
-            return await ctx.send(f"Removed timeout from {member_or_role.mention}")
+            embed = discord.Embed(
+                title="Timeout lifted",
+                description=f"Removed timeout from {member_or_role.mention}, they should be able to speak now.",
+                colour=0x2bbd8e,
+                timestamp=utcnow(),
+            )
+            if reason:
+                embed.add_field(name="Reason", value=reason, inline=False)
+            await ctx.send(embed=embed)
+            return
         if isinstance(member_or_role, discord.Role):
             enabled = await self.config.guild(ctx.guild).role_enabled()
             if not enabled:
-                return await ctx.send("Role (un)timeouts are not enabled.")
-            await ctx.send(
-                f"Removing timeout from {len(member_or_role.members)} members."
+                embed = discord.Embed(
+                    title="Untimeout Failed",
+                    description="Role (un)timeouts are not enabled.",
+                    colour=discord.Colour.red(),
+                    timestamp=utcnow(),
+                )
+                return await ctx.send(embed=embed)
+            embed = discord.Embed(
+                title="Role Untimeout",
+                description=f"Removing timeout from {len(member_or_role.members)} members.",
+                colour=discord.Colour.green(),
+                timestamp=utcnow(),
             )
+            await ctx.send(embed=embed)
             members = list(member_or_role.members)
             for member in members:
                 if member.is_timed_out():
                     await self.timeout_user(ctx, member, None, reason)
-            return await ctx.send(f"Removed timeout from {len(members)} members.")
+            embed = discord.Embed(
+                title="Role Untimeout Complete",
+                description=f"Removed timeout from {len(members)} members.",
+                colour=discord.Colour.green(),
+                timestamp=utcnow(),
+            )
+            await ctx.send(embed=embed)
 
     @commands.group()
     @commands.guild_only()
@@ -235,7 +309,13 @@ class Timeout(commands.Cog):
         current = await self.config.guild(ctx.guild).showmod()
         await self.config.guild(ctx.guild).showmod.set(not current)
         w = "Will not" if current else "Will"
-        await ctx.send(f"I {w} show the moderator in timeout DM's.")
+        embed = discord.Embed(
+            title="Timeout Setting Changed",
+            description=f"I {w} show the moderator in timeout DM's.",
+            colour=discord.Colour.blue(),
+            timestamp=utcnow(),
+        )
+        await ctx.send(embed=embed)
 
     @timeoutset.command(name="dm")
     async def timeoutset_dm(self, ctx: commands.Context):
@@ -243,7 +323,13 @@ class Timeout(commands.Cog):
         current = await self.config.guild(ctx.guild).dm()
         await self.config.guild(ctx.guild).dm.set(not current)
         w = "Will not" if current else "Will"
-        await ctx.send(f"I {w} DM the user when they are timed out.")
+        embed = discord.Embed(
+            title="Timeout Setting Changed",
+            description=f"I {w} DM the user when they are timed out.",
+            colour=discord.Colour.blue(),
+            timestamp=utcnow(),
+        )
+        await ctx.send(embed=embed)
 
     @timeoutset.command(name="role")
     async def timeoutset_role(self, ctx: commands.Context):
@@ -251,7 +337,13 @@ class Timeout(commands.Cog):
         current = await self.config.guild(ctx.guild).role_enabled()
         await self.config.guild(ctx.guild).role_enabled.set(not current)
         w = "Will not" if current else "Will"
-        await ctx.send(f"I {w} timeout role.")
+        embed = discord.Embed(
+            title="Timeout Setting Changed",
+            description=f"I {w} timeout role.",
+            colour=discord.Colour.blue(),
+            timestamp=utcnow(),
+        )
+        await ctx.send(embed=embed)
 
     async def cog_unload(self) -> None:
         global timeout
