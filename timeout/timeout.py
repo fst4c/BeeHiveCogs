@@ -14,8 +14,10 @@ from .exceptions import TimeoutException
 
 RequestType = Literal["discord_deleted_user", "owner", "user", "user_strict"]
 
-log = logging.getLogger("red.sravan.timeout")
+log = logging.getLogger("red.beehive-cogs.timeout")
 
+# Fix: define timeout as None at module level to avoid NameError in cog_unload
+timeout = None
 
 class Timeout(commands.Cog):
     """
@@ -28,8 +30,8 @@ class Timeout(commands.Cog):
         default_guild = {"dm": True, "showmod": False, "role_enabled": False}
         self.config.register_guild(**default_guild)
 
-    __author__ = ["sravan"]
-    __version__ = "1.6.2"
+    __author__ = ["adminelevation"]
+    __version__ = "1.0.0"
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         """
@@ -66,6 +68,9 @@ class Timeout(commands.Cog):
         time: Optional[datetime.timedelta],
         reason: Optional[str] = None,
     ) -> None:
+        # Fix: Check if member is already timed out if time is not None
+        if time and member.is_timed_out():
+            raise TimeoutException("User is already timed out.")
         await member.timeout(time, reason=reason)
         await modlog.create_case(
             bot=ctx.bot,
@@ -92,17 +97,17 @@ class Timeout(commands.Cog):
                 )
 
                 if time:
-                    timestamp = utcnow() + time
-                    timestamp = int(timestamp.timestamp())
+                    timestamp_val = utcnow() + time
+                    timestamp_int = int(timestamp_val.timestamp())
                     embed.add_field(
-                        name="Until", value=f"<t:{timestamp}:f>", inline=True
+                        name="Until", value=f"<t:{timestamp_int}:f>", inline=True
                     )
                     embed.add_field(
                         name="Duration", value=humanize.naturaldelta(time), inline=True
                     )
-                embed.add_field(name="Guild", value=ctx.guild, inline=False)
+                embed.add_field(name="Guild", value=str(ctx.guild), inline=False)
                 if await self.config.guild(ctx.guild).showmod():
-                    embed.add_field(name="Moderator", value=ctx.author, inline=False)
+                    embed.add_field(name="Moderator", value=str(ctx.author), inline=False)
                 await member.send(embed=embed)
 
     async def timeout_role(
@@ -161,7 +166,8 @@ class Timeout(commands.Cog):
         """
         if not time:
             time = datetime.timedelta(seconds=60)
-        timestamp = int((utcnow() + time).timestamp())
+        timestamp_val = utcnow() + time
+        timestamp = int(timestamp_val.timestamp())
         if isinstance(member_or_role, discord.Member):
             if member_or_role.is_timed_out():
                 embed = discord.Embed(
@@ -187,7 +193,16 @@ class Timeout(commands.Cog):
                     timestamp=utcnow(),
                 )
                 return await ctx.send(embed=embed)
-            await self.timeout_user(ctx, member_or_role, time, reason)
+            try:
+                await self.timeout_user(ctx, member_or_role, time, reason)
+            except TimeoutException:
+                embed = discord.Embed(
+                    title="Timeout Failed",
+                    description="This user is already timed out.",
+                    colour=discord.Colour.red(),
+                    timestamp=utcnow(),
+                )
+                return await ctx.send(embed=embed)
             embed = discord.Embed(
                 title="User Timed Out",
                 description=f"{member_or_role.mention} has been timed out.",
@@ -286,12 +301,14 @@ class Timeout(commands.Cog):
             )
             await ctx.send(embed=embed)
             members = list(member_or_role.members)
+            untimed_count = 0
             for member in members:
                 if member.is_timed_out():
                     await self.timeout_user(ctx, member, None, reason)
+                    untimed_count += 1
             embed = discord.Embed(
                 title="Role Untimeout Complete",
-                description=f"Removed timeout from {len(members)} members.",
+                description=f"Removed timeout from {untimed_count} members.",
                 colour=discord.Colour.green(),
                 timestamp=utcnow(),
             )
@@ -347,7 +364,8 @@ class Timeout(commands.Cog):
 
     async def cog_unload(self) -> None:
         global timeout
-        if timeout:
+        # Fix: Only try to remove/add command if timeout is not None
+        if timeout is not None:
             try:
                 self.bot.remove_command("timeout")
             except Exception as e:
@@ -359,6 +377,9 @@ class Timeout(commands.Cog):
 async def is_allowed_by_hierarchy(
     bot: Red, user: discord.Member, member: discord.Member
 ) -> bool:
+    # Fix: Check if user and member are in the same guild
+    if user.guild != member.guild:
+        return False
     return (
         user.guild.owner_id == user.id
         or user.top_role > member.top_role
