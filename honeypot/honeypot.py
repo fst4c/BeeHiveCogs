@@ -415,7 +415,6 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
-        # Only trigger if honeypot is enabled and the reaction is on the honeypot warning message
         if not payload.guild_id or not payload.channel_id or not payload.message_id:
             return
         guild = self.bot.get_guild(payload.guild_id)
