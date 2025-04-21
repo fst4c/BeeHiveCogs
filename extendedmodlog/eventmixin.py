@@ -1766,7 +1766,7 @@ class EventMixin:
 
         action = None
         embed = discord.Embed(
-            title=_("Server Emoji Updated"),
+            title=_("Server emoji updated"),
             description="",
             color=color,
             timestamp=time,
@@ -1779,7 +1779,7 @@ class EventMixin:
             worth_updating = True
             embed.description = _("An emoji was **removed** from the server.")
             embed.add_field(
-                name=_("Emoji Removed"),
+                name=_("Emoji removed"),
                 value=f"{removed_emoji} `{removed_emoji}`\nID: `{removed_emoji.id}`",
                 inline=False,
             )
@@ -1791,7 +1791,7 @@ class EventMixin:
             worth_updating = True
             embed.description = _("A new emoji was **added** to the server.")
             embed.add_field(
-                name=_("Emoji Added"),
+                name=_("Emoji added"),
                 value=f"{added_emoji} `{added_emoji}`\nID: `{added_emoji.id}`",
                 inline=False,
             )
@@ -1803,7 +1803,7 @@ class EventMixin:
             embed.description = _("An emoji was **updated** on the server.")
             if old_emoji.name != changed_emoji.name:
                 embed.add_field(
-                    name=_("Emoji Renamed"),
+                    name=_("Emoji renamed"),
                     value=_("Renamed from `{old}` to `{new}`").format(
                         old=old_emoji.name, new=changed_emoji.name
                     ),
