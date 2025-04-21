@@ -2303,7 +2303,7 @@ class EventMixin:
             time=discord.utils.format_dt(invite_time),
         )
         embed = discord.Embed(
-            title=_("Invite Deleted"),
+            title=_("Invite deleted"),
             colour=await self.get_event_colour(guild, "invite_deleted"),
             timestamp=invite_time,
         )
@@ -2312,7 +2312,7 @@ class EventMixin:
                 author=invite.inviter.mention, channel=invite.channel.mention
             )
         elif guild.widget_enabled and guild.widget_channel:
-            embed.description = _("Widget in {channel} invite deleted or used up.").format(
+            embed.description = _("{channel} invite deleted or used up.").format(
                 channel=guild.widget_channel.mention
             )
         if embed.description is None:
