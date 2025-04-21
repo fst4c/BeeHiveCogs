@@ -105,7 +105,7 @@ class Timeout(commands.Cog):
                     embed.add_field(
                         name="Duration", value=humanize.naturaldelta(time), inline=True
                     )
-                embed.add_field(name="Guild", value=str(ctx.guild), inline=False)
+                embed.add_field(name="Server", value=str(ctx.guild), inline=False)
                 if await self.config.guild(ctx.guild).showmod():
                     embed.add_field(name="Moderator", value=str(ctx.author), inline=False)
                 await member.send(embed=embed)
