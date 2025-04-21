@@ -1355,25 +1355,51 @@ class EventMixin:
         await i18n.set_contextual_locales_from_guild(self.bot, guild)
         # set guild level i18n
         time = datetime.datetime.now(datetime.timezone.utc)
+
+        # New style embed
         embed = discord.Embed(
-            description=role.name,
+            title=_("Role created"),
+            description=_("A new role was created in the server."),
             colour=await self.get_event_colour(guild, "role_create"),
             timestamp=time,
         )
-        embed.set_author(name=_("Role created ({r_id})").format(r_id=role.id))
-        msg = _("{emoji} {time} Role created {role}\n").format(
+        embed.add_field(name=_("Role"), value=f"{role.mention} (`{role.id}`)", inline=True)
+        embed.add_field(name=_("Name"), value=role.name, inline=True)
+        if role.colour and role.colour.value != 0:
+            embed.add_field(name=_("Colour"), value=str(role.colour), inline=True)
+        embed.add_field(name=_("Mentionable"), value=_("Yes") if role.mentionable else _("No"), inline=True)
+        embed.add_field(name=_("Hoisted"), value=_("Yes") if role.hoist else _("No"), inline=True)
+        embed.add_field(name=_("Position"), value=str(role.position), inline=True)
+        if perp:
+            embed.add_field(name=_("Created by"), value=perp.mention, inline=True)
+        if reason:
+            embed.add_field(name=_("Reason"), value=str(reason), inline=False)
+        embed.set_footer(text=_("Role ID: {r_id}").format(r_id=role.id))
+        if role.icon:
+            if isinstance(role.icon, discord.Asset):
+                embed.set_thumbnail(url=role.icon.url)
+            elif isinstance(role.icon, str):
+                # Unicode emoji as icon
+                def emoji_to_codepoints(emoji: str) -> str:
+                    return '-'.join(f"{ord(char):x}" for char in emoji)
+                cdn_fmt = (
+                    "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/{codepoints}.png"
+                )
+                codepoints = emoji_to_codepoints(str(role.icon))
+                url = cdn_fmt.format(codepoints=codepoints)
+                embed.set_thumbnail(url=url)
+
+        msg = _("{emoji} {time} Role created **{role}** (`{role_id}`)\n").format(
             emoji=self.settings[guild.id]["role_create"]["emoji"],
             time=discord.utils.format_dt(time),
             role=role.name,
+            role_id=role.id,
         )
-        embed.add_field(name=_("Role"), value=role.mention)
         if perp:
-            embed.add_field(name=_("Created by"), value=perp.mention)
             msg += _("By ") + str(perp) + "\n"
         if reason:
-            msg += _("Reason ") + reason + "\n"
-            embed.add_field(name=_("Reason "), value=reason, inline=False)
-        embed.add_field(name=_("Role ID"), value=box(str(role.id)))
+            msg += _("Reason ") + str(reason) + "\n"
+
         if embed_links:
             await channel.send(embed=embed, allowed_mentions=self.allowed_mentions)
         else:
@@ -1404,25 +1430,51 @@ class EventMixin:
         await i18n.set_contextual_locales_from_guild(self.bot, guild)
         # set guild level i18n
         time = datetime.datetime.now(datetime.timezone.utc)
+
+        # New style embed
         embed = discord.Embed(
-            description=role.name,
-            timestamp=time,
+            title=_("Role deleted"),
+            description=_("A role was deleted from the server."),
             colour=await self.get_event_colour(guild, "role_delete"),
+            timestamp=time,
         )
-        embed.set_author(name=_("Role deleted ({r_id})").format(r_id=role.id))
-        msg = _("{emoji} {time} Role deleted **{role}**\n").format(
+        embed.add_field(name=_("Role"), value=f"{role.mention} (`{role.id}`)", inline=True)
+        embed.add_field(name=_("Name"), value=role.name, inline=True)
+        if role.colour and role.colour.value != 0:
+            embed.add_field(name=_("Colour"), value=str(role.colour), inline=True)
+        embed.add_field(name=_("Mentionable"), value=_("Yes") if role.mentionable else _("No"), inline=True)
+        embed.add_field(name=_("Hoisted"), value=_("Yes") if role.hoist else _("No"), inline=True)
+        embed.add_field(name=_("Position"), value=str(role.position), inline=True)
+        if perp:
+            embed.add_field(name=_("Deleted by"), value=perp.mention, inline=True)
+        if reason:
+            embed.add_field(name=_("Reason"), value=str(reason), inline=False)
+        embed.set_footer(text=_("Role ID: {r_id}").format(r_id=role.id))
+        if role.icon:
+            if isinstance(role.icon, discord.Asset):
+                embed.set_thumbnail(url=role.icon.url)
+            elif isinstance(role.icon, str):
+                # Unicode emoji as icon
+                def emoji_to_codepoints(emoji: str) -> str:
+                    return '-'.join(f"{ord(char):x}" for char in emoji)
+                cdn_fmt = (
+                    "https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/{codepoints}.png"
+                )
+                codepoints = emoji_to_codepoints(str(role.icon))
+                url = cdn_fmt.format(codepoints=codepoints)
+                embed.set_thumbnail(url=url)
+
+        msg = _("{emoji} {time} Role deleted **{role}** (`{role_id}`)\n").format(
             emoji=self.settings[guild.id]["role_delete"]["emoji"],
             time=discord.utils.format_dt(time),
             role=role.name,
+            role_id=role.id,
         )
-        embed.add_field(name=_("Role"), value=role.mention)
         if perp:
-            embed.add_field(name=_("Deleted by"), value=perp.mention)
             msg += _("By ") + str(perp) + "\n"
         if reason:
-            msg += _("Reason ") + reason + "\n"
-            embed.add_field(name=_("Reason "), value=reason, inline=False)
-        embed.add_field(name=_("Role ID"), value=box(str(role.id)))
+            msg += _("Reason ") + str(reason) + "\n"
+
         if embed_links:
             await channel.send(embed=embed, allowed_mentions=self.allowed_mentions)
         else:
@@ -1473,23 +1525,32 @@ class EventMixin:
                 replying = f"https://discord.com/channels/{ref_guild}/{ref_chan}/{ref_msg}"
         if embed_links:
             embed = discord.Embed(
-                description=f">>> {before.content}",
+                title=_("Message Edited"),
+                description=_("A message was edited in the server."),
                 colour=await self.get_event_colour(guild, "message_edit"),
-                timestamp=before.created_at,
+                timestamp=time,
             )
-            # jump_url = f"[Click to see new message]({after.jump_url})"
-            embed.add_field(name=_("After Edit"), value=after.jump_url)
-            embed.add_field(name=_("Channel"), value=before.channel.jump_url)
+            embed.add_field(name=_("Author"), value=f"{before.author.mention} (`{before.author.id}`)", inline=True)
+            embed.add_field(name=_("Channel"), value=before.channel.mention, inline=True)
+            embed.add_field(name=_("Message ID"), value=box(str(after.id)), inline=True)
             if replying:
-                embed.add_field(name=_("Replying to:"), value=replying)
-            embed.add_field(name=_("Author"), value=before.author.mention)
+                embed.add_field(name=_("Replying to:"), value=replying, inline=False)
+            embed.add_field(
+                name=_("Before"),
+                value=(before.content if before.content else _("*(no content)*")),
+                inline=False,
+            )
+            embed.add_field(
+                name=_("After"),
+                value=f"[Jump to message]({after.jump_url})",
+                inline=False,
+            )
             embed.set_author(
                 name=_("{member} ({m_id}) - Edited Message").format(
                     member=before.author, m_id=before.author.id
                 ),
                 icon_url=str(before.author.display_avatar),
             )
-            embed.add_field(name=_("Message ID"), value=box(str(after.id)))
             await channel.send(embed=embed, allowed_mentions=self.allowed_mentions)
         else:
             msg = _(
@@ -1528,14 +1589,6 @@ class EventMixin:
         await i18n.set_contextual_locales_from_guild(self.bot, guild)
         # set guild level i18n
         time = datetime.datetime.now(datetime.timezone.utc)
-        embed = discord.Embed(
-            timestamp=time, colour=await self.get_event_colour(guild, "guild_change")
-        )
-        embed.set_author(
-            name=_("Updated Guild"),
-            icon_url=guild.icon,
-        )
-        embed.set_thumbnail(url=guild.icon)
         msg = _("{emoji} {time} Guild updated\n").format(
             emoji=self.settings[guild.id]["guild_change"]["emoji"],
             time=discord.utils.format_dt(time),
@@ -1551,19 +1604,27 @@ class EventMixin:
             "verification_level": _("Verification Level:"),
         }
         worth_updating = False
+        changes = []
         for attr, name in guild_updates.items():
             before_attr = getattr(before, attr)
             after_attr = getattr(after, attr)
             if before_attr != after_attr:
                 worth_updating = True
                 if attr == "icon":
-                    embed.description = _("Server Icon Updated")
-                    embed.set_image(url=after.icon)
+                    changes.append({
+                        "type": "icon",
+                        "before": before_attr,
+                        "after": after_attr,
+                    })
                     continue
+                changes.append({
+                    "type": attr,
+                    "name": name,
+                    "before": before_attr,
+                    "after": after_attr,
+                })
                 msg += _("Before ") + f"{name} {before_attr}\n"
                 msg += _("After ") + f"{name} {after_attr}\n"
-                embed.add_field(name=_("Before ") + name, value=str(before_attr))
-                embed.add_field(name=_("After ") + name, value=str(after_attr))
         if not worth_updating:
             return
         perp = None
@@ -1574,11 +1635,67 @@ class EventMixin:
             perp = getattr(entry, "user", None)
             reason = getattr(entry, "reason", None)
 
-        if perp:
-            embed.add_field(name=_("Updated by"), value=perp)
-        if reason:
-            embed.add_field(name=_("Reasons "), value=reason, inline=False)
         if embed_links:
+            # New embed style
+            embed = discord.Embed(
+                title="✨ " + _("Guild Updated"),
+                description=_("The server settings were updated. See below for details."),
+                color=0x5865F2,
+                timestamp=time,
+            )
+            embed.add_field(
+                name=_("Server"),
+                value=f"{guild.name} (`{guild.id}`)",
+                inline=False,
+            )
+            for change in changes:
+                if change.get("type") == "icon":
+                    embed.add_field(
+                        name=_("Server Icon Updated"),
+                        value=_("The server icon was changed."),
+                        inline=False,
+                    )
+                    if change["after"]:
+                        embed.set_image(url=change["after"])
+                else:
+                    before_val = change["before"]
+                    after_val = change["after"]
+                    # Format channel/owner objects for display
+                    if isinstance(before_val, discord.abc.GuildChannel):
+                        before_val = before_val.mention if before_val else _("None")
+                    if isinstance(after_val, discord.abc.GuildChannel):
+                        after_val = after_val.mention if after_val else _("None")
+                    if isinstance(before_val, discord.Member):
+                        before_val = f"{before_val.mention} (`{before_val.id}`)" if before_val else _("None")
+                    if isinstance(after_val, discord.Member):
+                        after_val = f"{after_val.mention} (`{after_val.id}`)" if after_val else _("None")
+                    embed.add_field(
+                        name=f"{change['name']} " + _("(Before)"),
+                        value=str(before_val) if before_val else _("None"),
+                        inline=True,
+                    )
+                    embed.add_field(
+                        name=f"{change['name']} " + _("(After)"),
+                        value=str(after_val) if after_val else _("None"),
+                        inline=True,
+                    )
+            if perp:
+                embed.add_field(
+                    name=_("Updated by"),
+                    value=f"{perp.mention} (`{perp.id}`)" if hasattr(perp, "mention") else str(perp),
+                    inline=False,
+                )
+            if reason:
+                embed.add_field(
+                    name=_("Reason"),
+                    value=str(reason),
+                    inline=False,
+                )
+            embed.set_footer(
+                text=_("Guild ID: {gid}").format(gid=guild.id)
+            )
+            if guild.icon:
+                embed.set_thumbnail(url=guild.icon)
             await channel.send(embed=embed, allowed_mentions=self.allowed_mentions)
         else:
             await channel.send(msg, allowed_mentions=self.allowed_mentions)
@@ -1605,19 +1722,15 @@ class EventMixin:
         )
         await i18n.set_contextual_locales_from_guild(self.bot, guild)
         # set guild level i18n
-        perp = None
 
         time = datetime.datetime.now(datetime.timezone.utc)
-        embed = discord.Embed(
-            description="",
-            timestamp=time,
-            colour=await self.get_event_colour(guild, "emoji_change"),
-        )
-        embed.set_author(name=_("Updated Server Emojis"))
+        color = await self.get_event_colour(guild, "emoji_change")
+        emoji_icon = self.settings[guild.id]["emoji_change"]["emoji"]
         msg = _("{emoji} {time} Updated Server Emojis").format(
-            emoji=self.settings[guild.id]["emoji_change"]["emoji"],
+            emoji=emoji_icon,
             time=discord.utils.format_dt(time),
         )
+
         worth_updating = False
         b = set(before)
         a = set(after)
@@ -1650,53 +1763,99 @@ class EventMixin:
             else:
                 # this shouldn't happen but it's here just in case
                 changed_emoji = None
+
         action = None
+        embed = discord.Embed(
+            title=_("Server Emoji Updated"),
+            description="",
+            color=color,
+            timestamp=time,
+        )
+        embed.set_footer(text=_("Guild ID: {gid}").format(gid=guild.id))
+        if guild.icon:
+            embed.set_thumbnail(url=guild.icon.url if hasattr(guild.icon, "url") else guild.icon)
+
         if removed_emoji is not None:
             worth_updating = True
-            new_msg = _("`{emoji_name}` (ID: {emoji_id}) Removed from the guild\n").format(
+            embed.description = _("An emoji was **removed** from the server.")
+            embed.add_field(
+                name=_("Emoji Removed"),
+                value=f"{removed_emoji} `{removed_emoji}`\nID: `{removed_emoji.id}`",
+                inline=False,
+            )
+            action = discord.AuditLogAction.emoji_delete
+            msg += _("\n`{emoji_name}` (ID: {emoji_id}) Removed from the guild").format(
                 emoji_name=removed_emoji, emoji_id=removed_emoji.id
             )
-            msg += new_msg
-            embed.description += new_msg
-            action = discord.AuditLogAction.emoji_delete
         elif added_emoji is not None:
             worth_updating = True
-            new_emoji = f"{added_emoji} `{added_emoji}`"
-            new_msg = _("{emoji} Added to the guild\n").format(emoji=new_emoji)
-            msg += new_msg
-            embed.description += new_msg
+            embed.description = _("A new emoji was **added** to the server.")
+            embed.add_field(
+                name=_("Emoji Added"),
+                value=f"{added_emoji} `{added_emoji}`\nID: `{added_emoji.id}`",
+                inline=False,
+            )
             action = discord.AuditLogAction.emoji_create
+            msg += _("\n{emoji} Added to the guild").format(emoji=f"{added_emoji} `{added_emoji}`")
         elif changed_emoji is not None:
             worth_updating = True
             emoji_name = f"{changed_emoji} `{changed_emoji}`"
+            embed.description = _("An emoji was **updated** on the server.")
             if old_emoji.name != changed_emoji.name:
-                new_msg = _("{emoji} Renamed from {old_emoji_name} to {new_emoji_name}\n").format(
+                embed.add_field(
+                    name=_("Emoji Renamed"),
+                    value=_("Renamed from `{old}` to `{new}`").format(
+                        old=old_emoji.name, new=changed_emoji.name
+                    ),
+                    inline=False,
+                )
+                action = discord.AuditLogAction.emoji_update
+                msg += _("\n{emoji} Renamed from {old_emoji_name} to {new_emoji_name}").format(
                     emoji=emoji_name,
                     old_emoji_name=old_emoji.name,
                     new_emoji_name=changed_emoji.name,
                 )
-                # emoji_update shows only for renames and not for role restriction updates
-                action = discord.AuditLogAction.emoji_update
-                msg += new_msg
-                embed.description += new_msg
             if old_emoji.roles != changed_emoji.roles:
-                worth_updating = True
                 if not changed_emoji.roles:
-                    new_msg = _("{emoji} Changed to unrestricted.\n").format(emoji=emoji_name)
-                    msg += new_msg
-                    embed.description += new_msg
+                    embed.add_field(
+                        name=_("Role Restriction Changed"),
+                        value=_("Changed to unrestricted."),
+                        inline=False,
+                    )
+                    msg += _("\n{emoji} Changed to unrestricted.").format(emoji=emoji_name)
                 elif not old_emoji.roles:
-                    new_msg = _("{emoji} Restricted to roles: {roles}\n").format(
+                    embed.add_field(
+                        name=_("Role Restriction Added"),
+                        value=_("Restricted to roles: {roles}").format(
+                            roles=humanize_list(
+                                [f"{role.name} ({role.id})" for role in changed_emoji.roles]
+                            )
+                        ),
+                        inline=False,
+                    )
+                    msg += _("\n{emoji} Restricted to roles: {roles}").format(
                         emoji=emoji_name,
                         roles=humanize_list(
                             [f"{role.name} ({role.id})" for role in changed_emoji.roles]
                         ),
                     )
-                    msg += new_msg
-                    embed.description += new_msg
                 else:
-                    new_msg = _(
-                        "{emoji} Role restriction changed from\n {old_roles}\n To\n {new_roles}"
+                    embed.add_field(
+                        name=_("Role Restriction Changed"),
+                        value=_(
+                            "Changed from:\n{old_roles}\nTo:\n{new_roles}"
+                        ).format(
+                            old_roles=humanize_list(
+                                [f"{role.mention} ({role.id})" for role in old_emoji.roles]
+                            ),
+                            new_roles=humanize_list(
+                                [f"{role.name} ({role.id})" for role in changed_emoji.roles]
+                            ),
+                        ),
+                        inline=False,
+                    )
+                    msg += _(
+                        "\n{emoji} Role restriction changed from\n {old_roles}\n To\n {new_roles}"
                     ).format(
                         emoji=emoji_name,
                         old_roles=humanize_list(
@@ -1706,8 +1865,6 @@ class EventMixin:
                             [f"{role.name} ({role.id})" for role in changed_emoji.roles]
                         ),
                     )
-                    msg += new_msg
-                    embed.description += new_msg
         perp = None
         reason = None
         if not worth_updating:
@@ -1718,11 +1875,19 @@ class EventMixin:
                 perp = getattr(entry, "user", None)
                 reason = getattr(entry, "reason", None)
         if perp:
-            embed.add_field(name=_("Updated by "), value=perp.mention)
-            msg += _("Updated by ") + str(perp) + "\n"
+            embed.add_field(
+                name=_("Updated by"),
+                value=f"{perp.mention} (`{perp.id}`)" if hasattr(perp, "mention") else str(perp),
+                inline=False,
+            )
+            msg += _("\nUpdated by ") + str(perp)
         if reason:
-            msg += _("Reason ") + reason + "\n"
-            embed.add_field(name=_("Reason "), value=reason, inline=False)
+            embed.add_field(
+                name=_("Reason"),
+                value=str(reason),
+                inline=False,
+            )
+            msg += _("\nReason ") + str(reason)
         if embed_links:
             await channel.send(embed=embed, allowed_mentions=self.allowed_mentions)
         else:
