@@ -417,12 +417,8 @@ class Honeypot(commands.Cog, name="Honeypot"):
             except Exception:
                 icon_url = None
         embed.set_footer(text=message.guild.name, icon_url=icon_url)
-        # Add stop.png as thumbnail if available
-        stop_file_path = os.path.join(os.path.dirname(__file__), "stop.png")
+        # Do NOT show stop.png in the log message
         files = []
-        if os.path.isfile(stop_file_path):
-            embed.set_thumbnail(url="attachment://stop.png")
-            files.append(discord.File(stop_file_path))
         ping_role_id = config.get("ping_role")
         ping_role = message.guild.get_role(ping_role_id) if ping_role_id else None
         await logs_channel.send(content=ping_role.mention if ping_role else None, embed=embed, files=files if files else None)
