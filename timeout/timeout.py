@@ -204,7 +204,7 @@ class Timeout(commands.Cog):
                 )
                 return await ctx.send(embed=embed)
             embed = discord.Embed(
-                title="User Timed Out",
+                title="User timed out",
                 description=f"{member_or_role.mention} has been timed out.",
                 colour=discord.Colour.orange(),
                 timestamp=utcnow(),
