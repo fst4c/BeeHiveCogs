@@ -820,10 +820,6 @@ class EventMixin:
                 embed.add_field(name=_("Kicked by"), value=perp.mention, inline=True)
             if reason:
                 embed.add_field(name=_("Reason"), value=str(reason), inline=False)
-            embed.set_author(
-                name=_("{member} ({m_id})").format(member=member, m_id=member.id),
-                icon_url=member.display_avatar,
-            )
             embed.set_thumbnail(url=member.display_avatar)
             await channel.send(embed=embed, allowed_mentions=self.allowed_mentions)
         else:
