@@ -195,31 +195,32 @@ class Omni(commands.Cog):
             normalized_content = self.normalize_text(message.content)
             input_data = [{"type": "text", "text": normalized_content}]
 
+            # Count and increment image stats for each image (not just once for the message)
+            image_attachments = []
             if message.attachments:
                 for attachment in message.attachments:
                     if attachment.content_type and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif"):
-                        input_data.append({"type": "image_url", "image_url": {"url": attachment.url}})
+                        image_attachments.append(attachment)
                         self.increment_statistic(guild.id, 'image_count')
                         self.increment_statistic('global', 'global_image_count')
 
-            # Analyze text content first
+            # Only send text for moderation in the main request
             text_category_scores = await self.analyze_content(input_data, api_key, message)
             moderation_threshold = await self.config.guild(guild).moderation_threshold()
             text_flagged = any(score > moderation_threshold for score in text_category_scores.values())
 
-            # Analyze each image separately
-            for attachment in message.attachments:
-                if attachment.content_type and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif"):
-                    image_data = [{"type": "image_url", "image_url": {"url": attachment.url}}]
-                    image_category_scores = await self.analyze_content(image_data, api_key, message)
-                    image_flagged = any(score > moderation_threshold for score in image_category_scores.values())
+            # Analyze each image individually (API only supports one image at a time)
+            for attachment in image_attachments:
+                image_data = [{"type": "image_url", "image_url": {"url": attachment.url}}]
+                image_category_scores = await self.analyze_content(image_data, api_key, message)
+                image_flagged = any(score > moderation_threshold for score in image_category_scores.values())
 
-                    if image_flagged:
-                        self.update_moderation_stats(guild.id, message, image_category_scores)
-                        await self.handle_moderation(message, image_category_scores)
+                if image_flagged:
+                    self.update_moderation_stats(guild.id, message, image_category_scores)
+                    await self.handle_moderation(message, image_category_scores)
 
-                    # Space out requests
-                    await asyncio.sleep(1)
+                # Space out requests
+                await asyncio.sleep(1)
 
             if text_flagged:
                 self.update_moderation_stats(guild.id, message, text_category_scores)
