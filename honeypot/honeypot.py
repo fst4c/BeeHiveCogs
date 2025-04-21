@@ -408,16 +408,6 @@ class Honeypot(commands.Cog, name="Honeypot"):
             }.get(action, "No action taken.")
 
             embed.add_field(name="Action taken", value=failed or action_result, inline=False)
-
-        # Fix: message.guild.icon may be None, and .url will raise if so
-        icon_url = None
-        if message.guild.icon:
-            try:
-                icon_url = message.guild.icon.url
-            except Exception:
-                icon_url = None
-        embed.set_footer(text=message.guild.name, icon_url=icon_url)
-        # Do NOT show stop.png in the log message
         files = []
         ping_role_id = config.get("ping_role")
         ping_role = message.guild.get_role(ping_role_id) if ping_role_id else None
@@ -485,8 +475,8 @@ class Honeypot(commands.Cog, name="Honeypot"):
         action = config["action"]
         logs_channel = guild.get_channel(logs_channel_id)
         embed = discord.Embed(
-            title="Honeypot trap triggered (reaction)",
-            description=f"User reacted to the honeypot warning message.",
+            title="Honeypot trap triggered by reaction",
+            description=f"A user reacted to the honeypot warning message.",
             color=0xff4545,
         )
         embed.add_field(name="User display name", value=member.display_name, inline=True)
@@ -528,19 +518,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
                 "timeout": "The user was timed out for a week"
             }.get(action, "No action taken.")
             embed.add_field(name="Action taken", value=failed or action_result, inline=False)
-        icon_url = None
-        if guild.icon:
-            try:
-                icon_url = guild.icon.url
-            except Exception:
-                icon_url = None
-        embed.set_footer(text=guild.name, icon_url=icon_url)
-        # Add stop.png as thumbnail if available
-        stop_file_path = os.path.join(os.path.dirname(__file__), "stop.png")
         files = []
-        if os.path.isfile(stop_file_path):
-            embed.set_thumbnail(url="attachment://stop.png")
-            files.append(discord.File(stop_file_path))
         ping_role_id = config.get("ping_role")
         ping_role = guild.get_role(ping_role_id) if ping_role_id else None
         if logs_channel:
