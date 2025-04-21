@@ -5,6 +5,10 @@ import discord  # type: ignore
 import yt_dlp  # type: ignore
 from redbot.core import commands, Config  # type: ignore
 
+# Add PIL for color extraction
+from PIL import Image
+import io
+import subprocess
 
 class TikTokLiveCog(commands.Cog):
     def __init__(self, bot):
@@ -45,6 +49,44 @@ class TikTokLiveCog(commands.Cog):
         """Download a TikTok video and send it in the channel."""
         await self.download_video(ctx, url)
 
+    async def _get_primary_color_from_video(self, video_path):
+        """
+        Extract the primary color from the first frame of the video.
+        Returns an integer suitable for discord.Embed color.
+        """
+        try:
+            # Use ffmpeg to extract the first frame as a PNG image in memory
+            ffmpeg_cmd = [
+                "ffmpeg",
+                "-i", video_path,
+                "-vf", "select=eq(n\\,0)",
+                "-vframes", "1",
+                "-f", "image2pipe",
+                "-vcodec", "png",
+                "pipe:1"
+            ]
+            proc = subprocess.run(
+                ffmpeg_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                check=True
+            )
+            image_bytes = proc.stdout
+            image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+            # Resize to reduce computation, then get most common color
+            small_image = image.resize((64, 64))
+            result = small_image.getcolors(64*64)
+            if not result:
+                return 0xfffffe  # fallback
+            # Get the most common color
+            most_common = max(result, key=lambda x: x[0])[1]
+            # Convert to int
+            color_int = (most_common[0] << 16) + (most_common[1] << 8) + most_common[2]
+            return color_int
+        except Exception as e:
+            logging.error(f"Failed to extract primary color: {e}")
+            return 0xfffffe  # fallback
+
     async def download_video(self, ctx, url: str, *, user_display_name: str = None):
         """Helper function to download a TikTok video and send it in the channel.
 
@@ -75,10 +117,13 @@ class TikTokLiveCog(commands.Cog):
                 # Remove hashtags from the title
                 clean_title = ' '.join(word for word in video_title.split() if not word.startswith('#'))
 
+                # Get the primary color from the first frame of the video
+                color_int = await self._get_primary_color_from_video(video_path)
+
                 embed = discord.Embed(
                     title="Here's that TikTok",
                     description=clean_title,
-                    color=0xfffffe
+                    color=color_int
                 )
                 if hashtags:
                     embed.add_field(name="Hashtags", value=' '.join(hashtags), inline=False)
