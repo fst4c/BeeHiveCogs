@@ -258,9 +258,9 @@ class Products(commands.Cog):
             inline=False
         )
         view = discord.ui.View()
-        view.add_item(discord.ui.Button(label="Download for Windows", url="https://cdn.beehive.systems/em_b2LVrQQy_installer_Win7-Win11_x86_x64.msi", style=discord.ButtonStyle.link, emoji="<:windows:1194913113863114762>"))
-        view.add_item(discord.ui.Button(label="Download for MacOS", url="https://cdn.beehive.systems/itsmagent-installer-iaW5KL9T.pkg", style=discord.ButtonStyle.link, emoji="<:apple:1194913115826040843>"))
-        view.add_item(discord.ui.Button(label="Download for Linux", url="https://cdn.beehive.systems/itsm_utdBE3lc_installer.run", style=discord.ButtonStyle.link, emoji="<:linux:1194913018526564412>"))
+        view.add_item(discord.ui.Button(label="Download for Windows", url="https://cdn.beehive.systems/em_b2LVrQQy_installer_Win7-Win11_x86_x64.msi", style=discord.ButtonStyle.link, emoji=""))
+        view.add_item(discord.ui.Button(label="Download for MacOS", url="https://cdn.beehive.systems/itsmagent-installer-iaW5KL9T.pkg", style=discord.ButtonStyle.link, emoji=""))
+        view.add_item(discord.ui.Button(label="Download for Linux", url="https://cdn.beehive.systems/itsm_utdBE3lc_installer.run", style=discord.ButtonStyle.link, emoji=""))
         await ctx.send(embed=embed, view=view)
 
     @commands.bot_has_permissions(embed_links=True)
