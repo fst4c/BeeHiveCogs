@@ -140,10 +140,19 @@ class TikTokLiveCog(commands.Cog):
         except ValueError as ve:
             await ctx.send(f"Failed to download video: {ve}")
         except Exception as e:
-            if "No video formats found" in str(e):
+            error_str = str(e)
+            # Handle TikTok login/cookie error
+            if (
+                "No video formats found" in error_str
+                or "This post may not be comfortable for some audiences. Log in for access." in error_str
+                or "Use --cookies-from-browser or --cookies for the authentication." in error_str
+            ):
                 embed = discord.Embed(
                     title="This TikTok is restricted",
-                    description="This video may contain potentially sensitive or graphic content, and TikTok has restricted access to it behind a login. Unfortunately, the bot cannot log in to access such content.",
+                    description=(
+                        "This video may contain potentially sensitive or graphic content, and TikTok has restricted access to it behind a login. "
+                        "Unfortunately, the bot cannot log in to access such content."
+                    ),
                     color=0xff4545
                 )
                 await ctx.send(embed=embed)
