@@ -1,11 +1,15 @@
-import discord #type: ignore
-from redbot.core import commands, Config, checks #type: ignore
-import matplotlib.pyplot as plt #type: ignore
+import discord  # type: ignore
+from redbot.core import commands, Config, checks  # type: ignore
+import matplotlib.pyplot as plt  # type: ignore
 import io
 import asyncio
+from datetime import datetime
 
 class Invites(commands.Cog):
-    """Tracks user invites with customizable announcements, rewards, and perks."""
+    """
+    A comprehensive invite tracking cog for Red-DiscordBot.
+    Tracks invites, provides leaderboards, rewards, announcements, and server growth charts.
+    """
 
     DISBOARD_BOT_ID = 302050872383242240
 
@@ -13,307 +17,290 @@ class Invites(commands.Cog):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1234567890, force_registration=True)
         default_guild = {
-            "invites": {},
-            "rewards": {},
+            "invites": {},  # {user_id: count}
+            "rewards": {},  # {invite_count: role_id}
             "announcement_channel": None,
-            "member_growth": []
+            "member_growth": [],  # [(iso_date, member_count)]
         }
         self.config.register_guild(**default_guild)
-        self.invites = {}
-        self.milestones = [1, 2, 3, 4, 5, 10, 15, 20]
+        self._cache = {}  # {guild_id: [Invite objects]}
+
+    async def red_delete_data_for_user(self, *, requester, user_id: int):
+        # Remove user invite data for GDPR compliance
+        for guild_id in await self.config.all_guilds():
+            async with self.config.guild_from_id(guild_id).invites() as invites:
+                invites.pop(str(user_id), None)
 
     @commands.Cog.listener()
     async def on_ready(self):
+        # Cache invites for all guilds
         for guild in self.bot.guilds:
             try:
-                self.invites[guild.id] = await guild.invites()
-            except Exception as e:
-                print(f"Failed to fetch invites for guild {guild.id}: {e}")
+                self._cache[guild.id] = await guild.invites()
+            except Exception:
+                self._cache[guild.id] = []
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild):
+        try:
+            self._cache[guild.id] = await guild.invites()
+        except Exception:
+            self._cache[guild.id] = []
+
+    @commands.Cog.listener()
+    async def on_invite_create(self, invite):
+        # Update cache when new invite is created
+        guild = invite.guild
+        try:
+            self._cache[guild.id] = await guild.invites()
+        except Exception:
+            pass
+
+    @commands.Cog.listener()
+    async def on_invite_delete(self, invite):
+        # Update cache when invite is deleted
+        guild = invite.guild
+        try:
+            self._cache[guild.id] = await guild.invites()
+        except Exception:
+            pass
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
         guild = member.guild
         try:
-            invites_before = self.invites.get(guild.id, [])
-            invites_after = await guild.invites()
-            self.invites[guild.id] = invites_after
+            before = self._cache.get(guild.id, [])
+            after = await guild.invites()
+            self._cache[guild.id] = after
 
-            for invite in invites_before:
-                if invite.uses < self.get_invite_uses(invites_after, invite.code):
-                    inviter = invite.inviter
-                    if inviter and inviter.id == self.DISBOARD_BOT_ID:
-                        print(f"Invite by Disboard bot ignored for guild {guild.id}")
-                        return
-                    if inviter:
-                        await self.update_invites(guild, inviter)
-                        await self.announce_invite(guild, member, inviter)
-                        await self.check_rewards(guild, inviter)
+            used_invite = None
+            for old in before:
+                new = next((i for i in after if i.code == old.code), None)
+                if new and new.uses > old.uses:
+                    used_invite = new
                     break
 
-            # Update member growth
+            inviter = used_invite.inviter if used_invite else None
+
+            # Ignore Disboard bot invites
+            if inviter and inviter.id == self.DISBOARD_BOT_ID:
+                return
+
+            if inviter:
+                await self._increment_invite(guild, inviter)
+                await self._announce_invite(guild, member, inviter)
+                await self._check_and_award_rewards(guild, inviter)
+
+            # Track member growth
             async with self.config.guild(guild).member_growth() as growth:
                 growth.append((member.joined_at.isoformat(), guild.member_count))
 
         except Exception as e:
-            print(f"Error processing member join for guild {guild.id}: {e}")
+            print(f"[Invites] Error processing member join in {guild.id}: {e}")
 
-    def get_invite_uses(self, invites, code):
-        for invite in invites:
-            if invite.code == code:
-                return invite.uses
-        return 0
-
-    async def update_invites(self, guild, inviter):
+    async def _increment_invite(self, guild, inviter):
         async with self.config.guild(guild).invites() as invites:
-            if str(inviter.id) not in invites:
-                invites[str(inviter.id)] = 0
+            invites.setdefault(str(inviter.id), 0)
             invites[str(inviter.id)] += 1
 
-    async def announce_invite(self, guild, member, inviter):
-        try:
-            channel_id = await self.config.guild(guild).announcement_channel()
-            announcement_channel = guild.get_channel(channel_id) if channel_id else None
-            if announcement_channel:
-                embed = discord.Embed(
-                    title="New Member Joined",
-                    description=f"{member.mention} joined using {inviter.mention}'s invite!",
-                    color=discord.Color.from_str("#2bbd8e")
-                )
-                await announcement_channel.send(embed=embed)
-        except Exception as e:
-            print(f"Failed to announce invite in guild {guild.id}: {e}")
+    async def _announce_invite(self, guild, member, inviter):
+        channel_id = await self.config.guild(guild).announcement_channel()
+        if not channel_id:
+            return
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            return
+        embed = discord.Embed(
+            title="New Member Joined!",
+            description=f"{member.mention} joined using {inviter.mention}'s invite.",
+            color=discord.Color.green()
+        )
+        await channel.send(embed=embed)
 
-    async def check_rewards(self, guild, inviter):
-        try:
-            invites = await self.config.guild(guild).invites()
-            rewards = await self.config.guild(guild).rewards()
-            invite_count = invites.get(str(inviter.id), 0)
+    async def _check_and_award_rewards(self, guild, inviter):
+        invites = await self.config.guild(guild).invites()
+        rewards = await self.config.guild(guild).rewards()
+        count = invites.get(str(inviter.id), 0)
+        for threshold, role_id in rewards.items():
+            try:
+                if count == int(threshold):
+                    role = guild.get_role(role_id)
+                    if role and role not in inviter.roles:
+                        await inviter.add_roles(role, reason="Invite reward")
+                        await self._announce_reward(guild, inviter, role, count)
+            except Exception:
+                continue
 
-            for count, reward in rewards.items():
-                if invite_count == int(count):
-                    role = guild.get_role(reward)
-                    if role:
-                        await inviter.add_roles(role)
-                        embed = discord.Embed(
-                            title="Reward Earned",
-                            description=f"Congratulations! You've been awarded the {role.name} role for inviting {count} members!",
-                            color=discord.Color.from_str("#2bbd8e")
-                        )
-                        await self.announce_reward(guild, inviter, embed)
-        except Exception as e:
-            print(f"Failed to check rewards for inviter {inviter.id} in guild {guild.id}: {e}")
+    async def _announce_reward(self, guild, inviter, role, count):
+        channel_id = await self.config.guild(guild).announcement_channel()
+        if not channel_id:
+            return
+        channel = guild.get_channel(channel_id)
+        if not channel:
+            return
+        embed = discord.Embed(
+            title="Invite Reward Earned!",
+            description=f"{inviter.mention} has been awarded the {role.mention} role for reaching {count} invites!",
+            color=discord.Color.gold()
+        )
+        await channel.send(embed=embed)
 
-    async def announce_reward(self, guild, inviter, embed):
-        try:
-            channel_id = await self.config.guild(guild).announcement_channel()
-            announcement_channel = guild.get_channel(channel_id) if channel_id else None
-            if announcement_channel:
-                await announcement_channel.send(embed=embed)
-        except Exception as e:
-            print(f"Failed to announce reward in guild {guild.id}: {e}")
-
+    @commands.group(name="invites", invoke_without_command=True)
     @commands.guild_only()
     @commands.admin()
-    @commands.group()
-    async def invites(self, ctx):
-        """Settings for the invite tracker."""
-        pass
+    async def invites_group(self, ctx):
+        """Invite tracker settings and stats."""
+        await ctx.send_help()
 
-    @invites.command()
-    async def announcechannel(self, ctx, channel: str):
-        """Set the announcement channel for invites. Use 'none' to clear the channel."""
-        if channel.lower() == "none":
+    @invites_group.command(name="announcechannel")
+    async def set_announce_channel(self, ctx, channel: discord.TextChannel = None):
+        """Set or clear the invite announcement channel."""
+        if channel is None:
             await self.config.guild(ctx.guild).announcement_channel.clear()
-            embed = discord.Embed(
-                title="Announcement Channel Cleared",
-                description="The announcement channel has been cleared.",
-                color=discord.Color.from_str("#ff4545")
-            )
+            await ctx.send("Announcement channel cleared.")
         else:
-            channel_obj = discord.utils.get(ctx.guild.text_channels, mention=channel) or discord.utils.get(ctx.guild.text_channels, name=channel)
-            if channel_obj:
-                await self.config.guild(ctx.guild).announcement_channel.set(channel_obj.id)
-                embed = discord.Embed(
-                    title="Announcement Channel Set",
-                    description=f"Announcement channel set to {channel_obj.mention}",
-                    color=discord.Color.from_str("#2bbd8e")
-                )
-            else:
-                embed = discord.Embed(
-                    title="Channel Not Found",
-                    description="The specified channel could not be found.",
-                    color=discord.Color.from_str("#ff4545")
-                )
-        await ctx.send(embed=embed)
+            await self.config.guild(ctx.guild).announcement_channel.set(channel.id)
+            await ctx.send(f"Announcement channel set to {channel.mention}.")
 
-    @invites.command()
-    async def addreward(self, ctx, invite_count: int, role: discord.Role):
+    @invites_group.command(name="addreward")
+    async def add_reward(self, ctx, invite_count: int, role: discord.Role):
         """Add a reward for a specific number of invites."""
         async with self.config.guild(ctx.guild).rewards() as rewards:
             rewards[str(invite_count)] = role.id
-        embed = discord.Embed(
-            title="Reward Added",
-            description=f"Reward set: {role.name} for {invite_count} invites",
-            color=discord.Color.from_str("#2bbd8e")
-        )
-        await ctx.send(embed=embed)
+        await ctx.send(f"Reward set: {role.mention} for {invite_count} invites.")
 
-    @invites.command()
-    async def removereward(self, ctx, invite_count: int):
+    @invites_group.command(name="removereward")
+    async def remove_reward(self, ctx, invite_count: int):
         """Remove a reward for a specific number of invites."""
         async with self.config.guild(ctx.guild).rewards() as rewards:
             if str(invite_count) in rewards:
                 del rewards[str(invite_count)]
-                embed = discord.Embed(
-                    title="Reward Removed",
-                    description=f"Reward for {invite_count} invites removed",
-                    color=discord.Color.from_str("#ff4545")
-                )
-                await ctx.send(embed=embed)
+                await ctx.send(f"Reward for {invite_count} invites removed.")
             else:
-                embed = discord.Embed(
-                    title="No Reward Found",
-                    description=f"No reward found for {invite_count} invites",
-                    color=discord.Color.from_str("#ff4545")
-                )
-                await ctx.send(embed=embed)
+                await ctx.send("No such reward found.")
 
-    @invites.command()
+    @invites_group.command(name="rewards")
+    async def list_rewards(self, ctx):
+        """List all invite rewards."""
+        rewards = await self.config.guild(ctx.guild).rewards()
+        if not rewards:
+            await ctx.send("No invite rewards set.")
+            return
+        lines = []
+        for count, role_id in sorted(rewards.items(), key=lambda x: int(x[0])):
+            role = ctx.guild.get_role(role_id)
+            if role:
+                lines.append(f"{count} invites: {role.mention}")
+        await ctx.send("\n".join(lines) if lines else "No valid rewards found.")
+
+    @invites_group.command(name="leaderboard")
     async def leaderboard(self, ctx):
-        """Show the leaderboard of top inviting users."""
+        """Show the top inviters in this server."""
         invites = await self.config.guild(ctx.guild).invites()
-        sorted_invites = sorted(invites.items(), key=lambda item: item[1], reverse=True)
-        leaderboard = []
+        if not invites:
+            await ctx.send("No invite data yet.")
+            return
+        sorted_invites = sorted(invites.items(), key=lambda x: x[1], reverse=True)
+        desc = ""
+        for idx, (user_id, count) in enumerate(sorted_invites[:10], 1):
+            member = ctx.guild.get_member(int(user_id))
+            name = member.mention if member else f"<@{user_id}>"
+            desc += f"**{idx}.** {name} — `{count}` invites\n"
+        embed = discord.Embed(
+            title="Invite Leaderboard",
+            description=desc or "No data.",
+            color=discord.Color.blurple()
+        )
+        await ctx.send(embed=embed)
 
-        for inviter_id, count in sorted_invites[:10]:  # Top 10 inviters
-            inviter = ctx.guild.get_member(int(inviter_id))
-            if inviter:
-                leaderboard.append(f"{inviter.mention}: {count} invites")
-
-        if leaderboard:
-            embed = discord.Embed(
-                title="Top Inviters",
-                description="\n".join(leaderboard),
-                color=discord.Color.from_str("#2bbd8e")
-            )
-            await ctx.send(embed=embed)
-        else:
-            embed = discord.Embed(
-                title="No invites recorded",
-                description="No invites tracked yet. Invites can only be tracked from the point the module is loaded and the bot is present in the server, moving forward.",
-                color=discord.Color.from_str("#ff4545")
-            )
-            await ctx.send(embed=embed)
-
-    @invites.command()
+    @invites_group.command(name="chart")
     async def chart(self, ctx):
-        """graph the server's growth"""
+        """Show a chart of server member growth."""
         growth = await self.config.guild(ctx.guild).member_growth()
-        if not growth:
-            await ctx.send("No member growth data available.")
+        if not growth or len(growth) < 2:
+            await ctx.send("Not enough data to plot member growth.")
             return
 
-        # Summarize the data by day
-        summarized_growth = {}
-        for entry in growth:
-            date = entry[0].split("T")[0]  # Extract the date part only
-            member_count = entry[1]
-            if date not in summarized_growth:
-                summarized_growth[date] = member_count
+        # Summarize by day
+        daily = {}
+        for iso, count in growth:
+            day = iso.split("T")[0]
+            daily[day] = count
+        days = sorted(daily.keys())
+        counts = [daily[day] for day in days]
 
-        dates = list(summarized_growth.keys())
-        member_counts = list(summarized_growth.values())
-
-        # Convert dates to "X days ago" or "X hours ago"
-        from datetime import datetime, timedelta
-
-        def format_date(date_str):
-            date_obj = datetime.strptime(date_str, "%Y-%m-%d")
-            now = datetime.now()
-            delta = now - date_obj
-            if delta.days > 0:
-                return f"{delta.days} days ago"
-            else:
-                hours = delta.seconds // 3600
-                return f"{hours} hours ago"
-
-        formatted_dates = [format_date(date) for date in dates]
-
-        plt.figure(figsize=(10, 5))
-        plt.plot_date([datetime.strptime(date, "%Y-%m-%d") for date in dates], member_counts, marker='o', linestyle='-')
-        plt.title('Server member growth')
-        plt.xlabel('Date')
-        plt.ylabel('Member count')
-        
-        # Display fewer date labels to reduce cramping
-        max_labels = 10
-        if len(dates) > max_labels:
-            step = len(dates) // max_labels
-            plt.xticks([datetime.strptime(date, "%Y-%m-%d") for date in dates[::step]], formatted_dates[::step], rotation=45, ha='right')
-        else:
-            plt.xticks([datetime.strptime(date, "%Y-%m-%d") for date in dates], formatted_dates, rotation=45, ha='right')
-        
+        plt.figure(figsize=(8, 4))
+        plt.plot([datetime.strptime(d, "%Y-%m-%d") for d in days], counts, marker="o")
+        plt.title("Server Member Growth")
+        plt.xlabel("Date")
+        plt.ylabel("Member Count")
         plt.tight_layout()
-
         buf = io.BytesIO()
-        plt.savefig(buf, format='png')
+        plt.savefig(buf, format="png")
+        plt.close()
         buf.seek(0)
-        file = discord.File(buf, filename='member_growth.png')
+        await ctx.send(file=discord.File(buf, filename="growth.png"))
 
-        await ctx.send(file=file)
+    @invites_group.command(name="stats")
+    async def stats(self, ctx, member: discord.Member = None):
+        """Show invite stats for a member or the server."""
+        invites = await self.config.guild(ctx.guild).invites()
+        if member:
+            count = invites.get(str(member.id), 0)
+            await ctx.send(f"{member.mention} has invited `{count}` member(s).")
+        else:
+            total = sum(invites.values())
+            await ctx.send(f"Total invites tracked: `{total}`.")
 
-    @invites.command()
-    async def stats(self, ctx):
-        """Fetch and show invite stats for the server."""
+    @invites_group.command(name="profile")
+    async def invites_profile(self, ctx, member: discord.Member = None):
+        """
+        Show a profile of a user's invite activity: number of invite links, invited members, and how many remain.
+        """
+        member = member or ctx.author
+        # Get all invites for this guild
+        try:
+            invites = await ctx.guild.invites()
+        except Exception:
+            invites = []
+        # Count how many invites this user has created
+        user_invites = [i for i in invites if i.inviter and i.inviter.id == member.id]
+        num_links = len(user_invites)
+        total_uses = sum(i.uses for i in user_invites)
+        # Get how many members this user has invited (from config)
+        invites_data = await self.config.guild(ctx.guild).invites()
+        invited_count = invites_data.get(str(member.id), 0)
+        # Try to estimate how many of those invited are still in the server
+        # This is a best effort: we don't track exactly who joined via whom, but we can estimate
+        # by comparing the number of uses of their invites to the number of tracked invites
+        # We'll use the tracked invites as the "invited" count, and estimate "still in server" as:
+        #   - If tracked invites > 0, then for each member in the server, check if they joined via this inviter
+        #   - But since we don't store that, we'll estimate: still_in = min(invited_count, total_uses)
+        #   - left = invited_count - still_in (if total_uses < invited_count, assume all still in)
+        still_in = min(invited_count, total_uses)
+        left = invited_count - still_in if invited_count > total_uses else 0
+
+        embed = discord.Embed(
+            title=f"Invite Profile: {member.display_name}",
+            color=discord.Color.blue()
+        )
+        embed.set_thumbnail(url=member.display_avatar.url if hasattr(member, "display_avatar") else member.avatar_url)
+        embed.add_field(name="Invite Links Created", value=str(num_links), inline=True)
+        embed.add_field(name="Members Invited", value=str(invited_count), inline=True)
+        embed.add_field(name="Members Still in Server", value=str(still_in), inline=True)
+        embed.add_field(name="Members Left", value=str(left), inline=True)
+        await ctx.send(embed=embed)
+
+    @invites_group.command(name="raw")
+    async def raw_invites(self, ctx):
+        """Show raw invite codes and their uses (from Discord API)."""
         invites = await ctx.guild.invites()
         if not invites:
-            await ctx.send("No invite stats available.")
+            await ctx.send("No invites found.")
             return
+        lines = []
+        for inv in invites:
+            inviter = inv.inviter.mention if inv.inviter else "Unknown"
+            lines.append(f"`{inv.code}` by {inviter}: {inv.uses} uses")
+        await ctx.send("\n".join(lines[:20]) if lines else "No invites found.")
 
-        pages = []
-        for invite in invites:
-            inviter = invite.inviter
-            uses = invite.uses
-            embed = discord.Embed(
-                title="Invite stats",
-                color=discord.Color.from_str("#2bbd8e")
-            )
-            embed.add_field(name="Invite code", value=f"**`{invite.code}`**", inline=True)
-            embed.add_field(name="Inviter", value=f"{inviter.mention if inviter else 'Unknown'}", inline=True)
-            embed.add_field(name="Uses", value=f"**`{uses}`**", inline=True)
-            pages.append(embed)
-
-        if not pages:
-            await ctx.send("No invite stats available.")
-            return
-
-        message = await ctx.send(embed=pages[0])
-
-        await message.add_reaction("⬅️")
-        await message.add_reaction("❌")
-        await message.add_reaction("➡️")
-
-        def check(reaction, user):
-            return user == ctx.author and str(reaction.emoji) in ["⬅️", "❌", "➡️"]
-
-        i = 0
-        while True:
-            try:
-                reaction, user = await self.bot.wait_for("reaction_add", timeout=60.0, check=check)
-
-                if str(reaction.emoji) == "➡️":
-                    i += 1
-                elif str(reaction.emoji) == "⬅️":
-                    i -= 1
-                elif str(reaction.emoji) == "❌":
-                    await message.delete()
-                    # return instead of breaking so we don't try to clear reactions on a message that no longer exists
-                    return
-
-                i = i % len(pages)
-
-                await message.edit(embed=pages[i])
-                await message.remove_reaction(reaction, user)
-            except asyncio.TimeoutError:
-                break
-        await message.clear_reactions()
