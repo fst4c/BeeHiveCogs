@@ -367,7 +367,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         embed.add_field(name="User display name", value=message.author.display_name, inline=True)
         embed.add_field(name="User mention", value=message.author.mention, inline=True)
         embed.add_field(name="User ID", value=message.author.id, inline=True)
-        embed.add_field(name="Scam type", value=scam_type, inline=True)
+        embed.add_field(name="Scam type", value=scam_type.upper(), inline=True)
 
         failed = None
         if action:
@@ -481,7 +481,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         embed.add_field(name="User display name", value=member.display_name, inline=True)
         embed.add_field(name="User mention", value=member.mention, inline=True)
         embed.add_field(name="User ID", value=member.id, inline=True)
-        embed.add_field(name="Scam type", value=scam_type, inline=True)
+        embed.add_field(name="Scam type", value=scam_type.upper(), inline=True)
         failed = None
         if action:
             try:
