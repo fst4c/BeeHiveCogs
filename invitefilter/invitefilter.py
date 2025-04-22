@@ -18,6 +18,7 @@ class InviteFilter(commands.Cog):
             whitelisted_channels=[],
             whitelisted_roles=[],
             whitelisted_categories=[],  # New: Whitelisted categories
+            whitelisted_users=[],       # New: Whitelisted users
             logging_channel=None,
             timeout_duration=1,  # Default to 1 minute timeout
             invites_deleted=0,
@@ -49,6 +50,11 @@ class InviteFilter(commands.Cog):
         # Check category whitelist
         whitelisted_categories = await self.config.guild(guild).whitelisted_categories()
         if message.channel.category_id and message.channel.category_id in whitelisted_categories:
+            return
+
+        # Check user whitelist
+        whitelisted_users = await self.config.guild(guild).whitelisted_users()
+        if member.id in whitelisted_users:
             return
 
         # Check role whitelist (ensure member object is used)
@@ -233,7 +239,7 @@ class InviteFilter(commands.Cog):
     @commands.mod_or_permissions()
     @invitefilter.group(invoke_without_command=True)
     async def whitelist(self, ctx):
-        """Manage the invite filter whitelist (channels, categories, and roles)."""
+        """Manage the invite filter whitelist (channels, categories, roles, and users)."""
         await ctx.send_help(ctx.command)
 
     @whitelist.command(name="channel")
@@ -312,6 +318,31 @@ class InviteFilter(commands.Cog):
         else:
             await ctx.send("No changes made to the role whitelist.")
 
+    @whitelist.command(name="user")
+    async def whitelist_user(self, ctx, user: discord.Member):
+        """Add or remove a user from the invite filter whitelist."""
+        guild = ctx.guild
+        # Use context manager for safe list modification
+        async with self.config.guild(guild).whitelisted_users() as whitelisted_users:
+            changelog = []
+            if user.id in whitelisted_users:
+                try:
+                    whitelisted_users.remove(user.id)
+                    changelog.append(f"➖ Removed user: {user.mention}")
+                except ValueError:
+                    await ctx.send("Error removing user, they might have already been removed.")
+                    return
+            else:
+                whitelisted_users.append(user.id)
+                changelog.append(f"➕ Added user: {user.mention}")
+
+        if changelog:
+            changelog_message = "\n".join(changelog)
+            embed = discord.Embed(title="Whitelist User Updated", description=changelog_message, color=discord.Color.blue())
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send("No changes made to the user whitelist.")
+
     @commands.mod_or_permissions()
     @invitefilter.command(name="logchannel", aliases=["logs"])
     async def set_log_channel(self, ctx, channel: discord.TextChannel = None):
@@ -384,6 +415,7 @@ class InviteFilter(commands.Cog):
         whitelisted_channels_ids = config_data['whitelisted_channels']
         whitelisted_roles_ids = config_data['whitelisted_roles']
         whitelisted_categories_ids = config_data['whitelisted_categories']  # New: Whitelisted categories
+        whitelisted_users_ids = config_data.get('whitelisted_users', [])     # New: Whitelisted users
         logging_channel_id = config_data['logging_channel']
         timeout_duration = config_data['timeout_duration']
 
@@ -391,6 +423,7 @@ class InviteFilter(commands.Cog):
         whitelisted_channels_mentions = [c.mention for i in whitelisted_channels_ids if (c := guild.get_channel(i))]
         whitelisted_roles_mentions = [r.mention for i in whitelisted_roles_ids if (r := guild.get_role(i))]  # Use mention for roles
         whitelisted_categories_names = [cat.name for i in whitelisted_categories_ids if (cat := guild.get_channel(i)) and isinstance(cat, discord.CategoryChannel)]  # Only include categories
+        whitelisted_users_mentions = [u.mention for i in whitelisted_users_ids if (u := guild.get_member(i))]  # Only show users still in guild
         logging_channel_mention = (c.mention if (c := guild.get_channel(logging_channel_id)) else "None") if logging_channel_id else "None"
 
         embed = discord.Embed(title="Invite filter settings", color=0xfffffe)  # Use a different color
@@ -399,6 +432,7 @@ class InviteFilter(commands.Cog):
         embed.add_field(name="Whitelisted channels", value=", ".join(whitelisted_channels_mentions) or "None", inline=True)
         embed.add_field(name="Whitelisted roles", value=", ".join(whitelisted_roles_mentions) or "None", inline=True)
         embed.add_field(name="Whitelisted categories", value=", ".join(whitelisted_categories_names) or "None", inline=True)  # New: Display whitelisted categories
+        embed.add_field(name="Whitelisted users", value=", ".join(whitelisted_users_mentions) or "None", inline=True)  # New: Display whitelisted users
         embed.add_field(name="Logging channel", value=logging_channel_mention, inline=True)
         embed.add_field(name="Timeout duration", value=f"{timeout_duration} minutes" + (" (disabled)" if timeout_duration == 0 else ""), inline=True)
 
