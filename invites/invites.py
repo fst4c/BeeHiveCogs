@@ -202,10 +202,55 @@ class Invites(commands.Cog):
             return
         sorted_invites = sorted(invites.items(), key=lambda x: x[1], reverse=True)
         desc = ""
+        # Check for vanity and widget invites
+        vanity_count = 0
+        widget_count = 0
+
+        # Try to get vanity and widget invite counts
+        try:
+            vanity_url = ctx.guild.vanity_url_code
+            if vanity_url:
+                # Discord API does not provide vanity invite uses directly, but we can get it from the widget
+                # or from the guild.vanity_invite property if available
+                if hasattr(ctx.guild, "vanity_invite") and ctx.guild.vanity_invite:
+                    vanity_count = ctx.guild.vanity_invite.uses
+                else:
+                    # fallback: try to get from invites list
+                    for inv in await ctx.guild.invites():
+                        if inv.code == vanity_url:
+                            vanity_count = inv.uses
+                            break
+        except Exception:
+            pass
+
+        try:
+            if ctx.guild.widget_enabled:
+                widget = await ctx.guild.widget()
+                if widget and hasattr(widget, "approximate_member_count"):
+                    # Widget invites don't have a use count, but we can try to estimate
+                    # However, Discord does not provide widget invite use counts directly
+                    # So we will just show WEB if widget is enabled
+                    widget_count = -1  # -1 means enabled, but unknown count
+        except Exception:
+            pass
+
         for idx, (user_id, count) in enumerate(sorted_invites[:10], 1):
             member = ctx.guild.get_member(int(user_id))
             name = member.mention if member else f"<@{user_id}>"
             desc += f"**{idx}.** {name} — `{count}` invites\n"
+
+        # Add vanity invite if present
+        if vanity_count:
+            desc += f"**`VANITY`** — `{vanity_count}` invites\n"
+        elif ctx.guild.vanity_url_code:
+            # If vanity exists but count is 0 or unknown, still show
+            desc += f"**`VANITY`** — `0` invites\n"
+
+        # Add widget invite if present
+        if ctx.guild.widget_enabled:
+            # Widget invites don't have a use count, so just show WEB
+            desc += f"**`WEB`** — `?` invites\n"
+
         embed = discord.Embed(
             title="Invite Leaderboard",
             description=desc or "No data.",
