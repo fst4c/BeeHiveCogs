@@ -47,15 +47,27 @@ class HomeworkAI(commands.Cog):
             "pricing_channel": None,
             "prices": DEFAULT_PRICES.copy(),
             "pricing_message_id": None,
+            "stats_channel": None,  # Channel for stats reporting
+            "stats": {
+                "ask": 0,
+                "answer": 0,
+                "explain": 0,
+                "upvotes": 0,
+                "downvotes": 0,
+            },
+            "stats_message_id": None,
         }
         self.config.register_user(**default_user)
         self.config.register_guild(**default_guild)
         self.billing_portal_url = "https://billing.stripe.com/p/login/6oE4h4dqVe3zbtefYY"
         self.bot.loop.create_task(self._maybe_update_all_pricing_channels())
+        self.bot.loop.create_task(self._periodic_stats_update())  # Start periodic stats update
 
     async def cog_load(self):
         # Called when the cog is loaded/reloaded
         await self._maybe_update_all_pricing_channels()
+        await self._maybe_update_all_stats_channels()
+        self.bot.loop.create_task(self._periodic_stats_update())  # Ensure periodic stats update on reload
 
     async def _maybe_update_all_pricing_channels(self):
         # Wait for bot to be ready
@@ -65,6 +77,24 @@ class HomeworkAI(commands.Cog):
                 await self._update_pricing_channel(guild)
             except Exception:
                 pass
+
+    async def _maybe_update_all_stats_channels(self):
+        await self.bot.wait_until_ready()
+        for guild in self.bot.guilds:
+            try:
+                await self._update_stats_channel(guild)
+            except Exception:
+                pass
+
+    async def _periodic_stats_update(self):
+        await self.bot.wait_until_ready()
+        while True:
+            for guild in self.bot.guilds:
+                try:
+                    await self._update_stats_channel(guild)
+                except Exception:
+                    pass
+            await asyncio.sleep(120)  # Update every 120 seconds
 
     async def _update_pricing_channel(self, guild):
         # Get pricing channel and prices for this guild
@@ -112,6 +142,44 @@ class HomeworkAI(commands.Cog):
         else:
             msg = await channel.send(embed=embed)
             await self.config.guild(guild).pricing_message_id.set(msg.id)
+
+    async def _update_stats_channel(self, guild):
+        channel_id = await self.config.guild(guild).stats_channel()
+        if not channel_id:
+            return
+        channel = guild.get_channel(channel_id)
+        if not channel or not isinstance(channel, discord.TextChannel):
+            return
+
+        stats = await self.config.guild(guild).stats()
+        msg_id = await self.config.guild(guild).stats_message_id()
+        embed = discord.Embed(
+            title="HomeworkAI Usage & Ratings",
+            color=discord.Color.blurple(),
+            description="Statistics for HomeworkAI usage and answer ratings in this server."
+        )
+        embed.add_field(name="Ask Uses", value=str(stats.get("ask", 0)), inline=True)
+        embed.add_field(name="Answer Uses", value=str(stats.get("answer", 0)), inline=True)
+        embed.add_field(name="Explain Uses", value=str(stats.get("explain", 0)), inline=True)
+        embed.add_field(name="👍 Upvotes", value=str(stats.get("upvotes", 0)), inline=True)
+        embed.add_field(name="👎 Downvotes", value=str(stats.get("downvotes", 0)), inline=True)
+        embed.set_footer(text="Stats update live as users interact with HomeworkAI.")
+
+        msg = None
+        if msg_id:
+            try:
+                msg = await channel.fetch_message(msg_id)
+            except Exception:
+                msg = None
+        if msg:
+            try:
+                await msg.edit(embed=embed)
+            except Exception:
+                msg = await channel.send(embed=embed)
+                await self.config.guild(guild).stats_message_id.set(msg.id)
+        else:
+            msg = await channel.send(embed=embed)
+            await self.config.guild(guild).stats_message_id.set(msg.id)
 
     async def get_openai_key(self):
         tokens = await self.bot.get_shared_api_tokens("openai")
@@ -171,6 +239,19 @@ class HomeworkAI(commands.Cog):
 
     @homeworkaiset.command()
     @commands.admin_or_permissions(manage_guild=True)
+    async def setstats(self, ctx, channel: discord.TextChannel):
+        """Set the channel where HomeworkAI usage and rating statistics are displayed and update the stats message."""
+        await self.config.guild(ctx.guild).stats_channel.set(channel.id)
+        await self._update_stats_channel(ctx.guild)
+        embed = discord.Embed(
+            title="Stats Channel Set",
+            description=f"Stats channel set to {channel.mention}. The stats message has been updated.",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
+
+    @homeworkaiset.command()
+    @commands.admin_or_permissions(manage_guild=True)
     async def setprice(self, ctx, command: str, price: str):
         """
         Set the price for a HomeworkAI command (ask, answer, explain).
@@ -200,6 +281,25 @@ class HomeworkAI(commands.Cog):
         embed = discord.Embed(
             title="Prices Reset",
             description="All HomeworkAI command prices have been reset to their defaults. Pricing message updated.",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
+
+    @homeworkaiset.command()
+    @commands.admin_or_permissions(manage_guild=True)
+    async def resetstats(self, ctx):
+        """Reset all HomeworkAI usage and rating statistics for this server."""
+        await self.config.guild(ctx.guild).stats.set({
+            "ask": 0,
+            "answer": 0,
+            "explain": 0,
+            "upvotes": 0,
+            "downvotes": 0,
+        })
+        await self._update_stats_channel(ctx.guild)
+        embed = discord.Embed(
+            title="Stats Reset",
+            description="All HomeworkAI usage and rating statistics have been reset for this server.",
             color=discord.Color.green()
         )
         await ctx.send(embed=embed)
@@ -919,6 +1019,50 @@ class HomeworkAI(commands.Cog):
 
     # --- HomeworkAI Question Commands ---
 
+    class RatingView(discord.ui.View):
+        def __init__(self, cog, ctx, prompt_type, guild_id, *, timeout=120):
+            super().__init__(timeout=timeout)
+            self.cog = cog
+            self.ctx = ctx
+            self.prompt_type = prompt_type
+            self.guild_id = guild_id
+            self.upvoted = False
+            self.downvoted = False
+
+        @discord.ui.button(label="👍", style=discord.ButtonStyle.success, custom_id="homeworkai_upvote")
+        async def upvote(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if self.upvoted:
+                await interaction.response.send_message("You already upvoted this answer.", ephemeral=True)
+                return
+            self.upvoted = True
+            await self.cog._increment_stat(self.guild_id, "upvotes")
+            await self.cog._update_stats_channel(self.ctx.guild)
+            await interaction.response.send_message("Thank you for your feedback! 👍", ephemeral=True)
+
+        @discord.ui.button(label="👎", style=discord.ButtonStyle.danger, custom_id="homeworkai_downvote")
+        async def downvote(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if self.downvoted:
+                await interaction.response.send_message("You already downvoted this answer.", ephemeral=True)
+                return
+            self.downvoted = True
+            await self.cog._increment_stat(self.guild_id, "downvotes")
+            await self.cog._update_stats_channel(self.ctx.guild)
+            await interaction.response.send_message("Thank you for your feedback! 👎", ephemeral=True)
+
+    async def _increment_stat(self, guild_id, stat):
+        guild = self.bot.get_guild(guild_id)
+        if not guild:
+            return
+        stats = await self.config.guild(guild).stats()
+        stats[stat] = stats.get(stat, 0) + 1
+        await self.config.guild(guild).stats.set(stats)
+
+    async def _increment_usage(self, guild, prompt_type):
+        stats = await self.config.guild(guild).stats()
+        stats[prompt_type] = stats.get(prompt_type, 0) + 1
+        await self.config.guild(guild).stats.set(stats)
+        await self._update_stats_channel(guild)
+
     async def _send_homeworkai_response(
         self,
         ctx: commands.Context,
@@ -1101,7 +1245,8 @@ class HomeworkAI(commands.Cog):
 
                         # Try to DM the user
                         try:
-                            await ctx.author.send(embed=embed)
+                            view = self.RatingView(self, ctx, prompt_type, ctx.guild.id if ctx.guild else None)
+                            await ctx.author.send(embed=embed, view=view)
                             await ctx.send(
                                 embed=discord.Embed(
                                     title="Finished thinking!",
@@ -1194,6 +1339,9 @@ class HomeworkAI(commands.Cog):
             # Optionally log the error, but don't block the command
             pass
 
+        if ctx.guild:
+            await self._increment_usage(ctx.guild, "ask")
+
         await self._send_homeworkai_response(ctx, question, image_url, prompt_type="ask")
 
     @commands.hybrid_command(name="answer", with_app_command=True)
@@ -1251,6 +1399,9 @@ class HomeworkAI(commands.Cog):
         except Exception as e:
             pass
 
+        if ctx.guild:
+            await self._increment_usage(ctx.guild, "answer")
+
         await self._send_homeworkai_response(ctx, question, image_url, prompt_type="answer")
 
     @commands.hybrid_command(name="explain", with_app_command=True)
@@ -1307,6 +1458,9 @@ class HomeworkAI(commands.Cog):
                         pass
         except Exception as e:
             pass
+
+        if ctx.guild:
+            await self._increment_usage(ctx.guild, "explain")
 
         await self._send_homeworkai_response(ctx, question, image_url, prompt_type="explain")
 
