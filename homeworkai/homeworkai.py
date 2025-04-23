@@ -1087,7 +1087,7 @@ class HomeworkAI(commands.Cog):
                 )
                 await ctx.send(embed=embed)
 
-    @commands.hybrid_command(name="ask")
+    @commands.hybrid_command(name="ask", with_app_command=True)
     async def ask(self, ctx: commands.Context, *, question: str = None):
         """
         Ask HomeworkAI an open-ended question (text or attach an image).
@@ -1149,32 +1149,118 @@ class HomeworkAI(commands.Cog):
 
         await self._send_homeworkai_response(ctx, question, image_url, prompt_type="ask")
 
-    @commands.command()
+    @commands.hybrid_command(name="answer", with_app_command=True)
     async def answer(self, ctx: commands.Context, *, question: str = None):
         """
         Ask HomeworkAI to answer a multiple choice or comparison question.
         The answer will be sent to you in DMs.
         """
+        # Check if the user has a customer_id set
+        customer_id = await self.config.user(ctx.author).customer_id()
+        if not customer_id:
+            embed = discord.Embed(
+                title="Access Required",
+                description=(
+                    "You don't have access to HomeworkAI yet.\n\n"
+                    "To apply for access, please use the `/onboard` command.\n"
+                    "Once approved, you'll be able to use HomeworkAI features."
+                ),
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+            return
+
         image_url = None
-        if ctx.message and ctx.message.attachments:
-            for att in ctx.message.attachments:
-                if getattr(att, "content_type", None) and att.content_type and att.content_type.startswith("image/"):
-                    image_url = att.url
-                    break
+        # For slash commands, attachments are in ctx.interaction.data if present
+        attachments = []
+        if hasattr(ctx, "interaction") and ctx.interaction is not None:
+            data = getattr(ctx.interaction, "data", {})
+            resolved = data.get("resolved", {}) if data else {}
+            attachments = list(resolved.get("attachments", {}).values()) if resolved else []
+        if not attachments and ctx.message and ctx.message.attachments:
+            attachments = ctx.message.attachments
+        for att in attachments:
+            content_type = getattr(att, "content_type", None) or att.get("content_type") if isinstance(att, dict) else None
+            url = getattr(att, "url", None) or att.get("url") if isinstance(att, dict) else None
+            if content_type and content_type.startswith("image/"):
+                image_url = url
+                break
+
+        # --- Stripe Meter Event Logging ---
+        try:
+            stripe_key = await self.get_stripe_key()
+            if stripe_key and customer_id:
+                timestamp = int(time.time())
+                meter_url = "https://api.stripe.com/v1/billing/meter_events"
+                data = {
+                    "event_name": "answer",
+                    "timestamp": timestamp,
+                    "payload[stripe_customer_id]": customer_id,
+                }
+                auth = aiohttp.BasicAuth(stripe_key)
+                async with aiohttp.ClientSession(auth=auth) as session:
+                    async with session.post(meter_url, data=data, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        pass
+        except Exception as e:
+            pass
+
         await self._send_homeworkai_response(ctx, question, image_url, prompt_type="answer")
 
-    @commands.command()
+    @commands.hybrid_command(name="explain", with_app_command=True)
     async def explain(self, ctx: commands.Context, *, question: str = None):
         """
         Ask HomeworkAI for a detailed, step-by-step explanation or tutorial.
         The answer will be sent to you in DMs.
         """
+        # Check if the user has a customer_id set
+        customer_id = await self.config.user(ctx.author).customer_id()
+        if not customer_id:
+            embed = discord.Embed(
+                title="Access Required",
+                description=(
+                    "You don't have access to HomeworkAI yet.\n\n"
+                    "To apply for access, please use the `/onboard` command.\n"
+                    "Once approved, you'll be able to use HomeworkAI features."
+                ),
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+            return
+
         image_url = None
-        if ctx.message and ctx.message.attachments:
-            for att in ctx.message.attachments:
-                if getattr(att, "content_type", None) and att.content_type and att.content_type.startswith("image/"):
-                    image_url = att.url
-                    break
+        # For slash commands, attachments are in ctx.interaction.data if present
+        attachments = []
+        if hasattr(ctx, "interaction") and ctx.interaction is not None:
+            data = getattr(ctx.interaction, "data", {})
+            resolved = data.get("resolved", {}) if data else {}
+            attachments = list(resolved.get("attachments", {}).values()) if resolved else []
+        if not attachments and ctx.message and ctx.message.attachments:
+            attachments = ctx.message.attachments
+        for att in attachments:
+            content_type = getattr(att, "content_type", None) or att.get("content_type") if isinstance(att, dict) else None
+            url = getattr(att, "url", None) or att.get("url") if isinstance(att, dict) else None
+            if content_type and content_type.startswith("image/"):
+                image_url = url
+                break
+
+        # --- Stripe Meter Event Logging ---
+        try:
+            stripe_key = await self.get_stripe_key()
+            if stripe_key and customer_id:
+                timestamp = int(time.time())
+                meter_url = "https://api.stripe.com/v1/billing/meter_events"
+                data = {
+                    "event_name": "explain",
+                    "timestamp": timestamp,
+                    "payload[stripe_customer_id]": customer_id,
+                }
+                auth = aiohttp.BasicAuth(stripe_key)
+                async with aiohttp.ClientSession(auth=auth) as session:
+                    async with session.post(meter_url, data=data, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        pass
+        except Exception as e:
+            pass
+
         await self._send_homeworkai_response(ctx, question, image_url, prompt_type="explain")
 
     @commands.hybrid_command(name="billing", with_app_command=True)
