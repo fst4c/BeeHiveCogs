@@ -227,18 +227,54 @@ class HomeworkAI(commands.Cog):
                     )
                     continue
 
+                # Verification code entry loop with "resend" support
                 await dm_channel.send(
-                    "A verification code has been sent to your phone. Please enter the code you received (or type `cancel` to stop)."
+                    "A verification code has been sent to your phone. Please enter the code you received, type `resend` to get a new code, or type `cancel` to stop."
                 )
-                for attempt in range(3):
+                attempts = 0
+                max_attempts = 3
+                while attempts < max_attempts:
                     try:
                         code_msg = await self.bot.wait_for("message", check=check, timeout=120)
                     except asyncio.TimeoutError:
                         await dm_channel.send("You took too long to respond. Application cancelled.")
                         return
-                    if code_msg.content.lower().strip() == "cancel":
+                    code_content = code_msg.content.lower().strip()
+                    if code_content == "cancel":
                         await dm_channel.send("Application cancelled.")
                         return
+                    if code_content == "resend":
+                        # Resend the code
+                        try:
+                            tokens = await self.bot.get_shared_api_tokens("twilio")
+                            verify_sid = tokens.get("verify_sid")
+                            url = f"https://verify.twilio.com/v2/Services/{verify_sid}/Verifications"
+                            data = {
+                                "To": phone_number,
+                                "Channel": "sms"
+                            }
+                            async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(account_sid, auth_token)) as session:
+                                async with session.post(url, data=data, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                                    if resp.status in (200, 201):
+                                        await dm_channel.send("A new verification code has been sent to your phone. Please enter the new code, type `resend` to get another code, or type `cancel` to stop.")
+                                    else:
+                                        text = await resp.text()
+                                        await dm_channel.send(
+                                            embed=discord.Embed(
+                                                title="Twilio Error",
+                                                description=f"Could not resend verification code. ({resp.status})\n{text}",
+                                                color=discord.Color.red()
+                                            )
+                                        )
+                        except Exception as e:
+                            await dm_channel.send(
+                                embed=discord.Embed(
+                                    title="Twilio Error",
+                                    description=f"An error occurred while resending the verification code: {e}",
+                                    color=discord.Color.red()
+                                )
+                            )
+                        continue  # Don't count as an attempt
                     code = code_msg.content.strip()
                     # Verify code with Twilio
                     try:
@@ -266,11 +302,12 @@ class HomeworkAI(commands.Cog):
                                     await dm_channel.send(
                                         embed=discord.Embed(
                                             title="Verification Failed",
-                                            description="The code you entered is incorrect. Please try again.",
+                                            description="The code you entered is incorrect. Please try again, type `resend` to get a new code, or `cancel` to stop.",
                                             color=discord.Color.red()
                                         )
                                     )
-                                    if attempt == 2:
+                                    attempts += 1
+                                    if attempts >= max_attempts:
                                         await dm_channel.send("Too many failed attempts. Application cancelled.")
                                         return
                                     continue
@@ -283,7 +320,8 @@ class HomeworkAI(commands.Cog):
                                 color=discord.Color.red()
                             )
                         )
-                        if attempt == 2:
+                        attempts += 1
+                        if attempts >= max_attempts:
                             await dm_channel.send("Too many failed attempts. Application cancelled.")
                             return
                         continue
