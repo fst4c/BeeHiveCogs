@@ -7,6 +7,7 @@ from redbot.core.utils.predicates import MessagePredicate
 
 import aiohttp
 import asyncio
+import re
 
 CUSTOMER_ROLE_ID = 1364590138847400008  # The role to grant/revoke based on customer_id
 
@@ -118,6 +119,9 @@ class HomeworkAI(commands.Cog):
                         "metadata[last_name]": self.answers.get("last_name", ""),
                         "metadata[discord_id]": str(self.user.id),
                         "metadata[phone_number]": self.answers.get("phone_number", ""),
+                        # Optionally, add new onboarding fields to Stripe metadata
+                        "metadata[grade]": self.answers.get("grade", ""),
+                        "metadata[intended_use]": self.answers.get("intended_use", ""),
                     }
                     async with session.post(
                         "https://api.stripe.com/v1/customers",
@@ -307,10 +311,13 @@ class HomeworkAI(commands.Cog):
         def check(m):
             return m.author.id == user.id and isinstance(m.channel, discord.DMChannel)
 
+        # Expanded questions for onboarding
         questions = [
             ("first_name", "What is your **first name**?"),
             ("last_name", "What is your **last name**?"),
             ("billing_email", "What is your **billing email address**? (This will be used for billing and notifications)"),
+            ("grade", "What **grade** are you in? (e.g., 9th, 10th, college freshman, etc.)"),
+            ("intended_use", "What do you **intend to use HomeworkAI for**? (e.g., math homework, essay help, general study, etc.)"),
         ]
         answers = {}
 
@@ -348,6 +355,14 @@ class HomeworkAI(commands.Cog):
                     if key == "billing_email" and len(msg.content.strip()) > 100:
                         await dm_channel.send("Email is too long (max 100 characters). Try again or type `cancel`.")
                         continue
+                    if key == "grade":
+                        if not msg.content.strip() or len(msg.content.strip()) > 50:
+                            await dm_channel.send("Please provide a valid grade (max 50 characters). Try again or type `cancel`.")
+                            continue
+                    if key == "intended_use":
+                        if not msg.content.strip() or len(msg.content.strip()) > 200:
+                            await dm_channel.send("Please provide a brief description (max 200 characters). Try again or type `cancel`.")
+                            continue
                     answers[key] = msg.content.strip()
                     break
 
@@ -365,7 +380,7 @@ class HomeworkAI(commands.Cog):
                 return
 
             # Ask for phone number
-            import re
+            
             phone_pattern = re.compile(r"^\+?[1-9]\d{1,14}$")  # E.164 format
 
             while True:
@@ -564,6 +579,8 @@ class HomeworkAI(commands.Cog):
             embed.add_field(name="First Name", value=answers["first_name"], inline=True)
             embed.add_field(name="Last Name", value=answers["last_name"], inline=True)
             embed.add_field(name="Billing Email", value=answers["billing_email"], inline=False)
+            embed.add_field(name="Grade", value=answers.get("grade", "N/A"), inline=True)
+            embed.add_field(name="Intended Use", value=answers.get("intended_use", "N/A"), inline=False)
             embed.add_field(name="Phone Number", value=answers["phone_number"], inline=False)
 
             # Send with action buttons
