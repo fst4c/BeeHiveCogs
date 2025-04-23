@@ -11,6 +11,13 @@ import re
 
 CUSTOMER_ROLE_ID = 1364590138847400008  # The role to grant/revoke based on customer_id
 
+# Default prices for each command (USD, as string for formatting)
+DEFAULT_PRICES = {
+    "ask": "$0.10",
+    "answer": "$0.15",
+    "explain": "$0.20",
+}
+
 class HomeworkAI(commands.Cog):
     """
     Use AI to get your homework done. It doesn't get any lazier than this, really.
@@ -30,10 +37,74 @@ class HomeworkAI(commands.Cog):
         }
         default_guild = {
             "applications_channel": None,
+            "pricing_channel": None,
+            "prices": DEFAULT_PRICES.copy(),
+            "pricing_message_id": None,
         }
         self.config.register_user(**default_user)
         self.config.register_guild(**default_guild)
         self.billing_portal_url = "https://billing.stripe.com/p/login/6oE4h4dqVe3zbtefYY"
+        self.bot.loop.create_task(self._maybe_update_all_pricing_channels())
+
+    async def cog_load(self):
+        # Called when the cog is loaded/reloaded
+        await self._maybe_update_all_pricing_channels()
+
+    async def _maybe_update_all_pricing_channels(self):
+        # Wait for bot to be ready
+        await self.bot.wait_until_ready()
+        for guild in self.bot.guilds:
+            try:
+                await self._update_pricing_channel(guild)
+            except Exception:
+                pass
+
+    async def _update_pricing_channel(self, guild):
+        # Get pricing channel and prices for this guild
+        channel_id = await self.config.guild(guild).pricing_channel()
+        prices = await self.config.guild(guild).prices()
+        if not channel_id:
+            return
+        channel = guild.get_channel(channel_id)
+        if not channel or not isinstance(channel, discord.TextChannel):
+            return
+
+        # Compose the pricing message
+        embed = discord.Embed(
+            title="HomeworkAI Pricing",
+            description="Here are the current prices for each HomeworkAI command:",
+            color=discord.Color.blurple()
+        )
+        for cmd, price in prices.items():
+            if cmd == "ask":
+                label = "Ask (General Question)"
+            elif cmd == "answer":
+                label = "Answer (Multiple Choice/Comparison)"
+            elif cmd == "explain":
+                label = "Explain (Step-by-Step)"
+            else:
+                label = cmd.capitalize()
+            embed.add_field(name=label, value=price, inline=False)
+        embed.set_footer(text="Prices are per command use and may change with notice.")
+
+        # Try to edit the previous pricing message if it exists, else send a new one
+        msg_id = await self.config.guild(guild).pricing_message_id()
+        msg = None
+        if msg_id:
+            try:
+                msg = await channel.fetch_message(msg_id)
+            except Exception:
+                msg = None
+        if msg:
+            try:
+                await msg.edit(embed=embed)
+            except Exception:
+                # If can't edit, send new
+                msg = await channel.send(embed=embed)
+                await self.config.guild(guild).pricing_message_id.set(msg.id)
+        else:
+            msg = await channel.send(embed=embed)
+            await self.config.guild(guild).pricing_message_id.set(msg.id)
 
     async def get_openai_key(self):
         tokens = await self.bot.get_shared_api_tokens("openai")
@@ -74,6 +145,54 @@ class HomeworkAI(commands.Cog):
         embed = discord.Embed(
             title="Applications Channel Set",
             description=f"Applications channel set to {channel.mention}.",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
+
+    @homeworkaiset.command()
+    @commands.admin_or_permissions(manage_guild=True)
+    async def setpricing(self, ctx, channel: discord.TextChannel):
+        """Set the channel where HomeworkAI pricing is displayed and update the pricing message."""
+        await self.config.guild(ctx.guild).pricing_channel.set(channel.id)
+        await self._update_pricing_channel(ctx.guild)
+        embed = discord.Embed(
+            title="Pricing Channel Set",
+            description=f"Pricing channel set to {channel.mention}. The pricing message has been updated.",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
+
+    @homeworkaiset.command()
+    @commands.admin_or_permissions(manage_guild=True)
+    async def setprice(self, ctx, command: str, price: str):
+        """
+        Set the price for a HomeworkAI command (ask, answer, explain).
+        Example: [p]homeworkaiset setprice ask $0.12
+        """
+        command = command.lower()
+        if command not in DEFAULT_PRICES:
+            await ctx.send(f"Invalid command. Valid options: {', '.join(DEFAULT_PRICES.keys())}")
+            return
+        prices = await self.config.guild(ctx.guild).prices()
+        prices[command] = price
+        await self.config.guild(ctx.guild).prices.set(prices)
+        await self._update_pricing_channel(ctx.guild)
+        embed = discord.Embed(
+            title="Price Updated",
+            description=f"Price for `{command}` set to `{price}`. Pricing message updated.",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
+
+    @homeworkaiset.command()
+    @commands.admin_or_permissions(manage_guild=True)
+    async def resetprices(self, ctx):
+        """Reset all HomeworkAI command prices to their defaults and update the pricing message."""
+        await self.config.guild(ctx.guild).prices.set(DEFAULT_PRICES.copy())
+        await self._update_pricing_channel(ctx.guild)
+        embed = discord.Embed(
+            title="Prices Reset",
+            description="All HomeworkAI command prices have been reset to their defaults. Pricing message updated.",
             color=discord.Color.green()
         )
         await ctx.send(embed=embed)
