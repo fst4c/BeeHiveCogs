@@ -571,8 +571,8 @@ class HomeworkAI(commands.Cog):
 
         # Expanded questions for onboarding
         questions = [
-            ("first_name", "What is your **first name**?"),
-            ("last_name", "What is your **last name**?"),
+            ("first_name", "What is your **legal first name**?"),
+            ("last_name", "What is your **legal last name**?"),
             ("billing_email", "What is your **billing email address**? (This will be used for billing and notifications)"),
             ("grade", "What **grade** are you in? (e.g., 9th, 10th, college freshman, etc.)"),
             ("intended_use", "What do you **intend to use HomeworkAI for**? (e.g., math homework, essay help, general study, etc.)"),
@@ -643,7 +643,7 @@ class HomeworkAI(commands.Cog):
 
             while True:
                 await dm_channel.send(
-                    "Please enter your **mobile phone number** in international format (e.g., `+12345678901`). This will be used for verification and important notifications."
+                    "Please enter your **mobile phone number** in international format (e.g., `+12345678901`). This will be used for verification and important notifications. Landlines and VOIP numbers are not accepted."
                 )
                 try:
                     msg = await self.bot.wait_for("message", check=check, timeout=120)
@@ -962,21 +962,21 @@ class HomeworkAI(commands.Cog):
 
                 if image_url:
                     payload = {
-                        "model": "gpt-4o",
+                        "model": "gpt-4.1",
                         "messages": [
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": user_content}
                         ],
-                        "max_tokens": 512
+                        "max_tokens": 1024
                     }
                 else:
                     payload = {
-                        "model": "gpt-4o",
+                        "model": "gpt-4.1",
                         "messages": [
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": question}
                         ],
-                        "max_tokens": 512
+                        "max_tokens": 1024
                     }
                 endpoint = "https://api.openai.com/v1/chat/completions"
 
