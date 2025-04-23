@@ -928,13 +928,13 @@ class HomeworkAI(commands.Cog):
             system_prompt = (
                 "You are HomeworkAI, an expert homework assistant. "
                 "Answer the user's question as clearly and concisely as possible. "
-                "If the user attaches an image, analyze it and provide a helpful answer."
+                "If the user attaches an image, analyze it and provide a helpful, accurate answer."
             )
         elif prompt_type == "answer":
             system_prompt = (
                 "You are HomeworkAI, an expert at answering multiple choice and comparison questions. "
                 "If the user provides a list of options or a multiple choice question, "
-                "explain your reasoning and select the best answer. "
+                "explain your reasoning concisely and accurately, and select the best answer. "
                 "If the user attaches an image, analyze it for relevant information."
             )
         elif prompt_type == "explain":
@@ -971,7 +971,7 @@ class HomeworkAI(commands.Cog):
                     }
                 else:
                     payload = {
-                        "model": "gpt-3.5-turbo",
+                        "model": "gpt-4o",
                         "messages": [
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": question}
