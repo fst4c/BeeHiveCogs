@@ -13,7 +13,7 @@ CUSTOMER_ROLE_ID = 1364590138847400008  # The role to grant/revoke based on cust
 
 class HomeworkAI(commands.Cog):
     """
-    Ask AI-powered questions about your homework!
+    Use AI to get your homework done. It doesn't get any lazier than this, really.
     """
 
     __version__ = "1.0.0"
