@@ -199,7 +199,7 @@ class HomeworkAI(commands.Cog):
 
     @homeworkaiset.command()
     @commands.is_owner()
-    async def setcustomerid(self, ctx, user: discord.User, customer_id: str):
+    async def setcid(self, ctx, user: discord.User, customer_id: str):
         """
         Set a user's customer ID (admin/owner only).
         """
@@ -252,7 +252,7 @@ class HomeworkAI(commands.Cog):
 
     @homeworkaiset.command(name="removecustomerid")
     @commands.is_owner()
-    async def removecustomerid(self, ctx, user: discord.User):
+    async def delcid(self, ctx, user: discord.User):
         """
         Remove a user's customer ID and revoke the customer role (admin/owner only).
         """
@@ -282,7 +282,7 @@ class HomeworkAI(commands.Cog):
 
     @homeworkaiset.command(name="resetcogdata")
     @commands.is_owner()
-    async def resetcogdata(self, ctx):
+    async def resetmodule(self, ctx):
         """
         **OWNER ONLY**: Reset all HomeworkAI cog data (users and guilds).
         This will erase all stored customer IDs, applications, and configuration.
