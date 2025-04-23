@@ -133,8 +133,8 @@ class HomeworkAI(commands.Cog):
 
         # Compose the pricing message
         embed = discord.Embed(
-            title="HomeworkAI Pricing",
-            description="Here are the current prices for each HomeworkAI command:",
+            title="HomeworkAI pricing",
+            description="Here are the current prices for each HomeworkAI feature. HomeworkAI is charged by usage, meaning you only pay for how much you use.",
             color=discord.Color.blurple()
         )
         for cmd, price in prices.items():
@@ -147,7 +147,7 @@ class HomeworkAI(commands.Cog):
             else:
                 label = cmd.capitalize()
             embed.add_field(name=label, value=price, inline=False)
-        embed.set_footer(text="Prices are per command use and may change with notice.\nInvite friends! For every 10 users you invite, you get $1 Stripe credit.")
+        embed.set_footer(text="Prices are per command use and may change with notice.\nInvite friends! For every 10 users you invite, you get $1 promotional credit.")
 
         # Try to edit the previous pricing message if it exists, else send a new one
         msg_id = await self.config.guild(guild).pricing_message_id()
@@ -188,7 +188,7 @@ class HomeworkAI(commands.Cog):
         embed.add_field(name="Explain Uses", value=str(stats.get("explain", 0)), inline=True)
         embed.add_field(name="👍 Upvotes", value=str(stats.get("upvotes", 0)), inline=True)
         embed.add_field(name="👎 Downvotes", value=str(stats.get("downvotes", 0)), inline=True)
-        embed.set_footer(text="Stats update live as users interact with HomeworkAI.\nInvite friends! For every 10 users you invite, you get $1 Stripe credit.")
+        embed.set_footer(text="Stats update live as users interact with HomeworkAI.\nInvite friends! For every 10 users you invite, you get $1 promotional credit.")
 
         msg = None
         if msg_id:
