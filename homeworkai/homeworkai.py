@@ -13,9 +13,9 @@ CUSTOMER_ROLE_ID = 1364590138847400008  # The role to grant/revoke based on cust
 
 # Default prices for each command (USD, as string for formatting)
 DEFAULT_PRICES = {
-    "ask": "$0.10",
-    "answer": "$0.15",
-    "explain": "$0.20",
+    "ask": "$0.10/ask",
+    "answer": "$0.15/answer",
+    "explain": "$0.20/explanation",
 }
 
 class HomeworkAI(commands.Cog):
@@ -77,11 +77,11 @@ class HomeworkAI(commands.Cog):
         )
         for cmd, price in prices.items():
             if cmd == "ask":
-                label = "Ask (General Question)"
+                label = "Ask (best for General Questions)"
             elif cmd == "answer":
-                label = "Answer (Multiple Choice/Comparison)"
+                label = "Answer (best for Multiple Choice and Comparison)"
             elif cmd == "explain":
-                label = "Explain (Step-by-Step)"
+                label = "Explain (best for Step-by-Step work)"
             else:
                 label = cmd.capitalize()
             embed.add_field(name=label, value=price, inline=False)
