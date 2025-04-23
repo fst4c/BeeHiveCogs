@@ -494,9 +494,11 @@ class HomeworkAI(commands.Cog):
                     description=(
                         "You now have access to HomeworkAI.\n\n"
                         "**How to use:**\n"
-                        "- Use the `ask` command in any server where HomeworkAI is enabled.\n"
-                        "- You can ask questions by text or by attaching an image.\n\n"
-                        f"To manage your billing or connect your payment method, visit: [Billing Portal]({self.billing_portal_url})"
+                        "- Use `/ask` to get answers to general questions (text or image supported).\n"
+                        "- Use `/answer` for multiple choice or comparison questions (text or image supported).\n"
+                        "- Use `/explain` to get step-by-step explanations for your homework problems.\n\n"
+                        "All answers are sent to you in DMs for privacy.\n\n"
+                        f"To manage your billing or connect your payment method, visit our [billing portal]({self.billing_portal_url})"
                     ),
                     color=discord.Color.green()
                 )
