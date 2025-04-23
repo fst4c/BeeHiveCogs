@@ -58,7 +58,15 @@ class HomeworkAI(commands.Cog):
     async def homeworkai(self, ctx):
         """HomeworkAI configuration commands."""
 
-    @homeworkai.command()
+    # --- ADMIN/CONFIG/MANAGEMENT COMMAND GROUP ---
+    @commands.group(name="homeworkaiset", invoke_without_command=True)
+    @commands.guild_only()
+    async def homeworkaiset(self, ctx):
+        """HomeworkAI admin/configuration/management commands."""
+        if ctx.invoked_subcommand is None:
+            await ctx.send_help(ctx.command)
+
+    @homeworkaiset.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def setapplications(self, ctx, channel: discord.TextChannel):
         """Set the channel where HomeworkAI applications are sent."""
@@ -69,6 +77,137 @@ class HomeworkAI(commands.Cog):
             color=discord.Color.green()
         )
         await ctx.send(embed=embed)
+
+    @homeworkaiset.command()
+    @commands.is_owner()
+    async def setcustomerid(self, ctx, user: discord.User, customer_id: str):
+        """
+        Set a user's customer ID (admin/owner only).
+        """
+        prev_id = await self.config.user(user).customer_id()
+        await self.config.user(user).customer_id.set(customer_id)
+        # If setting a customer_id, clear denied flag
+        if customer_id:
+            await self.config.user(user).denied.set(False)
+
+        # Role management: Add or remove the customer role in all mutual guilds
+        for guild in self.bot.guilds:
+            member = guild.get_member(user.id)
+            if not member:
+                continue
+            role = guild.get_role(CUSTOMER_ROLE_ID)
+            if not role:
+                continue
+            try:
+                if customer_id:
+                    if role not in member.roles:
+                        await member.add_roles(role, reason="Granted HomeworkAI customer role (setcustomerid)")
+                else:
+                    if role in member.roles:
+                        await member.remove_roles(role, reason="Removed HomeworkAI customer role (setcustomerid)")
+            except Exception:
+                pass
+
+        if not prev_id and customer_id:
+            try:
+                embed = discord.Embed(
+                    title="Welcome to HomeworkAI!",
+                    description=(
+                        "You now have access to HomeworkAI.\n\n"
+                        "**How to use:**\n"
+                        "- Use the `ask` command in any server where HomeworkAI is enabled.\n"
+                        "- You can ask questions by text or by attaching an image.\n\n"
+                        f"To manage your billing or connect your payment method, visit: [Billing Portal]({self.billing_portal_url})"
+                    ),
+                    color=discord.Color.green()
+                )
+                await user.send(embed=embed)
+            except Exception:
+                pass
+        embed = discord.Embed(
+            title="Customer ID Set",
+            description=f"Customer ID for {user.mention} set to `{customer_id}`.",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
+
+    @homeworkaiset.command(name="removecustomerid")
+    @commands.is_owner()
+    async def removecustomerid(self, ctx, user: discord.User):
+        """
+        Remove a user's customer ID and revoke the customer role (admin/owner only).
+        """
+        prev_id = await self.config.user(user).customer_id()
+        await self.config.user(user).customer_id.set(None)
+
+        # Remove the customer role in all mutual guilds
+        for guild in self.bot.guilds:
+            member = guild.get_member(user.id)
+            if not member:
+                continue
+            role = guild.get_role(CUSTOMER_ROLE_ID)
+            if not role:
+                continue
+            try:
+                if role in member.roles:
+                    await member.remove_roles(role, reason="Removed HomeworkAI customer role (removecustomerid)")
+            except Exception:
+                pass
+
+        embed = discord.Embed(
+            title="Customer ID Removed",
+            description=f"Customer ID for {user.mention} has been removed and the customer role revoked.",
+            color=discord.Color.orange()
+        )
+        await ctx.send(embed=embed)
+
+    @homeworkaiset.command(name="resetcogdata")
+    @commands.is_owner()
+    async def resetcogdata(self, ctx):
+        """
+        **OWNER ONLY**: Reset all HomeworkAI cog data (users and guilds).
+        This will erase all stored customer IDs, applications, and configuration.
+        """
+        confirm_message = await ctx.send(
+            embed=discord.Embed(
+                title="Reset HomeworkAI Data",
+                description="⚠️ **Are you sure you want to reset all HomeworkAI cog data?**\n"
+                            "This will erase all stored customer IDs, applications, and configuration for all users and guilds.\n\n"
+                            "Type `CONFIRM RESET` within 30 seconds to proceed.",
+                color=discord.Color.red()
+            )
+        )
+
+        def check(m):
+            return m.author.id == ctx.author.id and m.channel.id == ctx.channel.id
+
+        try:
+            msg = await self.bot.wait_for("message", check=check, timeout=30)
+        except asyncio.TimeoutError:
+            await ctx.send("Reset cancelled: confirmation timed out.")
+            return
+
+        if msg.content.strip() != "CONFIRM RESET":
+            await ctx.send("Reset cancelled: incorrect confirmation phrase.")
+            return
+
+        try:
+            await self.config.clear_all()
+            await ctx.send(
+                embed=discord.Embed(
+                    title="HomeworkAI Data Reset",
+                    description="All HomeworkAI cog data has been erased.",
+                    color=discord.Color.green()
+                )
+            )
+        except Exception as e:
+            await ctx.send(
+                embed=discord.Embed(
+                    title="Reset Failed",
+                    description=f"An error occurred while resetting data: {e}",
+                    color=discord.Color.red()
+                )
+            )
 
     @commands.Cog.listener()
     async def on_app_command_completion(self, interaction: discord.Interaction, command: discord.app_commands.Command):
@@ -902,89 +1041,6 @@ class HomeworkAI(commands.Cog):
                     break
         await self._send_homeworkai_response(ctx, question, image_url, prompt_type="explain")
 
-    @commands.command()
-    @commands.is_owner()
-    async def setcustomerid(self, ctx, user: discord.User, customer_id: str):
-        """
-        Set a user's customer ID (admin/owner only).
-        """
-        prev_id = await self.config.user(user).customer_id()
-        await self.config.user(user).customer_id.set(customer_id)
-        # If setting a customer_id, clear denied flag
-        if customer_id:
-            await self.config.user(user).denied.set(False)
-
-        # Role management: Add or remove the customer role in all mutual guilds
-        for guild in self.bot.guilds:
-            member = guild.get_member(user.id)
-            if not member:
-                continue
-            role = guild.get_role(CUSTOMER_ROLE_ID)
-            if not role:
-                continue
-            try:
-                if customer_id:
-                    if role not in member.roles:
-                        await member.add_roles(role, reason="Granted HomeworkAI customer role (setcustomerid)")
-                else:
-                    if role in member.roles:
-                        await member.remove_roles(role, reason="Removed HomeworkAI customer role (setcustomerid)")
-            except Exception:
-                pass
-
-        if not prev_id and customer_id:
-            try:
-                embed = discord.Embed(
-                    title="Welcome to HomeworkAI!",
-                    description=(
-                        "You now have access to HomeworkAI.\n\n"
-                        "**How to use:**\n"
-                        "- Use the `ask` command in any server where HomeworkAI is enabled.\n"
-                        "- You can ask questions by text or by attaching an image.\n\n"
-                        f"To manage your billing or connect your payment method, visit: [Billing Portal]({self.billing_portal_url})"
-                    ),
-                    color=discord.Color.green()
-                )
-                await user.send(embed=embed)
-            except Exception:
-                pass
-        embed = discord.Embed(
-            title="Customer ID Set",
-            description=f"Customer ID for {user.mention} set to `{customer_id}`.",
-            color=discord.Color.green()
-        )
-        await ctx.send(embed=embed)
-
-    @commands.command(name="removecustomerid")
-    @commands.is_owner()
-    async def removecustomerid(self, ctx, user: discord.User):
-        """
-        Remove a user's customer ID and revoke the customer role (admin/owner only).
-        """
-        prev_id = await self.config.user(user).customer_id()
-        await self.config.user(user).customer_id.set(None)
-
-        # Remove the customer role in all mutual guilds
-        for guild in self.bot.guilds:
-            member = guild.get_member(user.id)
-            if not member:
-                continue
-            role = guild.get_role(CUSTOMER_ROLE_ID)
-            if not role:
-                continue
-            try:
-                if role in member.roles:
-                    await member.remove_roles(role, reason="Removed HomeworkAI customer role (removecustomerid)")
-            except Exception:
-                pass
-
-        embed = discord.Embed(
-            title="Customer ID Removed",
-            description=f"Customer ID for {user.mention} has been removed and the customer role revoked.",
-            color=discord.Color.orange()
-        )
-        await ctx.send(embed=embed)
-
     @commands.hybrid_command(name="billing", with_app_command=True)
     async def billing(self, ctx: commands.Context):
         """
@@ -1103,51 +1159,3 @@ class HomeworkAI(commands.Cog):
                 color=discord.Color.red()
             )
             await ctx.send(embed=embed, ephemeral=True)
-
-    @commands.command(name="resetcogdata")
-    @commands.is_owner()
-    async def resetcogdata(self, ctx):
-        """
-        **OWNER ONLY**: Reset all HomeworkAI cog data (users and guilds).
-        This will erase all stored customer IDs, applications, and configuration.
-        """
-        confirm_message = await ctx.send(
-            embed=discord.Embed(
-                title="Reset HomeworkAI Data",
-                description="⚠️ **Are you sure you want to reset all HomeworkAI cog data?**\n"
-                            "This will erase all stored customer IDs, applications, and configuration for all users and guilds.\n\n"
-                            "Type `CONFIRM RESET` within 30 seconds to proceed.",
-                color=discord.Color.red()
-            )
-        )
-
-        def check(m):
-            return m.author.id == ctx.author.id and m.channel.id == ctx.channel.id
-
-        try:
-            msg = await self.bot.wait_for("message", check=check, timeout=30)
-        except asyncio.TimeoutError:
-            await ctx.send("Reset cancelled: confirmation timed out.")
-            return
-
-        if msg.content.strip() != "CONFIRM RESET":
-            await ctx.send("Reset cancelled: incorrect confirmation phrase.")
-            return
-
-        try:
-            await self.config.clear_all()
-            await ctx.send(
-                embed=discord.Embed(
-                    title="HomeworkAI Data Reset",
-                    description="All HomeworkAI cog data has been erased.",
-                    color=discord.Color.green()
-                )
-            )
-        except Exception as e:
-            await ctx.send(
-                embed=discord.Embed(
-                    title="Reset Failed",
-                    description=f"An error occurred while resetting data: {e}",
-                    color=discord.Color.red()
-                )
-            )
