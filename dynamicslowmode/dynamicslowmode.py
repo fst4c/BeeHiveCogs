@@ -1,8 +1,22 @@
 import discord
-from redbot.core import commands, Config, checks, tasks
+from redbot.core import commands, Config, checks
 from datetime import datetime, timedelta
 import asyncio
 from collections import deque, defaultdict
+
+import asyncio
+
+def loop(*, seconds=0, minutes=0, hours=0):
+    """A simple replacement for tasks.loop for Red 3.5+ compatibility."""
+    def decorator(func):
+        async def loop_runner(self, *args, **kwargs):
+            await self.bot.wait_until_ready()
+            while True:
+                await func(self, *args, **kwargs)
+                await asyncio.sleep(seconds + minutes * 60 + hours * 3600)
+        func._loop_runner = loop_runner
+        return func
+    return decorator
 
 class DynamicSlowmode(commands.Cog):
     """
@@ -23,10 +37,11 @@ class DynamicSlowmode(commands.Cog):
         self.config.register_guild(**self.DEFAULTS)
         self._message_cache = defaultdict(lambda: deque(maxlen=100))
         self._lock = asyncio.Lock()
-        self.slowmode_task.start()
+        self._slowmode_task = self.bot.loop.create_task(self._run_slowmode_task())
 
     def cog_unload(self):
-        self.slowmode_task.cancel()
+        if hasattr(self, "_slowmode_task"):
+            self._slowmode_task.cancel()
 
     @commands.group()
     @commands.guild_only()
@@ -106,9 +121,13 @@ class DynamicSlowmode(commands.Cog):
         async with self._lock:
             self._message_cache[message.channel.id].append(now)
 
-    @tasks.loop(seconds=60)
-    async def slowmode_task(self):
+    async def _run_slowmode_task(self):
         await self.bot.wait_until_ready()
+        while True:
+            await self.slowmode_task()
+            await asyncio.sleep(60)
+
+    async def slowmode_task(self):
         for guild in self.bot.guilds:
             conf = await self.config.guild(guild).all()
             if not conf["enabled"]:
@@ -143,8 +162,4 @@ class DynamicSlowmode(commands.Cog):
                         await channel.edit(slowmode_delay=new_slowmode, reason="Dynamic slowmode adjustment")
                     except Exception:
                         pass
-
-    @slowmode_task.before_loop
-    async def before_slowmode_task(self):
-        await self.bot.wait_until_ready()
 
