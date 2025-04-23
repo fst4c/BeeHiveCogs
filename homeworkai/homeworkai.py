@@ -1036,6 +1036,7 @@ class HomeworkAI(commands.Cog):
                             title=embed_title,
                             color=discord.Color.blurple()
                         )
+                        # Truncate question_section to 1024 for embed field
                         embed.add_field(
                             name=field_name,
                             value=question_section if len(question_section) < 1024 else question_section[:1020] + "...",
@@ -1043,9 +1044,11 @@ class HomeworkAI(commands.Cog):
                         )
                         if image_url:
                             embed.set_image(url=image_url)
+                        # Truncate answer to 1024 for embed field (Discord API limit)
+                        answer_field_value = answer if len(answer) <= 1024 else answer[:1020] + "..."
                         embed.add_field(
                             name="HomeworkAI says...",
-                            value=answer,
+                            value=answer_field_value,
                             inline=False
                         )
 
