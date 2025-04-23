@@ -890,10 +890,10 @@ class HomeworkAI(commands.Cog):
         try:
             await dm_channel.send(
                 embed=discord.Embed(
-                    title="HomeworkAI Application",
+                    title="HomeworkAI onboarding",
                     description=(
-                        "Welcome! Let's get you set up to use HomeworkAI.\n"
-                        "Please answer the following questions. You can type `cancel` at any time to stop the application."
+                        ":wave: **Hi there!**\n\nLet's get you set up to use HomeworkAI.\n"
+                        "Please answer the following questions. You can type `cancel` to stop the sign-up."
                     ),
                     color=discord.Color.blurple()
                 )
@@ -1006,7 +1006,6 @@ class HomeworkAI(commands.Cog):
                     )
                     continue
 
-                # Verification code entry loop with "resend" support
                 await dm_channel.send(
                     "A verification code has been sent to your phone. Please enter the code you received, type `resend` to get a new code, or type `cancel` to stop."
                 )
@@ -1085,9 +1084,9 @@ class HomeworkAI(commands.Cog):
                                 if resp.status in (200, 201) and result.get("status") == "approved":
                                     await dm_channel.send(
                                         embed=discord.Embed(
-                                            title="Phone Verified",
-                                            description="Your phone number has been verified successfully.",
-                                            color=discord.Color.green()
+                                            title="Phone verified",
+                                            description="Your verification was successful. Thanks for helping us fight fraud.",
+                                            color=0x2bbd8e
                                         )
                                     )
                                     answers["phone_number"] = phone_number
@@ -1138,16 +1137,16 @@ class HomeworkAI(commands.Cog):
                 return
 
             embed = discord.Embed(
-                title="New HomeworkAI Application",
-                color=discord.Color.blurple(),
+                title="New HomeworkAI sign-up",
+                color=0xfffffe,
             )
             embed.add_field(name="User", value=f"{user.mention} (`{user.id}`)", inline=False)
-            embed.add_field(name="First Name", value=answers["first_name"], inline=True)
-            embed.add_field(name="Last Name", value=answers["last_name"], inline=True)
-            embed.add_field(name="Billing Email", value=answers["billing_email"], inline=False)
+            embed.add_field(name="First name", value=answers["first_name"], inline=True)
+            embed.add_field(name="Last name", value=answers["last_name"], inline=True)
+            embed.add_field(name="Billing email", value=answers["billing_email"], inline=False)
+            embed.add_field(name="Phone number", value=answers["phone_number"], inline=False)
             embed.add_field(name="Grade", value=answers.get("grade", "N/A"), inline=True)
-            embed.add_field(name="Intended Use", value=answers.get("intended_use", "N/A"), inline=False)
-            embed.add_field(name="Phone Number", value=answers["phone_number"], inline=False)
+            embed.add_field(name="Intended use", value=answers.get("intended_use", "N/A"), inline=True)
 
             # Send with action buttons
             view = self.ApplicationActionView(self, user, answers)
@@ -1161,9 +1160,9 @@ class HomeworkAI(commands.Cog):
             await self.config.user(user).denied.set(False)
             await dm_channel.send(
                 embed=discord.Embed(
-                    title="Application Submitted",
-                    description="Your application has been submitted! We'll be in touch soon.",
-                    color=discord.Color.green()
+                    title="Thanks! You're in the queue!",
+                    description="We need to review your signup request to make sure everything looks good here.\n\nThis can take up to 8 hours, and you'll be notified of any updates via your DM's.",
+                    color=0x2bbd8e
                 )
             )
         except Exception as e:
