@@ -904,3 +904,51 @@ class HomeworkAI(commands.Cog):
                 color=discord.Color.red()
             )
             await ctx.send(embed=embed, ephemeral=True)
+
+    @commands.command(name="resetcogdata")
+    @commands.is_owner()
+    async def resetcogdata(self, ctx):
+        """
+        **OWNER ONLY**: Reset all HomeworkAI cog data (users and guilds).
+        This will erase all stored customer IDs, applications, and configuration.
+        """
+        confirm_message = await ctx.send(
+            embed=discord.Embed(
+                title="Reset HomeworkAI Data",
+                description="⚠️ **Are you sure you want to reset all HomeworkAI cog data?**\n"
+                            "This will erase all stored customer IDs, applications, and configuration for all users and guilds.\n\n"
+                            "Type `CONFIRM RESET` within 30 seconds to proceed.",
+                color=discord.Color.red()
+            )
+        )
+
+        def check(m):
+            return m.author.id == ctx.author.id and m.channel.id == ctx.channel.id
+
+        try:
+            msg = await self.bot.wait_for("message", check=check, timeout=30)
+        except asyncio.TimeoutError:
+            await ctx.send("Reset cancelled: confirmation timed out.")
+            return
+
+        if msg.content.strip() != "CONFIRM RESET":
+            await ctx.send("Reset cancelled: incorrect confirmation phrase.")
+            return
+
+        try:
+            await self.config.clear_all()
+            await ctx.send(
+                embed=discord.Embed(
+                    title="HomeworkAI Data Reset",
+                    description="All HomeworkAI cog data has been erased.",
+                    color=discord.Color.green()
+                )
+            )
+        except Exception as e:
+            await ctx.send(
+                embed=discord.Embed(
+                    title="Reset Failed",
+                    description=f"An error occurred while resetting data: {e}",
+                    color=discord.Color.red()
+                )
+            )
