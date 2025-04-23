@@ -25,6 +25,7 @@ class HomeworkAI(commands.Cog):
             "applied": False,
             "phone_number": None,
             "phone_verified": False,
+            "denied": False,  # Track if the user was denied
         }
         default_guild = {
             "applications_channel": None,
@@ -158,6 +159,8 @@ class HomeworkAI(commands.Cog):
             await self.cog.config.user(self.user).applied.set(False)
             # Optionally, mark phone_verified again
             await self.cog.config.user(self.user).phone_verified.set(True)
+            # Clear denied flag on approval
+            await self.cog.config.user(self.user).denied.set(False)
 
             # Give customer role in all mutual guilds
             for guild in self.cog.bot.guilds:
@@ -225,11 +228,13 @@ class HomeworkAI(commands.Cog):
                     await self.cog.config.user(self.user).applied.set(False)
                     # Optionally, clear phone_verified
                     await self.cog.config.user(self.user).phone_verified.set(False)
+                    # Mark as denied so user can reapply
+                    await self.cog.config.user(self.user).denied.set(True)
                     # DM the user
                     try:
                         embed = discord.Embed(
                             title="HomeworkAI Application Denied",
-                            description=f"Your application was denied for the following reason:\n\n> {self.reason.value}",
+                            description=f"Your application was denied for the following reason:\n\n> {self.reason.value}\n\nYou may submit a new application if you wish.",
                             color=discord.Color.red()
                         )
                         await self.user.send(embed=embed)
@@ -260,7 +265,11 @@ class HomeworkAI(commands.Cog):
         Collects info via DM prompt-by-prompt, including phone number verification via Twilio.
         """
         user = interaction.user
-        if await self.config.user(user).applied():
+        # Allow reapplication if denied, block only if currently applied or already approved
+        applied = await self.config.user(user).applied()
+        customer_id = await self.config.user(user).customer_id()
+        denied = await self.config.user(user).denied()
+        if applied:
             embed = discord.Embed(
                 title="Already Applied",
                 description="You have already applied to use HomeworkAI. Please wait for approval.",
@@ -268,6 +277,15 @@ class HomeworkAI(commands.Cog):
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
+        if customer_id:
+            embed = discord.Embed(
+                title="Already Approved",
+                description="You have already been approved for HomeworkAI. If you need help, please contact support.",
+                color=discord.Color.green()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        # If denied, allow reapplication (no block)
 
         # Try to DM the user
         try:
@@ -556,6 +574,8 @@ class HomeworkAI(commands.Cog):
             await self.config.user(user).applied.set(True)
             await self.config.user(user).phone_number.set(answers["phone_number"])
             await self.config.user(user).phone_verified.set(True)
+            # Clear denied flag on new application
+            await self.config.user(user).denied.set(False)
             await dm_channel.send(
                 embed=discord.Embed(
                     title="Application Submitted",
@@ -714,6 +734,9 @@ class HomeworkAI(commands.Cog):
         """
         prev_id = await self.config.user(user).customer_id()
         await self.config.user(user).customer_id.set(customer_id)
+        # If setting a customer_id, clear denied flag
+        if customer_id:
+            await self.config.user(user).denied.set(False)
 
         # Role management: Add or remove the customer role in all mutual guilds
         for guild in self.bot.guilds:
