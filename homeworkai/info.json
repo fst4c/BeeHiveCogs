@@ -1,0 +1,20 @@
+{
+  "author": [
+    "adminelevation"
+  ],
+  "install_msg": "Ask AI-powered questions about your homework! Includes application, phone verification, and billing integration.",
+  "name": "HomeworkAI",
+  "short": "AI-powered homework help with billing and application system.",
+  "description": "Ask AI-powered questions about your homework! Includes application, phone verification, and billing integration.",
+  "requirements": [],
+  "tags": [
+    "ai",
+    "homework",
+    "education",
+    "stripe",
+    "twilio",
+    "openai"
+  ],
+  "min_bot_version": "3.5.0",
+  "end_user_data_statement": "This cog stores user application data, phone numbers, and billing information (customer ID) for the purpose of managing access and billing. Data is not shared with third parties except for required integrations (OpenAI, Stripe, Twilio)."
+}
