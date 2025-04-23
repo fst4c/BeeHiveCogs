@@ -63,16 +63,6 @@ def get_poll_tally(url: str, vote_info: dict, hdrs: dict) -> dict:
     Fetches the current tally for all options in the poll.
     Returns: dict of {option_name: {"votes": int, "percent": float}}
     """
-    # This is similar to cast_vote, but does not cast a vote, just fetches the poll results.
-    # We'll use the same endpoint but without the vote.
-    # Actually, Polldaddy does not have a public API for this, so we simulate a GET to the poll results page.
-    # We'll use the same logic as cast_vote, but without the vote.
-    # For this bot, we just want the tally for the configured option.
-    # We'll use the same URL as cast_vote, but without the vote parameters.
-    # But for simplicity, let's just call cast_vote with a dummy cookie and not increment the vote.
-    # But to avoid incrementing, we can fetch the poll results page directly.
-    # However, for now, let's just use the same logic as cast_vote, but don't increment the vote.
-    # We'll fetch the poll results page.
     pollid = vote_info['poll']
     uri = f"https://poll.fm/{pollid}"
     try:
@@ -122,6 +112,7 @@ class PollShaddy(commands.Cog):
             "enabled": False,
             "interval": 5,  # seconds between votes
             "vote_tracking_channel": None,  # Channel ID for vote tracking
+            "debug": False,  # Debug mode for sending every vote result
         }
         self.config.register_guild(**default_guild)
         self._task = None
@@ -163,7 +154,23 @@ class PollShaddy(commands.Cog):
                     result = await asyncio.get_event_loop().run_in_executor(
                         None, cast_vote, POLL_URL, vote_info, cookie, headers
                     )
-                    # Optionally, you could store result in config or send to a channel
+                    # Debug mode: send every vote result to the vote tracking channel if enabled
+                    if conf.get("debug", False):
+                        channel_id = conf.get("vote_tracking_channel")
+                        if channel_id:
+                            channel = guild.get_channel(channel_id)
+                            if channel:
+                                selection_name = conf["name"] or conf["selection"]
+                                count = result.get("votes", 0)
+                                percent = result.get("percent", 0.0)
+                                try:
+                                    await channel.send(
+                                        f"🛠️ **[DEBUG] Vote Cast for '{selection_name}':**\n"
+                                        f"Votes: **{count}**\n"
+                                        f"Percent: **{percent:.2f}%**"
+                                    )
+                                except Exception:
+                                    pass
                 except Exception as e:
                     # Optionally log error
                     pass
@@ -298,6 +305,19 @@ class PollShaddy(commands.Cog):
         await ctx.send("Automatic voting disabled.")
 
     @pollshaddy.command()
+    async def debug(self, ctx, enabled: bool = None):
+        """
+        Enable or disable debug mode (send every vote result to the vote tracking channel).
+        Usage: [p]pollshaddy debug [true|false]
+        """
+        if enabled is None:
+            conf = await self.config.guild(ctx.guild).all()
+            await ctx.send(f"Debug mode is currently **{'enabled' if conf.get('debug', False) else 'disabled'}**.")
+            return
+        await self.config.guild(ctx.guild).debug.set(enabled)
+        await ctx.send(f"Debug mode {'enabled' if enabled else 'disabled'}.")
+
+    @pollshaddy.command()
     async def status(self, ctx):
         """Show current voting configuration."""
         conf = await self.config.guild(ctx.guild).all()
@@ -313,6 +333,7 @@ class PollShaddy(commands.Cog):
             f"**Chrome Version:** {conf['version']}\n"
             f"**Interval:** {conf['interval']} seconds\n"
             f"**Enabled:** {conf['enabled']}\n"
-            f"**Vote Tracking Channel:** {channel.mention if channel else 'Not set'}"
+            f"**Vote Tracking Channel:** {channel.mention if channel else 'Not set'}\n"
+            f"**Debug Mode:** {'Enabled' if conf.get('debug', False) else 'Disabled'}"
         )
         await ctx.send(msg)
