@@ -390,83 +390,83 @@ class HomeworkAI(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-        await ctx.trigger_typing()
-        try:
-            headers = {
-                "Authorization": f"Bearer {openai_key}",
-                "Content-Type": "application/json"
-            }
-            if image_url:
-                payload = {
-                    "model": "gpt-4-vision-preview",
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": question or "Please analyze this image."},
-                                {"type": "image_url", "image_url": {"url": image_url}}
-                            ]
-                        }
-                    ],
-                    "max_tokens": 512
+        async with ctx.typing():
+            try:
+                headers = {
+                    "Authorization": f"Bearer {openai_key}",
+                    "Content-Type": "application/json"
                 }
-                endpoint = "https://api.openai.com/v1/chat/completions"
-            else:
-                payload = {
-                    "model": "gpt-3.5-turbo",
-                    "messages": [
-                        {"role": "user", "content": question}
-                    ],
-                    "max_tokens": 512
-                }
-                endpoint = "https://api.openai.com/v1/chat/completions"
+                if image_url:
+                    payload = {
+                        "model": "gpt-4-vision-preview",
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": question or "Please analyze this image."},
+                                    {"type": "image_url", "image_url": {"url": image_url}}
+                                ]
+                            }
+                        ],
+                        "max_tokens": 512
+                    }
+                    endpoint = "https://api.openai.com/v1/chat/completions"
+                else:
+                    payload = {
+                        "model": "gpt-3.5-turbo",
+                        "messages": [
+                            {"role": "user", "content": question}
+                        ],
+                        "max_tokens": 512
+                    }
+                    endpoint = "https://api.openai.com/v1/chat/completions"
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(endpoint, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=60)) as resp:
-                    if resp.status != 200:
-                        text = await resp.text()
-                        embed = discord.Embed(
-                            title="OpenAI API Error",
-                            description=f"Status: {resp.status}\n{text}",
-                            color=discord.Color.red()
-                        )
-                        await ctx.send(embed=embed)
-                        return
-                    data = await resp.json()
-                    answer = None
-                    try:
-                        answer = data["choices"][0]["message"]["content"]
-                    except Exception:
-                        embed = discord.Embed(
-                            title="Unexpected OpenAI Response",
-                            description="OpenAI API returned an unexpected response.",
-                            color=discord.Color.red()
-                        )
-                        await ctx.send(embed=embed)
-                        return
-                    # Use embed for the answer, truncate if needed
-                    if len(answer) < 1900:
-                        embed = discord.Embed(
-                            title="HomeworkAI Answer",
-                            description=answer,
-                            color=discord.Color.blurple()
-                        )
-                        await ctx.send(embed=embed)
-                    else:
-                        embed = discord.Embed(
-                            title="HomeworkAI Answer (truncated)",
-                            description=answer[:1900] + "\n\n*Response truncated.*",
-                            color=discord.Color.blurple()
-                        )
-                        await ctx.send(embed=embed)
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(endpoint, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+                        if resp.status != 200:
+                            text = await resp.text()
+                            embed = discord.Embed(
+                                title="OpenAI API Error",
+                                description=f"Status: {resp.status}\n{text}",
+                                color=discord.Color.red()
+                            )
+                            await ctx.send(embed=embed)
+                            return
+                        data = await resp.json()
+                        answer = None
+                        try:
+                            answer = data["choices"][0]["message"]["content"]
+                        except Exception:
+                            embed = discord.Embed(
+                                title="Unexpected OpenAI Response",
+                                description="OpenAI API returned an unexpected response.",
+                                color=discord.Color.red()
+                            )
+                            await ctx.send(embed=embed)
+                            return
+                        # Use embed for the answer, truncate if needed
+                        if len(answer) < 1900:
+                            embed = discord.Embed(
+                                title="HomeworkAI Answer",
+                                description=answer,
+                                color=discord.Color.blurple()
+                            )
+                            await ctx.send(embed=embed)
+                        else:
+                            embed = discord.Embed(
+                                title="HomeworkAI Answer (truncated)",
+                                description=answer[:1900] + "\n\n*Response truncated.*",
+                                color=discord.Color.blurple()
+                            )
+                            await ctx.send(embed=embed)
 
-        except Exception as e:
-            embed = discord.Embed(
-                title="OpenAI Error",
-                description=f"An error occurred while contacting OpenAI: {e}",
-                color=discord.Color.red()
-            )
-            await ctx.send(embed=embed)
+            except Exception as e:
+                embed = discord.Embed(
+                    title="OpenAI Error",
+                    description=f"An error occurred while contacting OpenAI: {e}",
+                    color=discord.Color.red()
+                )
+                await ctx.send(embed=embed)
 
     @commands.command()
     @commands.is_owner()
