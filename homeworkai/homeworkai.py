@@ -73,6 +73,186 @@ class HomeworkAI(commands.Cog):
         # This is a placeholder in case you want to handle app command completions
         pass
 
+    # --- Application Approval/Deny Button Views ---
+
+    class ApplicationActionView(discord.ui.View):
+        def __init__(self, cog, user: discord.User, answers: dict, *, timeout=600):
+            super().__init__(timeout=timeout)
+            self.cog = cog
+            self.user = user
+            self.answers = answers
+            self.message = None
+
+        @discord.ui.button(label="Approve", style=discord.ButtonStyle.success, custom_id="homeworkai_approve")
+        async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            # Only allow admins to approve
+            if not interaction.user.guild_permissions.manage_guild and not interaction.user.guild_permissions.administrator:
+                await interaction.followup.send("You do not have permission to approve applications.", ephemeral=True)
+                return
+
+            # Create Stripe customer
+            stripe_key = await self.cog.get_stripe_key()
+            if not stripe_key:
+                await interaction.followup.send("Stripe API key is not configured. Please contact an administrator.", ephemeral=True)
+                return
+
+            # Check if already has customer_id
+            prev_customer_id = await self.cog.config.user(self.user).customer_id()
+            if prev_customer_id:
+                await interaction.followup.send("This user already has a customer ID.", ephemeral=True)
+                return
+
+            # Create Stripe customer
+            try:
+                async with aiohttp.ClientSession() as session:
+                    headers = {
+                        "Authorization": f"Bearer {stripe_key}",
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    }
+                    data = {
+                        "email": self.answers.get("billing_email"),
+                        "name": f"{self.answers.get('first_name', '')} {self.answers.get('last_name', '')}".strip(),
+                        "metadata[first_name]": self.answers.get("first_name", ""),
+                        "metadata[last_name]": self.answers.get("last_name", ""),
+                        "metadata[discord_id]": str(self.user.id),
+                        "metadata[phone_number]": self.answers.get("phone_number", ""),
+                    }
+                    async with session.post(
+                        "https://api.stripe.com/v1/customers",
+                        data=data,
+                        headers=headers,
+                        timeout=aiohttp.ClientTimeout(total=30)
+                    ) as resp:
+                        if resp.status not in (200, 201):
+                            text = await resp.text()
+                            await interaction.followup.send(
+                                f"Failed to create Stripe customer: {resp.status}\n{text}",
+                                ephemeral=True
+                            )
+                            return
+                        try:
+                            result = await resp.json()
+                        except Exception as e:
+                            await interaction.followup.send(
+                                f"Could not decode Stripe response: {e}",
+                                ephemeral=True
+                            )
+                            return
+                        customer_id = result.get("id")
+                        if not customer_id:
+                            await interaction.followup.send(
+                                "Stripe did not return a customer ID. Please check the logs.",
+                                ephemeral=True
+                            )
+                            return
+            except Exception as e:
+                await interaction.followup.send(
+                    f"An error occurred while creating the Stripe customer: {e}",
+                    ephemeral=True
+                )
+                return
+
+            # Save customer_id and mark as not pending
+            await self.cog.config.user(self.user).customer_id.set(customer_id)
+            await self.cog.config.user(self.user).applied.set(False)
+            # Optionally, mark phone_verified again
+            await self.cog.config.user(self.user).phone_verified.set(True)
+
+            # Give customer role in all mutual guilds
+            for guild in self.cog.bot.guilds:
+                member = guild.get_member(self.user.id)
+                if not member:
+                    continue
+                role = guild.get_role(CUSTOMER_ROLE_ID)
+                if not role:
+                    continue
+                try:
+                    if role not in member.roles:
+                        await member.add_roles(role, reason="Granted HomeworkAI customer role (application approved)")
+                except Exception:
+                    pass
+
+            # DM the user
+            try:
+                embed = discord.Embed(
+                    title="Welcome to HomeworkAI!",
+                    description=(
+                        "Your application has been **approved**! 🎉\n\n"
+                        "You now have access to HomeworkAI.\n\n"
+                        "**How to use:**\n"
+                        "- Use the `ask` command in any server where HomeworkAI is enabled.\n"
+                        "- You can ask questions by text or by attaching an image.\n\n"
+                        f"To manage your billing or connect your payment method, visit: [Billing Portal]({self.cog.billing_portal_url})"
+                    ),
+                    color=discord.Color.green()
+                )
+                await self.user.send(embed=embed)
+            except Exception:
+                pass
+
+            # Edit the application message to show approved
+            if self.message:
+                try:
+                    embed = self.message.embeds[0]
+                    embed.color = discord.Color.green()
+                    embed.title = "HomeworkAI Application (Approved)"
+                    await self.message.edit(embed=embed, view=None)
+                except Exception:
+                    pass
+
+            await interaction.followup.send(f"Application for {self.user.mention} has been **approved** and a Stripe customer was created.", ephemeral=True)
+
+        @discord.ui.button(label="Deny", style=discord.ButtonStyle.danger, custom_id="homeworkai_deny")
+        async def deny(self, interaction: discord.Interaction, button: discord.ui.Button):
+            # Only allow admins to deny
+            if not interaction.user.guild_permissions.manage_guild and not interaction.user.guild_permissions.administrator:
+                await interaction.response.send_message("You do not have permission to deny applications.", ephemeral=True)
+                return
+
+            # Ask for a reason via modal
+            class DenyReasonModal(discord.ui.Modal, title="Deny Application"):
+                reason = discord.ui.TextInput(
+                    label="Reason for denial",
+                    style=discord.TextStyle.paragraph,
+                    required=True,
+                    max_length=300,
+                    placeholder="Please provide a reason for denying this application."
+                )
+
+                async def on_submit(self, modal_interaction: discord.Interaction):
+                    # Save as denied, mark as not pending
+                    await self.cog.config.user(self.user).applied.set(False)
+                    # Optionally, clear phone_verified
+                    await self.cog.config.user(self.user).phone_verified.set(False)
+                    # DM the user
+                    try:
+                        embed = discord.Embed(
+                            title="HomeworkAI Application Denied",
+                            description=f"Your application was denied for the following reason:\n\n> {self.reason.value}",
+                            color=discord.Color.red()
+                        )
+                        await self.user.send(embed=embed)
+                    except Exception:
+                        pass
+                    # Edit the application message to show denied
+                    if self.message:
+                        try:
+                            embed = self.message.embeds[0]
+                            embed.color = discord.Color.red()
+                            embed.title = "HomeworkAI Application (Denied)"
+                            embed.add_field(name="Denial Reason", value=self.reason.value, inline=False)
+                            await self.message.edit(embed=embed, view=None)
+                        except Exception:
+                            pass
+                    await modal_interaction.response.send_message(f"Application for {self.user.mention} has been **denied**.", ephemeral=True)
+
+            modal = DenyReasonModal()
+            modal.cog = self.cog
+            modal.user = self.user
+            modal.message = self.message
+            await interaction.response.send_modal(modal)
+
     @discord.app_commands.command(name="onboard", description="Apply to use HomeworkAI.")
     async def onboard(self, interaction: discord.Interaction):
         """
@@ -287,7 +467,22 @@ class HomeworkAI(commands.Cog):
                         }
                         async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(account_sid, auth_token)) as session:
                             async with session.post(url, data=data, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                                result = await resp.json()
+                                # Defensive: check for JSON decode error
+                                try:
+                                    result = await resp.json()
+                                except Exception as e:
+                                    await dm_channel.send(
+                                        embed=discord.Embed(
+                                            title="Twilio Error",
+                                            description=f"Could not decode Twilio response: {e}",
+                                            color=discord.Color.red()
+                                        )
+                                    )
+                                    attempts += 1
+                                    if attempts >= max_attempts:
+                                        await dm_channel.send("Too many failed attempts. Application cancelled.")
+                                        return
+                                    continue
                                 if resp.status in (200, 201) and result.get("status") == "approved":
                                     await dm_channel.send(
                                         embed=discord.Embed(
@@ -332,7 +527,7 @@ class HomeworkAI(commands.Cog):
             # Send application to applications channel
             guild = interaction.guild
             channel_id = await self.config.guild(guild).applications_channel()
-            channel = guild.get_channel(channel_id) if channel_id else None
+            channel = guild.get_channel(channel_id) if (guild and channel_id) else None
             if not channel:
                 await dm_channel.send(
                     embed=discord.Embed(
@@ -352,7 +547,12 @@ class HomeworkAI(commands.Cog):
             embed.add_field(name="Last Name", value=answers["last_name"], inline=True)
             embed.add_field(name="Billing Email", value=answers["billing_email"], inline=False)
             embed.add_field(name="Phone Number", value=answers["phone_number"], inline=False)
-            await channel.send(embed=embed)
+
+            # Send with action buttons
+            view = self.ApplicationActionView(self, user, answers)
+            msg = await channel.send(embed=embed, view=view)
+            view.message = msg
+
             await self.config.user(user).applied.set(True)
             await self.config.user(user).phone_number.set(answers["phone_number"])
             await self.config.user(user).phone_verified.set(True)
@@ -415,7 +615,7 @@ class HomeworkAI(commands.Cog):
         if ctx.message and ctx.message.attachments:
             for att in ctx.message.attachments:
                 # Bug: att.content_type may be None, so check for that
-                if getattr(att, "content_type", None) and att.content_type.startswith("image/"):
+                if getattr(att, "content_type", None) and att.content_type and att.content_type.startswith("image/"):
                     image_url = att.url
                     break
 
@@ -436,7 +636,7 @@ class HomeworkAI(commands.Cog):
                 }
                 if image_url:
                     payload = {
-                        "model": "gpt-4-vision-preview",
+                        "model": "gpt-4o",
                         "messages": [
                             {
                                 "role": "user",
@@ -533,7 +733,7 @@ class HomeworkAI(commands.Cog):
             except Exception:
                 pass
 
-        if not prev_id:
+        if not prev_id and customer_id:
             try:
                 embed = discord.Embed(
                     title="Welcome to HomeworkAI!",
@@ -670,7 +870,16 @@ class HomeworkAI(commands.Cog):
                         )
                         await ctx.send(embed=embed, ephemeral=True)
                         return
-                    result = await resp.json()
+                    try:
+                        result = await resp.json()
+                    except Exception as e:
+                        embed = discord.Embed(
+                            title="Stripe API Error",
+                            description=f"Could not decode Stripe response: {e}",
+                            color=discord.Color.red()
+                        )
+                        await ctx.send(embed=embed, ephemeral=True)
+                        return
                     portal_url = result.get("url")
         except Exception as e:
             embed = discord.Embed(
