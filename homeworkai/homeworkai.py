@@ -1054,9 +1054,9 @@ class HomeworkAI(commands.Cog):
                             await ctx.author.send(embed=embed)
                             await ctx.send(
                                 embed=discord.Embed(
-                                    title="Check your DMs!",
-                                    description="I've sent the answer to your question in your DMs.",
-                                    color=discord.Color.green()
+                                    title="Finished thinking!",
+                                    description="Check your DM's for the answer",
+                                    color=0x2bbd8e
                                 )
                             )
                         except discord.Forbidden:
