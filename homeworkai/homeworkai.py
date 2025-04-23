@@ -32,7 +32,7 @@ class HomeworkAI(commands.Cog):
         }
         self.config.register_user(**default_user)
         self.config.register_guild(**default_guild)
-        self.billing_portal_url = "https://www.beehive.systems/billing"  # Example link
+        self.billing_portal_url = "https://billing.stripe.com/p/login/6oE4h4dqVe3zbtefYY"
 
     async def get_openai_key(self):
         tokens = await self.bot.get_shared_api_tokens("openai")
@@ -186,9 +186,9 @@ class HomeworkAI(commands.Cog):
                         "**How to use:**\n"
                         "- Use the `ask` command in any server where HomeworkAI is enabled.\n"
                         "- You can ask questions by text or by attaching an image.\n\n"
-                        f"To manage your billing or connect your payment method, visit: [Billing Portal]({self.cog.billing_portal_url})"
+                        f"**You still need to add a payment method to prevent service interruptions**.\n- [Click here to sign in and add one.]({self.cog.billing_portal_url})"
                     ),
-                    color=discord.Color.green()
+                    color=0x2bbd8e
                 )
                 await self.user.send(embed=embed)
             except Exception:
@@ -199,7 +199,7 @@ class HomeworkAI(commands.Cog):
                 try:
                     embed = self.message.embeds[0]
                     embed.color = discord.Color.green()
-                    embed.title = "HomeworkAI Application (Approved)"
+                    embed.title = "HomeworkAI application (Approved)"
                     await self.message.edit(embed=embed, view=None)
                 except Exception:
                     pass
