@@ -1090,6 +1090,21 @@ class HomeworkAI(commands.Cog):
         Ask HomeworkAI an open-ended question (text or attach an image).
         The answer will be sent to you in DMs.
         """
+        # Check if the user has a customer_id set
+        customer_id = await self.config.user(ctx.author).customer_id()
+        if not customer_id:
+            embed = discord.Embed(
+                title="Access Required",
+                description=(
+                    "You don't have access to HomeworkAI yet.\n\n"
+                    "To apply for access, please use the `/onboard` command.\n"
+                    "Once approved, you'll be able to use HomeworkAI features."
+                ),
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+            return
+
         image_url = None
         # For slash commands, attachments are in ctx.interaction.data if present
         attachments = []
@@ -1111,7 +1126,6 @@ class HomeworkAI(commands.Cog):
         # --- Stripe Meter Event Logging ---
         try:
             stripe_key = await self.get_stripe_key()
-            customer_id = await self.config.user(ctx.author).customer_id()
             if stripe_key and customer_id:
                 # Use current UTC timestamp as int
                 timestamp = int(time.time())
