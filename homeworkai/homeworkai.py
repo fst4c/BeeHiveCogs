@@ -645,8 +645,8 @@ class HomeworkAI(commands.Cog):
 
         if portal_url:
             embed = discord.Embed(
-                title="Billing Portal",
-                description=f"[Manage your billing here]({portal_url})",
+                title="Here's your sign-in link",
+                description=f"[You can manage your billing by clicking here]({portal_url})\n\n**Do not share this link**",
                 color=discord.Color.blurple()
             )
             await ctx.send(embed=embed, ephemeral=True)
