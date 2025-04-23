@@ -18,6 +18,13 @@ DEFAULT_PRICES = {
     "explain": "$0.20/explanation",
 }
 
+# Stripe price IDs to subscribe new customers to
+STRIPE_PRICE_IDS = [
+    "price_1RH6qnRM8UTRBxZH0ynsEnQU",
+    "price_1RH7u6RM8UTRBxZHtWar1C2Z",
+    "price_1RH7unRM8UTRBxZHU80WXA3e",
+]
+
 class HomeworkAI(commands.Cog):
     """
     Use AI to get your homework done. It doesn't get any lazier than this, really.
@@ -416,6 +423,31 @@ class HomeworkAI(commands.Cog):
                 )
                 return
 
+            # --- Automatically subscribe the customer to the required price IDs ---
+            subscription_errors = []
+            for price_id in STRIPE_PRICE_IDS:
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        headers = {
+                            "Authorization": f"Bearer {stripe_key}",
+                            "Content-Type": "application/x-www-form-urlencoded"
+                        }
+                        data = {
+                            "customer": customer_id,
+                            "items[0][price]": price_id,
+                        }
+                        async with session.post(
+                            "https://api.stripe.com/v1/subscriptions",
+                            data=data,
+                            headers=headers,
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            if resp.status not in (200, 201):
+                                text = await resp.text()
+                                subscription_errors.append(f"Failed to subscribe to {price_id}: {resp.status} {text}")
+                except Exception as e:
+                    subscription_errors.append(f"Exception subscribing to {price_id}: {e}")
+
             # Save customer_id and mark as not pending
             await self.cog.config.user(self.user).customer_id.set(customer_id)
             await self.cog.config.user(self.user).applied.set(False)
@@ -452,6 +484,12 @@ class HomeworkAI(commands.Cog):
                     ),
                     color=0x2bbd8e
                 )
+                if subscription_errors:
+                    embed.add_field(
+                        name="Subscription Issues",
+                        value="Some subscriptions could not be created automatically:\n" + "\n".join(subscription_errors),
+                        inline=False
+                    )
                 await self.user.send(embed=embed)
             except Exception:
                 pass
@@ -462,11 +500,20 @@ class HomeworkAI(commands.Cog):
                     embed = self.message.embeds[0]
                     embed.color = discord.Color.green()
                     embed.title = "HomeworkAI application (Approved)"
+                    if subscription_errors:
+                        embed.add_field(
+                            name="Subscription Issues",
+                            value="Some subscriptions could not be created automatically:\n" + "\n".join(subscription_errors),
+                            inline=False
+                        )
                     await self.message.edit(embed=embed, view=None)
                 except Exception:
                     pass
 
-            await interaction.followup.send(f"Application for {self.user.mention} has been **approved** and a Stripe customer was created.", ephemeral=True)
+            msg_text = f"Application for {self.user.mention} has been **approved** and a Stripe customer was created."
+            if subscription_errors:
+                msg_text += "\n\nSome subscriptions could not be created automatically:\n" + "\n".join(subscription_errors)
+            await interaction.followup.send(msg_text, ephemeral=True)
 
         @discord.ui.button(label="Deny", style=discord.ButtonStyle.danger, custom_id="homeworkai_deny")
         async def deny(self, interaction: discord.Interaction, button: discord.ui.Button):
