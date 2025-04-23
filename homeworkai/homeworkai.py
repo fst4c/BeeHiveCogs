@@ -6,6 +6,7 @@ from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.utils.predicates import MessagePredicate
 
 import aiohttp
+import asyncio
 
 class HomeworkAI(commands.Cog):
     """
@@ -29,7 +30,6 @@ class HomeworkAI(commands.Cog):
         self.billing_portal_url = "https://www.beehive.systems/billing"  # Example link
 
     async def get_openai_key(self):
-        # Fix: get_shared_api_tokens returns a dict, not a coroutine
         tokens = await self.bot.get_shared_api_tokens("openai")
         return tokens.get("api_key")
 
@@ -38,7 +38,6 @@ class HomeworkAI(commands.Cog):
         return tokens.get("api_key")
 
     async def cog_check(self, ctx):
-        # Only allow in guilds or DMs
         return True
 
     @commands.group()
@@ -51,58 +50,137 @@ class HomeworkAI(commands.Cog):
     async def setapplications(self, ctx, channel: discord.TextChannel):
         """Set the channel where HomeworkAI applications are sent."""
         await self.config.guild(ctx.guild).applications_channel.set(channel.id)
-        await ctx.send(f"Applications channel set to {channel.mention}.")
+        embed = discord.Embed(
+            title="Applications Channel Set",
+            description=f"Applications channel set to {channel.mention}.",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
 
-    @commands.command()
-    async def onboard(self, ctx: commands.Context):
+    @commands.Cog.listener()
+    async def on_app_command_completion(self, interaction: discord.Interaction, command: discord.app_commands.Command):
+        # This is a placeholder in case you want to handle app command completions
+        pass
+
+    @discord.app_commands.command(name="onboard", description="Apply to use HomeworkAI.")
+    async def onboard(self, interaction: discord.Interaction):
         """
-        Apply to use HomeworkAI.
+        Slash command: Apply to use HomeworkAI.
+        Collects info via DM prompt-by-prompt.
         """
-        if await self.config.user(ctx.author).applied():
-            await ctx.send("You have already applied to use HomeworkAI. Please wait for approval.")
+        user = interaction.user
+        if await self.config.user(user).applied():
+            embed = discord.Embed(
+                title="Already Applied",
+                description="You have already applied to use HomeworkAI. Please wait for approval.",
+                color=discord.Color.orange()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
-        # Fix: Modal class must be defined outside the function to avoid issues with self/cog
-        # But for now, we can patch by passing cog as attribute
-        class ApplicationModal(discord.ui.Modal, title="HomeworkAI Application"):
-            first_name = discord.ui.TextInput(label="First Name", required=True, max_length=50)
-            last_name = discord.ui.TextInput(label="Last Name", required=True, max_length=50)
-            billing_email = discord.ui.TextInput(label="Billing Email", required=True, style=discord.TextStyle.short, max_length=100)
+        # Try to DM the user
+        try:
+            await interaction.response.send_message(
+                "Please check your DMs to complete your HomeworkAI application.",
+                ephemeral=True
+            )
+            dm_channel = await user.create_dm()
+        except Exception:
+            await interaction.followup.send(
+                "I couldn't DM you. Please enable DMs from server members and try again.",
+                ephemeral=True
+            )
+            return
 
-            async def on_submit(self, interaction: discord.Interaction):
-                await self.process_application(interaction)
+        def check(m):
+            return m.author.id == user.id and isinstance(m.channel, discord.DMChannel)
 
-            async def process_application(self, interaction: discord.Interaction):
-                # Fix: Use interaction.guild and interaction.user for slash commands
-                guild = interaction.guild or ctx.guild
-                user = interaction.user or ctx.author
-                channel_id = await self.cog.config.guild(guild).applications_channel()
-                channel = guild.get_channel(channel_id) if channel_id else None
-                if not channel:
-                    await interaction.response.send_message("Applications channel is not set. Please contact an admin.", ephemeral=True)
-                    return
-                embed = discord.Embed(
-                    title="New HomeworkAI Application",
-                    color=discord.Color.blurple(),
-                    description=f"**User:** {user.mention} (`{user.id}`)\n"
-                                f"**First Name:** {self.first_name.value}\n"
-                                f"**Last Name:** {self.last_name.value}\n"
-                                f"**Billing Email:** {self.billing_email.value}"
+        questions = [
+            ("first_name", "What is your **first name**?"),
+            ("last_name", "What is your **last name**?"),
+            ("billing_email", "What is your **billing email address**? (This will be used for billing and notifications)"),
+        ]
+        answers = {}
+
+        try:
+            await dm_channel.send(
+                embed=discord.Embed(
+                    title="HomeworkAI Application",
+                    description=(
+                        "Welcome! Let's get you set up to use HomeworkAI.\n"
+                        "Please answer the following questions. You can type `cancel` at any time to stop the application."
+                    ),
+                    color=discord.Color.blurple()
                 )
-                await channel.send(embed=embed)
-                await self.cog.config.user(user).applied.set(True)
-                await interaction.response.send_message("Your application has been submitted! We'll be in touch soon.", ephemeral=True)
+            )
+            for key, prompt in questions:
+                while True:
+                    await dm_channel.send(prompt)
+                    try:
+                        msg = await self.bot.wait_for("message", check=check, timeout=120)
+                    except asyncio.TimeoutError:
+                        await dm_channel.send("You took too long to respond. Application cancelled.")
+                        return
+                    if msg.content.lower().strip() == "cancel":
+                        await dm_channel.send("Application cancelled.")
+                        return
+                    if key == "billing_email":
+                        # Basic email validation
+                        if "@" not in msg.content or "." not in msg.content:
+                            await dm_channel.send("That doesn't look like a valid email. Please try again or type `cancel`.")
+                            continue
+                    if key in ("first_name", "last_name"):
+                        if not msg.content.strip() or len(msg.content.strip()) > 50:
+                            await dm_channel.send("Please provide a valid name (max 50 characters). Try again or type `cancel`.")
+                            continue
+                    if key == "billing_email" and len(msg.content.strip()) > 100:
+                        await dm_channel.send("Email is too long (max 100 characters). Try again or type `cancel`.")
+                        continue
+                    answers[key] = msg.content.strip()
+                    break
 
-        modal = ApplicationModal()
-        modal.cog = self
-        # Fix: Check for ctx.interaction and send modal properly, fallback to error if not available
-        if hasattr(ctx, "interaction") and ctx.interaction:
-            await ctx.interaction.response.send_modal(modal)
-        elif hasattr(ctx, "send"):
-            await ctx.send("Please use this command as a slash command for the best experience.")
-        else:
-            # Should not happen, but fallback
-            pass
+            # Send application to applications channel
+            guild = interaction.guild
+            channel_id = await self.config.guild(guild).applications_channel()
+            channel = guild.get_channel(channel_id) if channel_id else None
+            if not channel:
+                await dm_channel.send(
+                    embed=discord.Embed(
+                        title="Applications Channel Not Set",
+                        description="Applications channel is not set. Please contact an admin.",
+                        color=discord.Color.red()
+                    )
+                )
+                return
+
+            embed = discord.Embed(
+                title="New HomeworkAI Application",
+                color=discord.Color.blurple(),
+            )
+            embed.add_field(name="User", value=f"{user.mention} (`{user.id}`)", inline=False)
+            embed.add_field(name="First Name", value=answers["first_name"], inline=True)
+            embed.add_field(name="Last Name", value=answers["last_name"], inline=True)
+            embed.add_field(name="Billing Email", value=answers["billing_email"], inline=False)
+            await channel.send(embed=embed)
+            await self.config.user(user).applied.set(True)
+            await dm_channel.send(
+                embed=discord.Embed(
+                    title="Application Submitted",
+                    description="Your application has been submitted! We'll be in touch soon.",
+                    color=discord.Color.green()
+                )
+            )
+        except Exception as e:
+            try:
+                await dm_channel.send(
+                    embed=discord.Embed(
+                        title="Application Error",
+                        description=f"An error occurred: {e}",
+                        color=discord.Color.red()
+                    )
+                )
+            except Exception:
+                pass
 
     @commands.command()
     async def ask(self, ctx: commands.Context, *, question: str = None):
@@ -111,17 +189,24 @@ class HomeworkAI(commands.Cog):
         """
         customer_id = await self.config.user(ctx.author).customer_id()
         if not customer_id:
-            await ctx.send(
-                "You need to set up a billing profile to use HomeworkAI. Please contact service support for assistance."
+            embed = discord.Embed(
+                title="Billing Profile Required",
+                description="You need to set up a billing profile to use HomeworkAI. Please contact service support for assistance.",
+                color=discord.Color.red()
             )
+            await ctx.send(embed=embed)
             return
 
         openai_key = await self.get_openai_key()
         if not openai_key:
-            await ctx.send("OpenAI API key is not configured. Please contact an administrator.")
+            embed = discord.Embed(
+                title="OpenAI API Key Not Configured",
+                description="OpenAI API key is not configured. Please contact an administrator.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
             return
 
-        # Check for image attachment
         image_url = None
         if ctx.message and ctx.message.attachments:
             for att in ctx.message.attachments:
@@ -130,7 +215,12 @@ class HomeworkAI(commands.Cog):
                     break
 
         if not question and not image_url:
-            await ctx.send("Please provide a question or attach an image.")
+            embed = discord.Embed(
+                title="No Question or Image Provided",
+                description="Please provide a question or attach an image.",
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
             return
 
         await ctx.trigger_typing()
@@ -140,7 +230,6 @@ class HomeworkAI(commands.Cog):
                 "Content-Type": "application/json"
             }
             if image_url:
-                # Use OpenAI's vision endpoint (GPT-4V)
                 payload = {
                     "model": "gpt-4-vision-preview",
                     "messages": [
@@ -156,7 +245,6 @@ class HomeworkAI(commands.Cog):
                 }
                 endpoint = "https://api.openai.com/v1/chat/completions"
             else:
-                # Use text endpoint
                 payload = {
                     "model": "gpt-3.5-turbo",
                     "messages": [
@@ -170,20 +258,48 @@ class HomeworkAI(commands.Cog):
                 async with session.post(endpoint, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=60)) as resp:
                     if resp.status != 200:
                         text = await resp.text()
-                        await ctx.send(f"OpenAI API error: {resp.status}\n{text}")
+                        embed = discord.Embed(
+                            title="OpenAI API Error",
+                            description=f"Status: {resp.status}\n{text}",
+                            color=discord.Color.red()
+                        )
+                        await ctx.send(embed=embed)
                         return
                     data = await resp.json()
-                    # Fix: Defensive check for response structure
                     answer = None
                     try:
                         answer = data["choices"][0]["message"]["content"]
                     except Exception:
-                        await ctx.send("OpenAI API returned an unexpected response.")
+                        embed = discord.Embed(
+                            title="Unexpected OpenAI Response",
+                            description="OpenAI API returned an unexpected response.",
+                            color=discord.Color.red()
+                        )
+                        await ctx.send(embed=embed)
                         return
-                    await ctx.send(answer if len(answer) < 1900 else box(answer[:1900]))
+                    # Use embed for the answer, truncate if needed
+                    if len(answer) < 1900:
+                        embed = discord.Embed(
+                            title="HomeworkAI Answer",
+                            description=answer,
+                            color=discord.Color.blurple()
+                        )
+                        await ctx.send(embed=embed)
+                    else:
+                        embed = discord.Embed(
+                            title="HomeworkAI Answer (truncated)",
+                            description=answer[:1900] + "\n\n*Response truncated.*",
+                            color=discord.Color.blurple()
+                        )
+                        await ctx.send(embed=embed)
 
         except Exception as e:
-            await ctx.send(f"An error occurred while contacting OpenAI: {e}")
+            embed = discord.Embed(
+                title="OpenAI Error",
+                description=f"An error occurred while contacting OpenAI: {e}",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
 
     @commands.command()
     @commands.is_owner()
@@ -194,7 +310,6 @@ class HomeworkAI(commands.Cog):
         prev_id = await self.config.user(user).customer_id()
         await self.config.user(user).customer_id.set(customer_id)
         if not prev_id:
-            # First time setting customer id, send welcome DM
             try:
                 embed = discord.Embed(
                     title="Welcome to HomeworkAI!",
@@ -210,7 +325,12 @@ class HomeworkAI(commands.Cog):
                 await user.send(embed=embed)
             except Exception:
                 pass
-        await ctx.send(f"Customer ID for {user.mention} set to `{customer_id}`.")
+        embed = discord.Embed(
+            title="Customer ID Set",
+            description=f"Customer ID for {user.mention} set to `{customer_id}`.",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
 
     @commands.hybrid_command(name="billing", with_app_command=True)
     async def billing(self, ctx: commands.Context):
@@ -220,15 +340,24 @@ class HomeworkAI(commands.Cog):
         await ctx.defer(ephemeral=True)
         customer_id = await self.config.user(ctx.author).customer_id()
         if not customer_id:
-            await ctx.send("You do not have a billing profile set up. Please contact support.", ephemeral=True)
+            embed = discord.Embed(
+                title="No Billing Profile",
+                description="You do not have a billing profile set up. Please contact support.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed, ephemeral=True)
             return
 
         stripe_key = await self.get_stripe_key()
         if not stripe_key:
-            await ctx.send("Stripe API key is not configured. Please contact an administrator.", ephemeral=True)
+            embed = discord.Embed(
+                title="Stripe API Key Not Configured",
+                description="Stripe API key is not configured. Please contact an administrator.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed, ephemeral=True)
             return
 
-        # Stripe customer portal session creation
         portal_url = None
         try:
             async with aiohttp.ClientSession() as session:
@@ -236,7 +365,6 @@ class HomeworkAI(commands.Cog):
                     "Authorization": f"Bearer {stripe_key}",
                     "Content-Type": "application/x-www-form-urlencoded"
                 }
-                # Stripe expects form data, not JSON
                 data = {
                     "customer": customer_id,
                     "return_url": "https://www.beehive.systems/billing"
@@ -249,15 +377,35 @@ class HomeworkAI(commands.Cog):
                 ) as resp:
                     if resp.status != 200:
                         text = await resp.text()
-                        await ctx.send(f"Stripe API error: {resp.status}\n{text}", ephemeral=True)
+                        embed = discord.Embed(
+                            title="Stripe API Error",
+                            description=f"Status: {resp.status}\n{text}",
+                            color=discord.Color.red()
+                        )
+                        await ctx.send(embed=embed, ephemeral=True)
                         return
                     result = await resp.json()
                     portal_url = result.get("url")
         except Exception as e:
-            await ctx.send(f"An error occurred while contacting Stripe: {e}", ephemeral=True)
+            embed = discord.Embed(
+                title="Stripe Error",
+                description=f"An error occurred while contacting Stripe: {e}",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed, ephemeral=True)
             return
 
         if portal_url:
-            await ctx.send(f"Manage your billing here: {portal_url}", ephemeral=True)
+            embed = discord.Embed(
+                title="Billing Portal",
+                description=f"[Manage your billing here]({portal_url})",
+                color=discord.Color.blurple()
+            )
+            await ctx.send(embed=embed, ephemeral=True)
         else:
-            await ctx.send("Could not generate a billing portal link. Please contact support.", ephemeral=True)
+            embed = discord.Embed(
+                title="Billing Portal Error",
+                description="Could not generate a billing portal link. Please contact support.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed, ephemeral=True)
