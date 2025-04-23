@@ -4,7 +4,7 @@ from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import box
 from redbot.core.utils.menus import start_adding_reactions
 from redbot.core.utils.predicates import MessagePredicate
-
+import time
 import aiohttp
 import asyncio
 import re
@@ -826,18 +826,52 @@ class HomeworkAI(commands.Cog):
                 )
                 await ctx.send(embed=embed)
 
-    @commands.command()
+    @commands.hybrid_command(name="ask")
     async def ask(self, ctx: commands.Context, *, question: str = None):
         """
         Ask HomeworkAI an open-ended question (text or attach an image).
         The answer will be sent to you in DMs.
         """
         image_url = None
-        if ctx.message and ctx.message.attachments:
-            for att in ctx.message.attachments:
-                if getattr(att, "content_type", None) and att.content_type and att.content_type.startswith("image/"):
-                    image_url = att.url
-                    break
+        # For slash commands, attachments are in ctx.interaction.data if present
+        attachments = []
+        if hasattr(ctx, "interaction") and ctx.interaction is not None:
+            # Try to get attachments from the interaction (for slash)
+            data = getattr(ctx.interaction, "data", {})
+            resolved = data.get("resolved", {}) if data else {}
+            attachments = list(resolved.get("attachments", {}).values()) if resolved else []
+        if not attachments and ctx.message and ctx.message.attachments:
+            attachments = ctx.message.attachments
+        for att in attachments:
+            # Discord.py's Attachment object or dict from interaction
+            content_type = getattr(att, "content_type", None) or att.get("content_type") if isinstance(att, dict) else None
+            url = getattr(att, "url", None) or att.get("url") if isinstance(att, dict) else None
+            if content_type and content_type.startswith("image/"):
+                image_url = url
+                break
+
+        # --- Stripe Meter Event Logging ---
+        try:
+            stripe_key = await self.get_stripe_key()
+            customer_id = await self.config.user(ctx.author).customer_id()
+            if stripe_key and customer_id:
+                # Use current UTC timestamp as int
+                timestamp = int(time.time())
+                meter_url = "https://api.stripe.com/v1/billing/meter_events"
+                data = {
+                    "event_name": "ask",
+                    "timestamp": timestamp,
+                    "payload[stripe_customer_id]": customer_id,
+                }
+                auth = aiohttp.BasicAuth(stripe_key)
+                async with aiohttp.ClientSession(auth=auth) as session:
+                    async with session.post(meter_url, data=data, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        # Optionally, you could log or handle errors here
+                        pass
+        except Exception as e:
+            # Optionally log the error, but don't block the command
+            pass
+
         await self._send_homeworkai_response(ctx, question, image_url, prompt_type="ask")
 
     @commands.command()
