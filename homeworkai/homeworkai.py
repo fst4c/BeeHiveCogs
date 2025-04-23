@@ -616,6 +616,7 @@ class HomeworkAI(commands.Cog):
     async def ask(self, ctx: commands.Context, *, question: str = None):
         """
         Ask HomeworkAI a question (text or attach an image).
+        The answer will be sent to you in DMs.
         """
         customer_id = await self.config.user(ctx.author).customer_id()
         if not customer_id:
@@ -719,21 +720,66 @@ class HomeworkAI(commands.Cog):
                             )
                             await ctx.send(embed=embed)
                             return
-                        # Use embed for the answer, truncate if needed
-                        if len(answer) < 1900:
-                            embed = discord.Embed(
-                                title="HomeworkAI Answer",
-                                description=answer,
-                                color=discord.Color.blurple()
-                            )
-                            await ctx.send(embed=embed)
+
+                        # Compose the DM embed
+                        # Truncate answer if needed
+                        max_answer_len = 1900
+                        truncated = False
+                        if len(answer) > max_answer_len:
+                            answer = answer[:max_answer_len] + "\n\n*Response truncated.*"
+                            truncated = True
+
+                        # Compose the question section
+                        if question:
+                            question_section = question
+                        elif image_url:
+                            question_section = "*(No text question provided, image attached)*"
                         else:
-                            embed = discord.Embed(
-                                title="HomeworkAI Answer (truncated)",
-                                description=answer[:1900] + "\n\n*Response truncated.*",
-                                color=discord.Color.blurple()
+                            question_section = "N/A"
+
+                        embed = discord.Embed(
+                            title="Your HomeworkAI Answer",
+                            color=discord.Color.blurple()
+                        )
+                        embed.add_field(
+                            name="Your asked",
+                            value=question_section if len(question_section) < 1024 else question_section[:1020] + "...",
+                            inline=False
+                        )
+                        if image_url:
+                            embed.set_image(url=image_url)
+                        embed.add_field(
+                            name="HomeworkAI says...",
+                            value=answer,
+                            inline=False
+                        )
+
+                        # Try to DM the user
+                        try:
+                            await ctx.author.send(embed=embed)
+                            await ctx.send(
+                                embed=discord.Embed(
+                                    title="Check your DMs!",
+                                    description="I've sent the answer to your question in your DMs.",
+                                    color=discord.Color.green()
+                                )
                             )
-                            await ctx.send(embed=embed)
+                        except discord.Forbidden:
+                            await ctx.send(
+                                embed=discord.Embed(
+                                    title="Unable to DM",
+                                    description="I couldn't send you a DM. Please enable DMs from server members and try again.",
+                                    color=discord.Color.red()
+                                )
+                            )
+                        except Exception as e:
+                            await ctx.send(
+                                embed=discord.Embed(
+                                    title="DM Error",
+                                    description=f"An error occurred while sending your answer in DMs: {e}",
+                                    color=discord.Color.red()
+                                )
+                            )
 
             except Exception as e:
                 embed = discord.Embed(
