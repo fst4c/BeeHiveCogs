@@ -491,7 +491,7 @@ class HomeworkAI(commands.Cog):
     @commands.hybrid_command(name="billing", with_app_command=True)
     async def billing(self, ctx: commands.Context):
         """
-        Get a link to your Stripe billing portal.
+        View payments, dues, invoices, and update your payment method on-file
         """
         await ctx.defer(ephemeral=True)
         customer_id = await self.config.user(ctx.author).customer_id()
