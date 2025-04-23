@@ -158,7 +158,14 @@ class PollShaddy(commands.Cog):
                     if conf.get("debug", False):
                         channel_id = conf.get("vote_tracking_channel")
                         if channel_id:
+                            # Try both get_channel and fetch_channel for reliability
                             channel = guild.get_channel(channel_id)
+                            if channel is None:
+                                try:
+                                    channel = await self.bot.fetch_channel(channel_id)
+                                except Exception as fetch_exc:
+                                    print(f"Failed to fetch channel {channel_id}: {fetch_exc}")
+                                    channel = None
                             if channel:
                                 selection_name = conf["name"] or conf["selection"]
                                 count = result.get("votes", 0)
@@ -169,11 +176,14 @@ class PollShaddy(commands.Cog):
                                         f"Votes: **{count}**\n"
                                         f"Percent: **{percent:.2f}%**"
                                     )
-                                except Exception:
-                                    pass
+                                except Exception as send_exc:
+                                    print(f"Failed to send debug message: {send_exc}")
+                            else:
+                                print(f"Debug: Could not find channel with ID {channel_id} in guild {guild.name} ({guild.id})")
+                        else:
+                            print(f"Debug: No vote_tracking_channel set for guild {guild.name} ({guild.id})")
                 except Exception as e:
-                    # Optionally log error
-                    pass
+                    print(f"Exception in vote_loop for guild {guild.name} ({guild.id}): {e}")
                 await asyncio.sleep(conf.get("interval", 5))
             await asyncio.sleep(1)
 
@@ -187,8 +197,16 @@ class PollShaddy(commands.Cog):
                 channel_id = conf.get("vote_tracking_channel")
                 if not channel_id:
                     continue
+                # Try both get_channel and fetch_channel for reliability
                 channel = guild.get_channel(channel_id)
+                if channel is None:
+                    try:
+                        channel = await self.bot.fetch_channel(channel_id)
+                    except Exception as fetch_exc:
+                        print(f"Failed to fetch channel {channel_id}: {fetch_exc}")
+                        channel = None
                 if not channel:
+                    print(f"Announce: Could not find channel with ID {channel_id} in guild {guild.name} ({guild.id})")
                     continue
                 try:
                     vote_info = {
@@ -219,14 +237,18 @@ class PollShaddy(commands.Cog):
                     if option_tally:
                         count = option_tally.get("votes", 0)
                         percent = option_tally.get("percent", 0.0)
-                        await channel.send(
-                            f"🗳️ **Vote Update for '{selection_name}':**\n"
-                            f"Votes: **{count}**\n"
-                            f"Percent: **{percent:.2f}%**"
-                        )
+                        try:
+                            await channel.send(
+                                f"🗳️ **Vote Update for '{selection_name}':**\n"
+                                f"Votes: **{count}**\n"
+                                f"Percent: **{percent:.2f}%**"
+                            )
+                        except Exception as send_exc:
+                            print(f"Failed to send announce message: {send_exc}")
+                    else:
+                        print(f"Announce: Could not find tally for option '{selection_name}' in guild {guild.name} ({guild.id})")
                 except Exception as e:
-                    # Optionally log error
-                    pass
+                    print(f"Exception in announce_votes_loop for guild {guild.name} ({guild.id}): {e}")
             await asyncio.sleep(30)
 
     @commands.group()
@@ -324,6 +346,12 @@ class PollShaddy(commands.Cog):
         channel = None
         if conf.get("vote_tracking_channel"):
             channel = ctx.guild.get_channel(conf["vote_tracking_channel"])
+            if channel is None:
+                try:
+                    channel = await self.bot.fetch_channel(conf["vote_tracking_channel"])
+                except Exception as fetch_exc:
+                    print(f"Failed to fetch channel {conf['vote_tracking_channel']}: {fetch_exc}")
+                    channel = None
         msg = (
             f"**Poll UID:** {conf['poll_uid']}\n"
             f"**Poll ID:** {conf['poll']}\n"
