@@ -927,7 +927,7 @@ class HomeworkAI(commands.Cog):
         if prompt_type == "ask":
             system_prompt = (
                 "You are HomeworkAI, an expert homework assistant. "
-                "Answer the user's question as clearly and concisely as possible. Format math inside a ```codeblock``` using standard expression indicators."
+                "Answer the user's question as clearly and concisely as possible. Format math responses inside a ```codeblock``` using standard expression indicators."
                 "If the user attaches an image, analyze it and provide a helpful, accurate answer."
             )
         elif prompt_type == "answer":
