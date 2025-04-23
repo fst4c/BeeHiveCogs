@@ -612,11 +612,18 @@ class HomeworkAI(commands.Cog):
             except Exception:
                 pass
 
-    @commands.command()
-    async def ask(self, ctx: commands.Context, *, question: str = None):
+    # --- HomeworkAI Question Commands ---
+
+    async def _send_homeworkai_response(
+        self,
+        ctx: commands.Context,
+        question: str,
+        image_url: str,
+        prompt_type: str
+    ):
         """
-        Ask HomeworkAI a question (text or attach an image).
-        The answer will be sent to you in DMs.
+        Helper for ask/answer/explain commands.
+        prompt_type: "ask", "answer", or "explain"
         """
         customer_id = await self.config.user(ctx.author).customer_id()
         if not customer_id:
@@ -649,14 +656,6 @@ class HomeworkAI(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-        image_url = None
-        if ctx.message and ctx.message.attachments:
-            for att in ctx.message.attachments:
-                # Bug: att.content_type may be None, so check for that
-                if getattr(att, "content_type", None) and att.content_type and att.content_type.startswith("image/"):
-                    image_url = att.url
-                    break
-
         if not question and not image_url:
             embed = discord.Embed(
                 title="No Question or Image Provided",
@@ -666,6 +665,29 @@ class HomeworkAI(commands.Cog):
             await ctx.send(embed=embed)
             return
 
+        # Prompt engineering for each command type
+        if prompt_type == "ask":
+            system_prompt = (
+                "You are HomeworkAI, an expert homework assistant. "
+                "Answer the user's question as clearly and concisely as possible. "
+                "If the user attaches an image, analyze it and provide a helpful answer."
+            )
+        elif prompt_type == "answer":
+            system_prompt = (
+                "You are HomeworkAI, an expert at answering multiple choice and comparison questions. "
+                "If the user provides a list of options or a multiple choice question, "
+                "explain your reasoning and select the best answer. "
+                "If the user attaches an image, analyze it for relevant information."
+            )
+        elif prompt_type == "explain":
+            system_prompt = (
+                "You are HomeworkAI, an expert tutor. "
+                "Provide a detailed, step-by-step explanation or tutorial for the user's question. "
+                "If the user attaches an image, use it to help explain the answer in depth."
+            )
+        else:
+            system_prompt = "You are HomeworkAI, an expert homework assistant."
+
         async with ctx.typing():
             try:
                 headers = {
@@ -673,29 +695,32 @@ class HomeworkAI(commands.Cog):
                     "Content-Type": "application/json"
                 }
                 if image_url:
+                    user_content = [
+                        {"type": "text", "text": question or "Please analyze this image."},
+                        {"type": "image_url", "image_url": {"url": image_url}}
+                    ]
+                else:
+                    user_content = question
+
+                if image_url:
                     payload = {
                         "model": "gpt-4o",
                         "messages": [
-                            {
-                                "role": "user",
-                                "content": [
-                                    {"type": "text", "text": question or "Please analyze this image."},
-                                    {"type": "image_url", "image_url": {"url": image_url}}
-                                ]
-                            }
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_content}
                         ],
                         "max_tokens": 512
                     }
-                    endpoint = "https://api.openai.com/v1/chat/completions"
                 else:
                     payload = {
                         "model": "gpt-3.5-turbo",
                         "messages": [
+                            {"role": "system", "content": system_prompt},
                             {"role": "user", "content": question}
                         ],
                         "max_tokens": 512
                     }
-                    endpoint = "https://api.openai.com/v1/chat/completions"
+                endpoint = "https://api.openai.com/v1/chat/completions"
 
                 async with aiohttp.ClientSession() as session:
                     async with session.post(endpoint, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=60)) as resp:
@@ -724,10 +749,8 @@ class HomeworkAI(commands.Cog):
                         # Compose the DM embed
                         # Truncate answer if needed
                         max_answer_len = 1900
-                        truncated = False
                         if len(answer) > max_answer_len:
                             answer = answer[:max_answer_len] + "\n\n*Response truncated.*"
-                            truncated = True
 
                         # Compose the question section
                         if question:
@@ -737,12 +760,26 @@ class HomeworkAI(commands.Cog):
                         else:
                             question_section = "N/A"
 
+                        # Title and field names per command
+                        if prompt_type == "ask":
+                            embed_title = "Your HomeworkAI Answer"
+                            field_name = "You asked"
+                        elif prompt_type == "answer":
+                            embed_title = "HomeworkAI Multiple Choice/Comparison Answer"
+                            field_name = "Your question"
+                        elif prompt_type == "explain":
+                            embed_title = "HomeworkAI Step-by-Step Explanation"
+                            field_name = "Your question"
+                        else:
+                            embed_title = "Your HomeworkAI Answer"
+                            field_name = "You asked"
+
                         embed = discord.Embed(
-                            title="Your HomeworkAI Answer",
+                            title=embed_title,
                             color=discord.Color.blurple()
                         )
                         embed.add_field(
-                            name="Your asked",
+                            name=field_name,
                             value=question_section if len(question_section) < 1024 else question_section[:1020] + "...",
                             inline=False
                         )
@@ -788,6 +825,48 @@ class HomeworkAI(commands.Cog):
                     color=discord.Color.red()
                 )
                 await ctx.send(embed=embed)
+
+    @commands.command()
+    async def ask(self, ctx: commands.Context, *, question: str = None):
+        """
+        Ask HomeworkAI an open-ended question (text or attach an image).
+        The answer will be sent to you in DMs.
+        """
+        image_url = None
+        if ctx.message and ctx.message.attachments:
+            for att in ctx.message.attachments:
+                if getattr(att, "content_type", None) and att.content_type and att.content_type.startswith("image/"):
+                    image_url = att.url
+                    break
+        await self._send_homeworkai_response(ctx, question, image_url, prompt_type="ask")
+
+    @commands.command()
+    async def answer(self, ctx: commands.Context, *, question: str = None):
+        """
+        Ask HomeworkAI to answer a multiple choice or comparison question.
+        The answer will be sent to you in DMs.
+        """
+        image_url = None
+        if ctx.message and ctx.message.attachments:
+            for att in ctx.message.attachments:
+                if getattr(att, "content_type", None) and att.content_type and att.content_type.startswith("image/"):
+                    image_url = att.url
+                    break
+        await self._send_homeworkai_response(ctx, question, image_url, prompt_type="answer")
+
+    @commands.command()
+    async def explain(self, ctx: commands.Context, *, question: str = None):
+        """
+        Ask HomeworkAI for a detailed, step-by-step explanation or tutorial.
+        The answer will be sent to you in DMs.
+        """
+        image_url = None
+        if ctx.message and ctx.message.attachments:
+            for att in ctx.message.attachments:
+                if getattr(att, "content_type", None) and att.content_type and att.content_type.startswith("image/"):
+                    image_url = att.url
+                    break
+        await self._send_homeworkai_response(ctx, question, image_url, prompt_type="explain")
 
     @commands.command()
     @commands.is_owner()
