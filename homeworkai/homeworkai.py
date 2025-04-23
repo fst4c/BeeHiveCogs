@@ -8,6 +8,8 @@ from redbot.core.utils.predicates import MessagePredicate
 import aiohttp
 import asyncio
 
+CUSTOMER_ROLE_ID = 1364590138847400008  # The role to grant/revoke based on customer_id
+
 class HomeworkAI(commands.Cog):
     """
     Ask AI-powered questions about your homework!
@@ -187,8 +189,6 @@ class HomeworkAI(commands.Cog):
 
                 # Send verification code via Twilio Verify API
                 try:
-                    # Bug: get_shared_api_tokens is not awaitable, but in original code it's called as self.bot.get_shared_api_tokens("twilio").get("verify_sid")
-                    # This will not work if get_shared_api_tokens is a coroutine (Red 3.5+). Fix: await it.
                     tokens = await self.bot.get_shared_api_tokens("twilio")
                     verify_sid = tokens.get("verify_sid")
                     if not verify_sid:
@@ -352,6 +352,17 @@ class HomeworkAI(commands.Cog):
             await ctx.send(embed=embed)
             return
 
+        # Give the customer role if not already present
+        if ctx.guild:
+            try:
+                member = ctx.guild.get_member(ctx.author.id)
+                if member:
+                    role = ctx.guild.get_role(CUSTOMER_ROLE_ID)
+                    if role and role not in member.roles:
+                        await member.add_roles(role, reason="Granted HomeworkAI customer role (has customer_id)")
+            except Exception:
+                pass
+
         openai_key = await self.get_openai_key()
         if not openai_key:
             embed = discord.Embed(
@@ -465,6 +476,25 @@ class HomeworkAI(commands.Cog):
         """
         prev_id = await self.config.user(user).customer_id()
         await self.config.user(user).customer_id.set(customer_id)
+
+        # Role management: Add or remove the customer role in all mutual guilds
+        for guild in self.bot.guilds:
+            member = guild.get_member(user.id)
+            if not member:
+                continue
+            role = guild.get_role(CUSTOMER_ROLE_ID)
+            if not role:
+                continue
+            try:
+                if customer_id:
+                    if role not in member.roles:
+                        await member.add_roles(role, reason="Granted HomeworkAI customer role (setcustomerid)")
+                else:
+                    if role in member.roles:
+                        await member.remove_roles(role, reason="Removed HomeworkAI customer role (setcustomerid)")
+            except Exception:
+                pass
+
         if not prev_id:
             try:
                 embed = discord.Embed(
@@ -488,6 +518,36 @@ class HomeworkAI(commands.Cog):
         )
         await ctx.send(embed=embed)
 
+    @commands.command(name="removecustomerid")
+    @commands.is_owner()
+    async def removecustomerid(self, ctx, user: discord.User):
+        """
+        Remove a user's customer ID and revoke the customer role (admin/owner only).
+        """
+        prev_id = await self.config.user(user).customer_id()
+        await self.config.user(user).customer_id.set(None)
+
+        # Remove the customer role in all mutual guilds
+        for guild in self.bot.guilds:
+            member = guild.get_member(user.id)
+            if not member:
+                continue
+            role = guild.get_role(CUSTOMER_ROLE_ID)
+            if not role:
+                continue
+            try:
+                if role in member.roles:
+                    await member.remove_roles(role, reason="Removed HomeworkAI customer role (removecustomerid)")
+            except Exception:
+                pass
+
+        embed = discord.Embed(
+            title="Customer ID Removed",
+            description=f"Customer ID for {user.mention} has been removed and the customer role revoked.",
+            color=discord.Color.orange()
+        )
+        await ctx.send(embed=embed)
+
     @commands.hybrid_command(name="billing", with_app_command=True)
     async def billing(self, ctx: commands.Context):
         """
@@ -496,6 +556,17 @@ class HomeworkAI(commands.Cog):
         await ctx.defer(ephemeral=True)
         customer_id = await self.config.user(ctx.author).customer_id()
         if not customer_id:
+            # Remove the customer role if present
+            if ctx.guild:
+                try:
+                    member = ctx.guild.get_member(ctx.author.id)
+                    if member:
+                        role = ctx.guild.get_role(CUSTOMER_ROLE_ID)
+                        if role and role in member.roles:
+                            await member.remove_roles(role, reason="Removed HomeworkAI customer role (no billing profile)")
+                except Exception:
+                    pass
+
             embed = discord.Embed(
                 title="No Billing Profile",
                 description="You do not have a billing profile set up. Please contact support.",
@@ -503,6 +574,17 @@ class HomeworkAI(commands.Cog):
             )
             await ctx.send(embed=embed, ephemeral=True)
             return
+
+        # Give the customer role if not already present
+        if ctx.guild:
+            try:
+                member = ctx.guild.get_member(ctx.author.id)
+                if member:
+                    role = ctx.guild.get_role(CUSTOMER_ROLE_ID)
+                    if role and role not in member.roles:
+                        await member.add_roles(role, reason="Granted HomeworkAI customer role (billing command)")
+            except Exception:
+                pass
 
         stripe_key = await self.get_stripe_key()
         if not stripe_key:
@@ -516,6 +598,16 @@ class HomeworkAI(commands.Cog):
 
         portal_url = None
         try:
+            # Build the return_url as the URL for the channel the command was used in
+            # If in a guild, use the guild channel URL, else fallback to a default
+            if ctx.guild and ctx.channel:
+                return_url = f"https://discord.com/channels/{ctx.guild.id}/{ctx.channel.id}"
+            elif ctx.channel:
+                # For DMs, guild is None, so use @me for the guild id
+                return_url = f"https://discord.com/channels/@me/{ctx.channel.id}"
+            else:
+                return_url = "https://beehive.systems"
+
             async with aiohttp.ClientSession() as session:
                 headers = {
                     "Authorization": f"Bearer {stripe_key}",
@@ -523,7 +615,7 @@ class HomeworkAI(commands.Cog):
                 }
                 data = {
                     "customer": customer_id,
-                    "return_url": "https://www.beehive.systems/billing"
+                    "return_url": return_url
                 }
                 async with session.post(
                     "https://api.stripe.com/v1/billing_portal/sessions",
