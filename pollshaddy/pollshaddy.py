@@ -1,6 +1,108 @@
 import discord
 from redbot.core import commands, Config
 import asyncio
+import time
+import requests
+from bs4 import BeautifulSoup
+
+COOKIE_URL = 'https://polldaddy.com/n'
+POLL_URL = 'https://polls.polldaddy.com/vote-js.php'
+
+def get_cookie(url: str, vote_info: dict, hdrs: dict) -> str:
+    pollid = vote_info['poll_uid']
+    pollnum = vote_info['poll']
+    uri = f'{url}/{pollid}/{pollnum}?{int(time.time())}'
+    try:
+        req = requests.get(uri, headers=hdrs, timeout=60)
+        req.raise_for_status()
+    except requests.exceptions.RequestException as err:
+        print(f'Failed to get cookie. Error: {err}\n {getattr(req, "text", "")}')
+        raise
+    end_string = req.text.index(';') - 1
+    start_string = req.text.index('=') + 2
+    return req.text[start_string:end_string]
+
+def cast_vote(url: str, vote_info: dict, cookie_id: str, hdrs: dict) -> dict:
+    """
+    Casts a vote and returns the votes and percent for the chosen option.
+    Returns: dict with keys "votes" (int) and "percent" (float)
+    """
+    name = vote_info['name']
+    uri = (
+        f"{url}?p={vote_info['poll']}&b=0&a={vote_info['selection']},&o=&va=16&cookie=0"
+        f"&tags={vote_info['poll']}-src:poll-embed&n={cookie_id}&url={vote_info['referer']}"
+    )
+    try:
+        req = requests.get(uri, headers=hdrs, timeout=60)
+        req.raise_for_status()
+    except requests.exceptions.RequestException as err:
+        print(f'Failed to cast vote. Error: {err}\n {getattr(req, "text", "")}')
+        raise
+    votes = 0
+    percent = 0.0
+    soup = BeautifulSoup(req.text, 'lxml')
+    noms = soup.find_all('li')
+    for info in noms:
+        if info.find('span', {'title': name}):
+            try:
+                votes_text = info.find('span', {'class': 'pds-feedback-votes'}).text.strip()
+                space = votes_text.find(' ')
+                votes = votes_text[1:space].replace(',', '').strip()
+                votes = int(votes)
+                pct_text = info.find('span', {'class': 'pds-feedback-per'}).text
+                percent = float(pct_text.replace('%', '').strip())
+            except Exception:
+                print(f"Error getting proper values. Resetting votes/percent to 0")
+                votes = 0
+                percent = 0.0
+            break
+    return {"votes": votes, "percent": percent}
+
+def get_poll_tally(url: str, vote_info: dict, hdrs: dict) -> dict:
+    """
+    Fetches the current tally for all options in the poll.
+    Returns: dict of {option_name: {"votes": int, "percent": float}}
+    """
+    # This is similar to cast_vote, but does not cast a vote, just fetches the poll results.
+    # We'll use the same endpoint but without the vote.
+    # Actually, Polldaddy does not have a public API for this, so we simulate a GET to the poll results page.
+    # We'll use the same logic as cast_vote, but without the vote.
+    # For this bot, we just want the tally for the configured option.
+    # We'll use the same URL as cast_vote, but without the vote parameters.
+    # But for simplicity, let's just call cast_vote with a dummy cookie and not increment the vote.
+    # But to avoid incrementing, we can fetch the poll results page directly.
+    # However, for now, let's just use the same logic as cast_vote, but don't increment the vote.
+    # We'll fetch the poll results page.
+    pollid = vote_info['poll']
+    uri = f"https://poll.fm/{pollid}"
+    try:
+        req = requests.get(uri, headers=hdrs, timeout=60)
+        req.raise_for_status()
+    except requests.exceptions.RequestException as err:
+        print(f'Failed to fetch poll tally. Error: {err}\n {getattr(req, "text", "")}')
+        return {}
+    soup = BeautifulSoup(req.text, 'lxml')
+    noms = soup.find_all('li')
+    tally = {}
+    for info in noms:
+        name_span = info.find('span', {'class': 'pds-answer-text'})
+        if not name_span:
+            continue
+        option_name = name_span.text.strip()
+        votes = 0
+        percent = 0.0
+        try:
+            votes_text = info.find('span', {'class': 'pds-feedback-votes'}).text.strip()
+            space = votes_text.find(' ')
+            votes = votes_text[1:space].replace(',', '').strip()
+            votes = int(votes)
+            pct_text = info.find('span', {'class': 'pds-feedback-per'}).text
+            percent = float(pct_text.replace('%', '').strip())
+        except Exception:
+            votes = 0
+            percent = 0.0
+        tally[option_name] = {"votes": votes, "percent": percent}
+    return tally
 
 class PollShaddy(commands.Cog):
     """
@@ -58,10 +160,10 @@ class PollShaddy(commands.Cog):
                     cookie = await asyncio.get_event_loop().run_in_executor(
                         None, get_cookie, COOKIE_URL, vote_info, headers
                     )
-                    tally = await asyncio.get_event_loop().run_in_executor(
+                    result = await asyncio.get_event_loop().run_in_executor(
                         None, cast_vote, POLL_URL, vote_info, cookie, headers
                     )
-                    # Optionally, you could store tally in config or send to a channel
+                    # Optionally, you could store result in config or send to a channel
                 except Exception as e:
                     # Optionally log error
                     pass
@@ -82,7 +184,6 @@ class PollShaddy(commands.Cog):
                 if not channel:
                     continue
                 try:
-                    # Fetch the latest tally for the poll
                     vote_info = {
                         "poll_uid": conf["poll_uid"],
                         "poll": conf["poll"],
@@ -95,16 +196,22 @@ class PollShaddy(commands.Cog):
                         'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/'
                         f'{conf["version"]}.0.0.0 Safari/537.36'
                     }
-                    # We assume get_poll_tally returns a dict of {option_id: {"count": int, "percent": float, "name": str}}
-                    # and that conf["selection"] is the option_id we want to track
+                    # Get the current tally for the configured option
                     tally = await asyncio.get_event_loop().run_in_executor(
                         None, get_poll_tally, POLL_URL, vote_info, headers
                     )
-                    selection_id = conf["selection"]
-                    selection_name = conf["name"] or selection_id
-                    if tally and selection_id in tally:
-                        count = tally[selection_id].get("count", 0)
-                        percent = tally[selection_id].get("percent", 0.0)
+                    selection_name = conf["name"]
+                    if not selection_name:
+                        selection_name = conf["selection"]
+                    # Try to find the tally for the configured option name
+                    option_tally = None
+                    for opt_name, data in tally.items():
+                        if opt_name == selection_name:
+                            option_tally = data
+                            break
+                    if option_tally:
+                        count = option_tally.get("votes", 0)
+                        percent = option_tally.get("percent", 0.0)
                         await channel.send(
                             f"🗳️ **Vote Update for '{selection_name}':**\n"
                             f"Votes: **{count}**\n"
