@@ -1,0 +1,18 @@
+{
+  "author": [
+    "adminelevation"
+  ],
+  "install_msg": "Dynamically adjust channel slowmode in 1-second increments based on activity to keep chat readable and moderatable.",
+  "name": "dynamicslowmode",
+  "short": "Dynamic slowmode for channels.",
+  "description": "Automatically adjusts slowmode in specified channels to maintain a target message rate.",
+  "tags": [
+    "moderation",
+    "slowmode",
+    "utility",
+    "auto"
+  ],
+  "requirements": [],
+  "hidden": false,
+  "disabled": false
+}
