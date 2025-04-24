@@ -527,13 +527,25 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @commands.admin_or_permissions()
     @commands.group()
     async def honeypot(self, ctx: commands.Context) -> None:
-        """Honeypots are channels that attract advertising bots and compromised Discord accounts to detect and remove them from your server before they can hurt you or your members."""
+        """
+        Manage the honeypot system for your server.
+
+        Honeypots are special channels designed to attract advertising bots and compromised Discord accounts.
+        When a user interacts with the honeypot channel, the bot can take automated action to protect your community.
+
+        Use subcommands to create, configure, and monitor the honeypot.
+        """
         pass
 
     @commands.admin_or_permissions()
     @honeypot.command()
     async def create(self, ctx: commands.Context) -> None:
-        """Create the honeypot channel."""
+        """
+        Create a honeypot channel in your server.
+
+        This will create a new text channel named 'honeypot' with special instructions and permissions.
+        Only one honeypot channel can exist per server.
+        """
         async with ctx.typing():
             honeypot_channel_id = await self.config.guild(ctx.guild).honeypot_channel()
             honeypot_channel = ctx.guild.get_channel(honeypot_channel_id) if honeypot_channel_id else None
@@ -640,7 +652,11 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @commands.admin_or_permissions()
     @honeypot.command()
     async def activate(self, ctx: commands.Context) -> None:
-        """Enable the honeypot functionality."""
+        """
+        Enable the honeypot system.
+
+        Once enabled, the bot will monitor the honeypot channel and take action when users interact with it.
+        """
         async with ctx.typing():
             await self.config.guild(ctx.guild).enabled.set(True)
             embed = discord.Embed(
@@ -653,7 +669,11 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @commands.admin_or_permissions()
     @honeypot.command()
     async def disable(self, ctx: commands.Context) -> None:
-        """Disable the honeypot functionality."""
+        """
+        Disable the honeypot system.
+
+        The honeypot channel will remain, but no actions will be taken when users interact with it.
+        """
         async with ctx.typing():
             await self.config.guild(ctx.guild).enabled.set(False)
             embed = discord.Embed(
@@ -666,7 +686,11 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @commands.admin_or_permissions()
     @honeypot.command()
     async def remove(self, ctx: commands.Context) -> None:
-        """Disable the honeypot and delete the honeypot channel."""
+        """
+        Delete the honeypot channel and disable the honeypot system.
+
+        This will remove the honeypot channel from your server and clear all related configuration.
+        """
         async with ctx.typing():
             honeypot_channel_id = await self.config.guild(ctx.guild).honeypot_channel()
             honeypot_channel = ctx.guild.get_channel(honeypot_channel_id) if honeypot_channel_id else None
@@ -703,7 +727,18 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @commands.admin_or_permissions()
     @honeypot.command()
     async def action(self, ctx: commands.Context, action: str) -> None:
-        """Set the action to take when a user is detected in the honeypot channel."""
+        """
+        Set the automated action to take when a user triggers the honeypot.
+
+        Valid actions:
+        - mute: Assign the configured mute/suppress role to the user.
+        - kick: Kick the user from the server.
+        - ban: Ban the user from the server.
+        - timeout: Timeout the user for 7 days.
+
+        Example:
+            `[p]honeypot action ban`
+        """
         async with ctx.typing():
             if action not in ["mute", "kick", "ban", "timeout"]:
                 embed = discord.Embed(
@@ -724,7 +759,11 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @commands.admin_or_permissions()
     @honeypot.command()
     async def logs(self, ctx: commands.Context, channel: discord.TextChannel) -> None:
-        """Set the channel where logs will be sent."""
+        """
+        Set the channel where honeypot logs and alerts will be sent.
+
+        Provide a text channel to receive notifications when the honeypot is triggered.
+        """
         async with ctx.typing():
             await self.config.guild(ctx.guild).logs_channel.set(channel.id)
             embed = discord.Embed(
@@ -737,7 +776,11 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @commands.admin_or_permissions()
     @honeypot.command()
     async def settings(self, ctx: commands.Context) -> None:
-        """View the current honeypot settings."""
+        """
+        Show the current honeypot configuration for this server.
+
+        Displays all relevant settings, including enabled status, action, channels, and roles.
+        """
         async with ctx.typing():
             config = await self.config.guild(ctx.guild).all()
             embed = discord.Embed(title="Current honeypot settings", color=0xfffffe)
@@ -758,7 +801,11 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
     @honeypot.command()
     async def stats(self, ctx: commands.Context) -> None:
-        """View the current honeypot statistics."""
+        """
+        Show honeypot detection statistics.
+
+        Displays the number of detections for each scam type in this server and globally.
+        """
         async with ctx.typing():
             config = await self.config.guild(ctx.guild).all()
             global_stats = await self.config.global_scam_stats()
