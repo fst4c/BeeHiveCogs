@@ -841,17 +841,17 @@ class HomeworkAI(commands.Cog):
         denied = await self.config.user(user).denied()
         if applied:
             embed = discord.Embed(
-                title="Already Applied",
-                description="You have already applied to use HomeworkAI. Please wait for approval.",
+                title="Your signup is pending",
+                description="Our team is still reviewing your signup, this can take up to 8 hours.\n\nIf you have waited longer than this without a response, please open a ticket for an expedited review.",
                 color=discord.Color.orange()
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
         if customer_id:
             embed = discord.Embed(
-                title="Already Approved",
-                description="You have already been approved for HomeworkAI. If you need help, please contact support.",
-                color=discord.Color.green()
+                title="Can't get what you already have",
+                description="You're already a HomeworkAI user. Go ask it some questions or something.",
+                color=0x2bbd8e
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
