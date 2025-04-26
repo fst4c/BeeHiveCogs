@@ -14,9 +14,9 @@ CUSTOMER_ROLE_ID = 1364590138847400008  # The role to grant/revoke based on cust
 
 # Default prices for each command (USD, as string for formatting)
 DEFAULT_PRICES = {
-    "ask": "$0.10/ask",
-    "answer": "$0.15/answer",
-    "explain": "$0.20/explanation",
+    "ask": "$0.10",
+    "answer": "$0.15",
+    "explain": "$0.20",
 }
 
 # Stripe price IDs to subscribe new customers to
@@ -177,7 +177,7 @@ class HomeworkAI(commands.Cog):
             # Add the slash command mention if known
             mention = command_mentions.get(cmd)
             if mention:
-                value = f"{price} — {mention}"
+                value = f"{price} per {mention}"
             else:
                 value = str(price)
             embed.add_field(name=label, value=value, inline=False)
