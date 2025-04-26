@@ -159,6 +159,12 @@ class HomeworkAI(commands.Cog):
             description="Here are the current prices for each HomeworkAI feature. HomeworkAI is charged by usage, meaning you only pay for how much you use.",
             color=discord.Color.blurple()
         )
+        # Map command names to their slash command mention format
+        command_mentions = {
+            "ask": "</ask:>",
+            "answer": "</answer:>",
+            "explain": "</explain:>",
+        }
         for cmd, price in prices.items():
             if cmd == "ask":
                 label = "Ask (best for General Questions)"
@@ -168,7 +174,13 @@ class HomeworkAI(commands.Cog):
                 label = "Explain (best for Step-by-Step work)"
             else:
                 label = cmd.capitalize()
-            embed.add_field(name=label, value=price, inline=False)
+            # Add the slash command mention if known
+            mention = command_mentions.get(cmd)
+            if mention:
+                value = f"{price} — {mention}"
+            else:
+                value = str(price)
+            embed.add_field(name=label, value=value, inline=False)
         embed.set_footer(text="Prices are per command use and may change with notice.\nInvite friends! For every 10 users you invite, you get $1 promotional credit.")
 
         # Try to edit the previous pricing message if it exists, else send a new one
