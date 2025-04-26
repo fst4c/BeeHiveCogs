@@ -75,6 +75,17 @@ class HomeworkAI(commands.Cog):
 
         self.bot.loop.create_task(self._initialize_invite_tracking())
 
+        # --- Bot Status Cycling ---
+        self._status_cycle = [
+            discord.Activity(type=discord.ActivityType.watching, name="for /ask"),
+            discord.Activity(type=discord.ActivityType.watching, name="for /answer"),
+            discord.Activity(type=discord.ActivityType.watching, name="for /explain"),
+            discord.Activity(type=discord.ActivityType.streaming, name="homework answers", url="https://twitch.tv/homeworkai"),
+            discord.CustomActivity(name="Use /onboard to get started"),
+        ]
+        self._status_index = 0
+        self._status_task = self.bot.loop.create_task(self._cycle_status())
+
     async def _initialize_invite_tracking(self):
         await self.bot.wait_until_ready()
         for guild in self.bot.guilds:
@@ -120,6 +131,17 @@ class HomeworkAI(commands.Cog):
                 except Exception:
                     pass
             await asyncio.sleep(120)  # Update every 120 seconds
+
+    async def _cycle_status(self):
+        await self.bot.wait_until_ready()
+        while True:
+            try:
+                activity = self._status_cycle[self._status_index]
+                await self.bot.change_presence(activity=activity)
+                self._status_index = (self._status_index + 1) % len(self._status_cycle)
+            except Exception:
+                pass
+            await asyncio.sleep(30)  # Change status every 30 seconds
 
     async def _update_pricing_channel(self, guild):
         # Get pricing channel and prices for this guild
@@ -208,14 +230,16 @@ class HomeworkAI(commands.Cog):
 
     async def get_openai_key(self):
         tokens = await self.bot.get_shared_api_tokens("openai")
-        return tokens.get("api_key")
+        return tokens.get("api_key") if tokens else None
 
     async def get_stripe_key(self):
         tokens = await self.bot.get_shared_api_tokens("stripe")
-        return tokens.get("api_key")
+        return tokens.get("api_key") if tokens else None
 
     async def get_twilio_keys(self):
         tokens = await self.bot.get_shared_api_tokens("twilio")
+        if not tokens:
+            return (None, None)
         return (
             tokens.get("account_sid"),
             tokens.get("auth_token"),
