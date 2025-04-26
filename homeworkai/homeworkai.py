@@ -81,7 +81,7 @@ class HomeworkAI(commands.Cog):
             discord.Activity(type=discord.ActivityType.watching, name="for /answer"),
             discord.Activity(type=discord.ActivityType.watching, name="for /explain"),
             discord.Activity(type=discord.ActivityType.streaming, name="homework answers", url="https://twitch.tv/homeworkai"),
-            discord.CustomActivity(name="Use /onboard to get started"),
+            discord.CustomActivity(name="Use /signup to get started"),
         ]
         self._status_index = 0
         self._status_task = self.bot.loop.create_task(self._cycle_status())
