@@ -156,7 +156,7 @@ class HomeworkAI(commands.Cog):
         embed = discord.Embed(
             title="HomeworkAI pricing",
             description="Here are the current prices for each HomeworkAI feature. HomeworkAI is charged by usage, meaning you only pay for how much you use.",
-            color=discord.Color.blurple()
+            color=0x476b89
         )
         # Map command names to their slash command mention format
         command_mentions = {
