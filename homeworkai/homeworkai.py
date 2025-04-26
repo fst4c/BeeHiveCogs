@@ -732,14 +732,14 @@ class HomeworkAI(commands.Cog):
                 embed = discord.Embed(
                     title="Welcome to HomeworkAI!",
                     description=(
-                        "Your application has been **approved**! 🎉\n\n"
+                        "Your signup has been **approved**! 🎉\n\n"
                         "You now have access to HomeworkAI.\n\n"
                         "**How to use:**\n"
                         "- Use the `ask` command in any server where HomeworkAI is enabled.\n"
                         "- You can ask questions by text or by attaching an image.\n\n"
                         f"**You still need to add a payment method to prevent service interruptions**.\n- [Click here to sign in and add one.]({self.cog.billing_portal_url})"
                     ),
-                    color=0x2bbd8e
+                    color=0x476b89
                 )
                 if subscription_errors:
                     embed.add_field(
