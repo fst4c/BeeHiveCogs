@@ -861,8 +861,8 @@ class HomeworkAI(commands.Cog):
         try:
             await interaction.response.send_message(
                 embed=discord.Embed(
-                    title="Check Your DMs",
-                    description="Please check your DMs to complete your HomeworkAI application.",
+                    title="Let's do this",
+                    description="Signup started, check your messages to continue in private.",
                     color=discord.Color.blurple()
                 ),
                 ephemeral=True
@@ -872,9 +872,9 @@ class HomeworkAI(commands.Cog):
             try:
                 await interaction.followup.send(
                     embed=discord.Embed(
-                        title="Unable to DM",
+                        title="Your DM's are closed",
                         description="I couldn't DM you. Please enable DMs from server members and try again.",
-                        color=discord.Color.red()
+                        color=0xff4545
                     ),
                     ephemeral=True
                 )
