@@ -1008,7 +1008,7 @@ class HomeworkAI(commands.Cog):
                 await dm_channel.send(
                     embed=discord.Embed(
                         title="Phone Number",
-                        description="Please enter your **mobile phone number** in international format (e.g., `+12345678901`). This will be used for verification and important notifications. Landlines and VOIP numbers are not accepted.",
+                        description="Please enter your **mobile phone number** in international format (e.g., `+12345678901`). We'll use this solely for verification and billing; your information is **never** sold or shared.",
                         color=discord.Color.blurple()
                     )
                 )
@@ -1085,8 +1085,8 @@ class HomeworkAI(commands.Cog):
 
                 await dm_channel.send(
                     embed=discord.Embed(
-                        title="Verification Code Sent",
-                        description="A verification code has been sent to your phone. Please enter the code you received, type `resend` to get a new code, or type `cancel` to stop.",
+                        title="Check your phone",
+                        description="A verification code has been sent to you.\n\nPlease respond with the code to verify yourself.\n\n- Type **`resend`** to get a new code\n- Type **`cancel`** to cancel your signup.",
                         color=discord.Color.blurple()
                     )
                 )
