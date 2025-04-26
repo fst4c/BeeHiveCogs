@@ -1489,13 +1489,12 @@ class HomeworkAI(commands.Cog):
         customer_id = await self.config.user(ctx.author).customer_id()
         if not customer_id:
             embed = discord.Embed(
-                title="Access Required",
+                title="You're not a HomeworkAI user yet",
                 description=(
-                    "You don't have access to HomeworkAI yet.\n\n"
-                    "To apply for access, please use the `/onboard` command.\n"
-                    "Once approved, you'll be able to use HomeworkAI features."
+                    "Get started with </signup:1365562353076146206> to sign up and start getting answers.\n\n"
+                    "Power through homework faster with HomeworkAI. Get answers, explanations, and more no matter where the question is."
                 ),
-                color=discord.Color.orange()
+                color=0xff4545
             )
             await ctx.send(embed=embed)
             return
