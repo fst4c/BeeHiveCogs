@@ -365,9 +365,12 @@ class HomeworkAI(commands.Cog):
             try:
                 user = self.bot.get_user(inviter_id)
                 if user:
-                    await user.send(
-                        f"🎉 You invited {member.mention} to HomeworkAI! If they complete onboarding, you'll get credit toward a $1.00 Stripe reward."
+                    embed = discord.Embed(
+                        title="You brought a friend!",
+                        description=f"Thanks for inviting {member.mention} to HomeworkAI!\n\nIf they sign up and complete onboarding, you'll get $1 of free HomeworkAI usage as our way of saying thank you.\n\nDon't forget to remind them to **/signup**.",
+                        color=0x2bbd8e
                     )
+                    await user.send(embed=embed)
             except Exception:
                 pass
 
@@ -675,7 +678,6 @@ class HomeworkAI(commands.Cog):
                         "metadata[last_name]": self.answers.get("last_name", ""),
                         "metadata[discord_id]": str(self.user.id),
                         "metadata[phone_number]": self.answers.get("phone_number", ""),
-                        # Optionally, add new onboarding fields to Stripe metadata
                         "metadata[grade]": self.answers.get("grade", ""),
                         "metadata[intended_use]": self.answers.get("intended_use", ""),
                     }
@@ -866,8 +868,8 @@ class HomeworkAI(commands.Cog):
             modal.message = self.message
             await interaction.response.send_modal(modal)
 
-    @discord.app_commands.command(name="onboard", description="Apply to use HomeworkAI.")
-    async def onboard(self, interaction: discord.Interaction):
+    @discord.app_commands.command(name="signup", description="Start using HomeworkAI")
+    async def signup(self, interaction: discord.Interaction):
         """
         Slash command: Apply to use HomeworkAI.
         Collects info via DM prompt-by-prompt, including phone number verification via Twilio.
