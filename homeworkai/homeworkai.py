@@ -99,10 +99,9 @@ class HomeworkAI(commands.Cog):
             self._invite_code_cache[guild.id] = {}
 
     async def cog_load(self):
-        # Called when the cog is loaded/reloaded
         await self._maybe_update_all_pricing_channels()
         await self._maybe_update_all_stats_channels()
-        self.bot.loop.create_task(self._periodic_stats_update())  # Ensure periodic stats update on reload
+        self.bot.loop.create_task(self._periodic_stats_update())
         self.bot.loop.create_task(self._initialize_invite_tracking())
 
     async def _maybe_update_all_pricing_channels(self):
