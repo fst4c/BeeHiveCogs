@@ -1770,9 +1770,9 @@ class HomeworkAI(commands.Cog):
                     pass
 
             embed = discord.Embed(
-                title="No Billing Profile",
-                description="You do not have a billing profile set up. Please contact support.",
-                color=discord.Color.red()
+                title="You don't have a billing profile yet.",
+                description="Not a HomeworkAI user yet? Use </signup:1365562353076146206> to get started.",
+                color=0xff4545
             )
             await ctx.send(embed=embed, ephemeral=True)
             return
