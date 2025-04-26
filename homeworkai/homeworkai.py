@@ -1474,8 +1474,8 @@ class HomeworkAI(commands.Cog):
             attachments = ctx.message.attachments
         for att in attachments:
             # Discord.py's Attachment object or dict from interaction
-            content_type = getattr(att, "content_type", None) or att.get("content_type") if isinstance(att, dict) else None
-            url = getattr(att, "url", None) or att.get("url") if isinstance(att, dict) else None
+            content_type = getattr(att, "content_type", None) if not isinstance(att, dict) else att.get("content_type")
+            url = getattr(att, "url", None) if not isinstance(att, dict) else att.get("url")
             if content_type and content_type.startswith("image/"):
                 image_url = url
                 break
@@ -1492,9 +1492,13 @@ class HomeworkAI(commands.Cog):
                     "timestamp": timestamp,
                     "payload[stripe_customer_id]": customer_id,
                 }
-                auth = aiohttp.BasicAuth(stripe_key)
-                async with aiohttp.ClientSession(auth=auth) as session:
-                    async with session.post(meter_url, data=data, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                # Stripe expects Bearer token, not BasicAuth for this endpoint
+                headers = {
+                    "Authorization": f"Bearer {stripe_key}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(meter_url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                         # Optionally, you could log or handle errors here
                         pass
         except Exception as e:
@@ -1537,8 +1541,8 @@ class HomeworkAI(commands.Cog):
         if not attachments and ctx.message and ctx.message.attachments:
             attachments = ctx.message.attachments
         for att in attachments:
-            content_type = getattr(att, "content_type", None) or att.get("content_type") if isinstance(att, dict) else None
-            url = getattr(att, "url", None) or att.get("url") if isinstance(att, dict) else None
+            content_type = getattr(att, "content_type", None) if not isinstance(att, dict) else att.get("content_type")
+            url = getattr(att, "url", None) if not isinstance(att, dict) else att.get("url")
             if content_type and content_type.startswith("image/"):
                 image_url = url
                 break
@@ -1554,9 +1558,12 @@ class HomeworkAI(commands.Cog):
                     "timestamp": timestamp,
                     "payload[stripe_customer_id]": customer_id,
                 }
-                auth = aiohttp.BasicAuth(stripe_key)
-                async with aiohttp.ClientSession(auth=auth) as session:
-                    async with session.post(meter_url, data=data, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                headers = {
+                    "Authorization": f"Bearer {stripe_key}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(meter_url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                         pass
         except Exception as e:
             pass
@@ -1597,8 +1604,8 @@ class HomeworkAI(commands.Cog):
         if not attachments and ctx.message and ctx.message.attachments:
             attachments = ctx.message.attachments
         for att in attachments:
-            content_type = getattr(att, "content_type", None) or att.get("content_type") if isinstance(att, dict) else None
-            url = getattr(att, "url", None) or att.get("url") if isinstance(att, dict) else None
+            content_type = getattr(att, "content_type", None) if not isinstance(att, dict) else att.get("content_type")
+            url = getattr(att, "url", None) if not isinstance(att, dict) else att.get("url")
             if content_type and content_type.startswith("image/"):
                 image_url = url
                 break
@@ -1614,9 +1621,12 @@ class HomeworkAI(commands.Cog):
                     "timestamp": timestamp,
                     "payload[stripe_customer_id]": customer_id,
                 }
-                auth = aiohttp.BasicAuth(stripe_key)
-                async with aiohttp.ClientSession(auth=auth) as session:
-                    async with session.post(meter_url, data=data, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                headers = {
+                    "Authorization": f"Bearer {stripe_key}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(meter_url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                         pass
         except Exception as e:
             pass
