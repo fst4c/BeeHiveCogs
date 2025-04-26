@@ -143,7 +143,6 @@ class HomeworkAI(commands.Cog):
             await asyncio.sleep(30)  # Change status every 30 seconds
 
     async def _update_pricing_channel(self, guild):
-        # Get pricing channel and prices for this guild
         channel_id = await self.config.guild(guild).pricing_channel()
         prices = await self.config.guild(guild).prices()
         if not channel_id:
@@ -152,13 +151,11 @@ class HomeworkAI(commands.Cog):
         if not channel or not isinstance(channel, discord.TextChannel):
             return
 
-        # Compose the pricing message
         embed = discord.Embed(
             title="HomeworkAI pricing",
             description="Here are the current prices for each HomeworkAI feature. HomeworkAI is charged by usage, meaning you only pay for how much you use.",
             color=0x476b89
         )
-        # Map command names to their slash command mention format
         command_mentions = {
             "ask": "</ask:1364653272194875545>",
             "answer": "</answer:1364669240912904192>",
@@ -173,7 +170,6 @@ class HomeworkAI(commands.Cog):
                 label = "Explain (best for Step-by-Step work)"
             else:
                 label = cmd.capitalize()
-            # Add the slash command mention if known
             mention = command_mentions.get(cmd)
             if mention:
                 value = f"{price} per {mention}"
