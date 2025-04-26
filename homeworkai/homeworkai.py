@@ -75,66 +75,6 @@ class HomeworkAI(commands.Cog):
 
         self.bot.loop.create_task(self._initialize_invite_tracking())
 
-        # --- Custom Status Cycling ---
-        self._status_cycle_index = 0
-        self._status_cycle_task = self.bot.loop.create_task(self._cycle_status())
-
-    async def _cycle_status(self):
-        await self.bot.wait_until_ready()
-        # Use ActivityType.playing, watching, and listening for status cycling
-        status_list = [
-            (discord.ActivityType.watching, lambda: self._get_pricing_status()),
-            (discord.ActivityType.watching, lambda: self._get_stats_status()),
-            (discord.ActivityType.playing, lambda: "🤖 Try /ask, /answer, /explain"),
-        ]
-        while True:
-            try:
-                idx = self._status_cycle_index % len(status_list)
-                activity_type, status_func = status_list[idx]
-                # Await the status string if it's a coroutine, else just get the string
-                if asyncio.iscoroutinefunction(status_func):
-                    status_text = await status_func()
-                else:
-                    status_text = status_func()
-                # If the status string is a coroutine (e.g. returns coroutine), await it
-                if asyncio.iscoroutine(status_text):
-                    status_text = await status_text
-                await self.bot.change_presence(activity=discord.Activity(type=activity_type, name=status_text))
-                self._status_cycle_index += 1
-            except Exception:
-                pass
-            await asyncio.sleep(30)  # Change status every 30 seconds
-
-    async def _get_pricing_status(self):
-        # Gather pricing info for status
-        pricing_status = None
-        for guild in self.bot.guilds:
-            try:
-                prices = await self.config.guild(guild).prices()
-                if prices:
-                    pricing_status = " | ".join(f"{cmd}: {price}" for cmd, price in prices.items())
-                    break
-            except Exception:
-                continue
-        if not pricing_status:
-            pricing_status = "ask $0.10 | answer $0.15 | explain $0.20"
-        return f"💲 {pricing_status}"
-
-    async def _get_stats_status(self):
-        # Gather stats info for status
-        stats_status = None
-        for guild in self.bot.guilds:
-            try:
-                stats = await self.config.guild(guild).stats()
-                if stats:
-                    stats_status = f"Ask: {stats.get('ask',0)} | Ans: {stats.get('answer',0)} | Exp: {stats.get('explain',0)}"
-                    break
-            except Exception:
-                continue
-        if not stats_status:
-            stats_status = "Ask: 0 | Ans: 0 | Exp: 0"
-        return f"📊 {stats_status}"
-
     async def _initialize_invite_tracking(self):
         await self.bot.wait_until_ready()
         for guild in self.bot.guilds:
@@ -153,11 +93,6 @@ class HomeworkAI(commands.Cog):
         await self._maybe_update_all_stats_channels()
         self.bot.loop.create_task(self._periodic_stats_update())  # Ensure periodic stats update on reload
         self.bot.loop.create_task(self._initialize_invite_tracking())
-        # Restart status cycling on reload
-        if hasattr(self, "_status_cycle_task"):
-            self._status_cycle_task.cancel()
-        self._status_cycle_index = 0
-        self._status_cycle_task = self.bot.loop.create_task(self._cycle_status())
 
     async def _maybe_update_all_pricing_channels(self):
         # Wait for bot to be ready
@@ -672,15 +607,1140 @@ class HomeworkAI(commands.Cog):
 
         @discord.ui.button(label="Approve", style=discord.ButtonStyle.success, custom_id="homeworkai_approve")
         async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
-            # ... (no change, see above)
-            pass
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            # Only allow admins to approve
+            if not interaction.user.guild_permissions.manage_guild and not interaction.user.guild_permissions.administrator:
+                await interaction.followup.send("You do not have permission to approve applications.", ephemeral=True)
+                return
+
+            # Create Stripe customer
+            stripe_key = await self.cog.get_stripe_key()
+            if not stripe_key:
+                await interaction.followup.send("Stripe API key is not configured. Please contact an administrator.", ephemeral=True)
+                return
+
+            # Check if already has customer_id
+            prev_customer_id = await self.cog.config.user(self.user).customer_id()
+            if prev_customer_id:
+                await interaction.followup.send("This user already has a customer ID.", ephemeral=True)
+                return
+
+            # Create Stripe customer
+            try:
+                async with aiohttp.ClientSession() as session:
+                    headers = {
+                        "Authorization": f"Bearer {stripe_key}",
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    }
+                    data = {
+                        "email": self.answers.get("billing_email"),
+                        "name": f"{self.answers.get('first_name', '')} {self.answers.get('last_name', '')}".strip(),
+                        "metadata[first_name]": self.answers.get("first_name", ""),
+                        "metadata[last_name]": self.answers.get("last_name", ""),
+                        "metadata[discord_id]": str(self.user.id),
+                        "metadata[phone_number]": self.answers.get("phone_number", ""),
+                        # Optionally, add new onboarding fields to Stripe metadata
+                        "metadata[grade]": self.answers.get("grade", ""),
+                        "metadata[intended_use]": self.answers.get("intended_use", ""),
+                    }
+                    async with session.post(
+                        "https://api.stripe.com/v1/customers",
+                        data=data,
+                        headers=headers,
+                        timeout=aiohttp.ClientTimeout(total=30)
+                    ) as resp:
+                        if resp.status not in (200, 201):
+                            text = await resp.text()
+                            await interaction.followup.send(
+                                f"Failed to create Stripe customer: {resp.status}\n{text}",
+                                ephemeral=True
+                            )
+                            return
+                        try:
+                            result = await resp.json()
+                        except Exception as e:
+                            await interaction.followup.send(
+                                f"Could not decode Stripe response: {e}",
+                                ephemeral=True
+                            )
+                            return
+                        customer_id = result.get("id")
+                        if not customer_id:
+                            await interaction.followup.send(
+                                "Stripe did not return a customer ID. Please check the logs.",
+                                ephemeral=True
+                            )
+                            return
+            except Exception as e:
+                await interaction.followup.send(
+                    f"An error occurred while creating the Stripe customer: {e}",
+                    ephemeral=True
+                )
+                return
+
+            # --- Automatically subscribe the customer to the required price IDs ---
+            subscription_errors = []
+            for price_id in STRIPE_PRICE_IDS:
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        headers = {
+                            "Authorization": f"Bearer {stripe_key}",
+                            "Content-Type": "application/x-www-form-urlencoded"
+                        }
+                        data = {
+                            "customer": customer_id,
+                            "items[0][price]": price_id,
+                        }
+                        async with session.post(
+                            "https://api.stripe.com/v1/subscriptions",
+                            data=data,
+                            headers=headers,
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            if resp.status not in (200, 201):
+                                text = await resp.text()
+                                subscription_errors.append(f"Failed to subscribe to {price_id}: {resp.status} {text}")
+                except Exception as e:
+                    subscription_errors.append(f"Exception subscribing to {price_id}: {e}")
+
+            # Save customer_id and mark as not pending
+            await self.cog.config.user(self.user).customer_id.set(customer_id)
+            await self.cog.config.user(self.user).applied.set(False)
+            # Optionally, mark phone_verified again
+            await self.cog.config.user(self.user).phone_verified.set(True)
+            # Clear denied flag on approval
+            await self.cog.config.user(self.user).denied.set(False)
+
+            # Give customer role in all mutual guilds
+            for guild in self.cog.bot.guilds:
+                member = guild.get_member(self.user.id)
+                if not member:
+                    continue
+                role = guild.get_role(CUSTOMER_ROLE_ID)
+                if not role:
+                    continue
+                try:
+                    if role not in member.roles:
+                        await member.add_roles(role, reason="Granted HomeworkAI customer role (application approved)")
+                except Exception:
+                    pass
+
+            # DM the user
+            try:
+                embed = discord.Embed(
+                    title="Welcome to HomeworkAI!",
+                    description=(
+                        "Your application has been **approved**! 🎉\n\n"
+                        "You now have access to HomeworkAI.\n\n"
+                        "**How to use:**\n"
+                        "- Use the `ask` command in any server where HomeworkAI is enabled.\n"
+                        "- You can ask questions by text or by attaching an image.\n\n"
+                        f"**You still need to add a payment method to prevent service interruptions**.\n- [Click here to sign in and add one.]({self.cog.billing_portal_url})"
+                    ),
+                    color=0x2bbd8e
+                )
+                if subscription_errors:
+                    embed.add_field(
+                        name="Subscription Issues",
+                        value="Some subscriptions could not be created automatically:\n" + "\n".join(subscription_errors),
+                        inline=False
+                    )
+                await self.user.send(embed=embed)
+            except Exception:
+                pass
+
+            # Edit the application message to show approved
+            if self.message:
+                try:
+                    embed = self.message.embeds[0]
+                    embed.color = discord.Color.green()
+                    embed.title = "HomeworkAI application (Approved)"
+                    if subscription_errors:
+                        embed.add_field(
+                            name="Subscription Issues",
+                            value="Some subscriptions could not be created automatically:\n" + "\n".join(subscription_errors),
+                            inline=False
+                        )
+                    await self.message.edit(embed=embed, view=None)
+                except Exception:
+                    pass
+
+            msg_text = f"Application for {self.user.mention} has been **approved** and a Stripe customer was created."
+            if subscription_errors:
+                msg_text += "\n\nSome subscriptions could not be created automatically:\n" + "\n".join(subscription_errors)
+            await interaction.followup.send(msg_text, ephemeral=True)
+
+            # --- Invite Credit Granting: Check if this user was invited and grant credits if eligible ---
+            # Find all users who have this user in their invited_users list
+            for user_id in (u.id for u in self.cog.bot.users):
+                inviter_conf = self.cog.config.user_from_id(user_id)
+                invited_users = await inviter_conf.invited_users()
+                if self.user.id in invited_users:
+                    await self.cog._grant_invite_credits(user_id)
 
         @discord.ui.button(label="Deny", style=discord.ButtonStyle.danger, custom_id="homeworkai_deny")
         async def deny(self, interaction: discord.Interaction, button: discord.ui.Button):
-            # ... (no change, see above)
-            pass
+            # Only allow admins to deny
+            if not interaction.user.guild_permissions.manage_guild and not interaction.user.guild_permissions.administrator:
+                await interaction.response.send_message("You do not have permission to deny applications.", ephemeral=True)
+                return
+
+            # Ask for a reason via modal
+            class DenyReasonModal(discord.ui.Modal, title="Deny Application"):
+                reason = discord.ui.TextInput(
+                    label="Reason for denial",
+                    style=discord.TextStyle.paragraph,
+                    required=True,
+                    max_length=300,
+                    placeholder="Please provide a reason for denying this application."
+                )
+
+                async def on_submit(self, modal_interaction: discord.Interaction):
+                    # Save as denied, mark as not pending
+                    await self.cog.config.user(self.user).applied.set(False)
+                    # Optionally, clear phone_verified
+                    await self.cog.config.user(self.user).phone_verified.set(False)
+                    # Mark as denied so user can reapply
+                    await self.cog.config.user(self.user).denied.set(True)
+                    # DM the user
+                    try:
+                        embed = discord.Embed(
+                            title="HomeworkAI Application Denied",
+                            description=f"Your application was denied for the following reason:\n\n> {self.reason.value}\n\nYou may submit a new application if you wish.",
+                            color=discord.Color.red()
+                        )
+                        await self.user.send(embed=embed)
+                    except Exception:
+                        pass
+                    # Edit the application message to show denied
+                    if self.message:
+                        try:
+                            embed = self.message.embeds[0]
+                            embed.color = discord.Color.red()
+                            embed.title = "HomeworkAI Application (Denied)"
+                            embed.add_field(name="Denial Reason", value=self.reason.value, inline=False)
+                            await self.message.edit(embed=embed, view=None)
+                        except Exception:
+                            pass
+                    await modal_interaction.response.send_message(f"Application for {self.user.mention} has been **denied**.", ephemeral=True)
+
+            modal = DenyReasonModal()
+            modal.cog = self.cog
+            modal.user = self.user
+            modal.message = self.message
+            await interaction.response.send_modal(modal)
 
     @discord.app_commands.command(name="onboard", description="Apply to use HomeworkAI.")
     async def onboard(self, interaction: discord.Interaction):
-        # ... (no change, see above)
-        pass
+        """
+        Slash command: Apply to use HomeworkAI.
+        Collects info via DM prompt-by-prompt, including phone number verification via Twilio.
+        """
+        user = interaction.user
+        # Allow reapplication if denied, block only if currently applied or already approved
+        applied = await self.config.user(user).applied()
+        customer_id = await self.config.user(user).customer_id()
+        denied = await self.config.user(user).denied()
+        if applied:
+            embed = discord.Embed(
+                title="Already Applied",
+                description="You have already applied to use HomeworkAI. Please wait for approval.",
+                color=discord.Color.orange()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        if customer_id:
+            embed = discord.Embed(
+                title="Already Approved",
+                description="You have already been approved for HomeworkAI. If you need help, please contact support.",
+                color=discord.Color.green()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+        # If denied, allow reapplication (no block)
+
+        # Try to DM the user
+        try:
+            await interaction.response.send_message(
+                "Please check your DMs to complete your HomeworkAI application.",
+                ephemeral=True
+            )
+            dm_channel = await user.create_dm()
+        except Exception:
+            try:
+                await interaction.followup.send(
+                    "I couldn't DM you. Please enable DMs from server members and try again.",
+                    ephemeral=True
+                )
+            except Exception:
+                pass
+            return
+
+        def check(m):
+            return m.author.id == user.id and isinstance(m.channel, discord.DMChannel)
+
+        # Expanded questions for onboarding
+        questions = [
+            ("first_name", "What is your **legal first name**?"),
+            ("last_name", "What is your **legal last name**?"),
+            ("billing_email", "What is your **billing email address**? (This will be used for billing and notifications)"),
+            ("grade", "What **grade** are you in? (e.g., 9th, 10th, college freshman, etc.)"),
+            ("intended_use", "What do you **intend to use HomeworkAI for**? (e.g., math homework, essay help, general study, etc.)"),
+        ]
+        answers = {}
+
+        try:
+            await dm_channel.send(
+                embed=discord.Embed(
+                    title="HomeworkAI onboarding",
+                    description=(
+                        ":wave: **Hi there!**\n\nLet's get you set up to use HomeworkAI.\n"
+                        "Please answer the following questions. You can type `cancel` to stop the sign-up."
+                    ),
+                    color=discord.Color.blurple()
+                )
+            )
+            for key, prompt in questions:
+                while True:
+                    await dm_channel.send(prompt)
+                    try:
+                        msg = await self.bot.wait_for("message", check=check, timeout=120)
+                    except asyncio.TimeoutError:
+                        await dm_channel.send("You took too long to respond. Application cancelled.")
+                        return
+                    if msg.content.lower().strip() == "cancel":
+                        await dm_channel.send("Application cancelled.")
+                        return
+                    if key == "billing_email":
+                        # Basic email validation
+                        if "@" not in msg.content or "." not in msg.content:
+                            await dm_channel.send("That doesn't look like a valid email. Please try again or type `cancel`.")
+                            continue
+                    if key in ("first_name", "last_name"):
+                        if not msg.content.strip() or len(msg.content.strip()) > 50:
+                            await dm_channel.send("Please provide a valid name (max 50 characters). Try again or type `cancel`.")
+                            continue
+                    if key == "billing_email" and len(msg.content.strip()) > 100:
+                        await dm_channel.send("Email is too long (max 100 characters). Try again or type `cancel`.")
+                        continue
+                    if key == "grade":
+                        if not msg.content.strip() or len(msg.content.strip()) > 50:
+                            await dm_channel.send("Please provide a valid grade (max 50 characters). Try again or type `cancel`.")
+                            continue
+                    if key == "intended_use":
+                        if not msg.content.strip() or len(msg.content.strip()) > 200:
+                            await dm_channel.send("Please provide a brief description (max 200 characters). Try again or type `cancel`.")
+                            continue
+                    answers[key] = msg.content.strip()
+                    break
+
+            # Phone number collection and verification
+            # Get Twilio credentials
+            account_sid, auth_token = await self.get_twilio_keys()
+            if not (account_sid and auth_token):
+                await dm_channel.send(
+                    embed=discord.Embed(
+                        title="Twilio Not Configured",
+                        description="Phone verification is not available at this time. Please contact an administrator.",
+                        color=discord.Color.red()
+                    )
+                )
+                return
+
+            # Ask for phone number
+            
+            phone_pattern = re.compile(r"^\+?[1-9]\d{1,14}$")  # E.164 format
+
+            while True:
+                await dm_channel.send(
+                    "Please enter your **mobile phone number** in international format (e.g., `+12345678901`). This will be used for verification and important notifications. Landlines and VOIP numbers are not accepted."
+                )
+                try:
+                    msg = await self.bot.wait_for("message", check=check, timeout=120)
+                except asyncio.TimeoutError:
+                    await dm_channel.send("You took too long to respond. Application cancelled.")
+                    return
+                if msg.content.lower().strip() == "cancel":
+                    await dm_channel.send("Application cancelled.")
+                    return
+                phone_number = msg.content.strip()
+                if not phone_pattern.match(phone_number):
+                    await dm_channel.send("That doesn't look like a valid phone number in international format. Please try again or type `cancel`.")
+                    continue
+
+                # Send verification code via Twilio Verify API
+                try:
+                    tokens = await self.bot.get_shared_api_tokens("twilio")
+                    verify_sid = tokens.get("verify_sid")
+                    if not verify_sid:
+                        await dm_channel.send(
+                            embed=discord.Embed(
+                                title="Twilio Not Configured",
+                                description="Phone verification is not available at this time. Please contact an administrator.",
+                                color=discord.Color.red()
+                            )
+                        )
+                        return
+                    url = f"https://verify.twilio.com/v2/Services/{verify_sid}/Verifications"
+                    data = {
+                        "To": phone_number,
+                        "Channel": "sms"
+                    }
+                    async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(account_sid, auth_token)) as session:
+                        async with session.post(url, data=data, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                            if resp.status not in (200, 201):
+                                text = await resp.text()
+                                await dm_channel.send(
+                                    embed=discord.Embed(
+                                        title="Twilio Error",
+                                        description=f"Could not send verification code. ({resp.status})\n{text}",
+                                        color=discord.Color.red()
+                                    )
+                                )
+                                continue
+                except Exception as e:
+                    await dm_channel.send(
+                        embed=discord.Embed(
+                            title="Twilio Error",
+                            description=f"An error occurred while sending the verification code: {e}",
+                            color=discord.Color.red()
+                        )
+                    )
+                    continue
+
+                await dm_channel.send(
+                    "A verification code has been sent to your phone. Please enter the code you received, type `resend` to get a new code, or type `cancel` to stop."
+                )
+                attempts = 0
+                max_attempts = 3
+                while attempts < max_attempts:
+                    try:
+                        code_msg = await self.bot.wait_for("message", check=check, timeout=120)
+                    except asyncio.TimeoutError:
+                        await dm_channel.send("You took too long to respond. Application cancelled.")
+                        return
+                    code_content = code_msg.content.lower().strip()
+                    if code_content == "cancel":
+                        await dm_channel.send("Application cancelled.")
+                        return
+                    if code_content == "resend":
+                        # Resend the code
+                        try:
+                            tokens = await self.bot.get_shared_api_tokens("twilio")
+                            verify_sid = tokens.get("verify_sid")
+                            url = f"https://verify.twilio.com/v2/Services/{verify_sid}/Verifications"
+                            data = {
+                                "To": phone_number,
+                                "Channel": "sms"
+                            }
+                            async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(account_sid, auth_token)) as session:
+                                async with session.post(url, data=data, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                                    if resp.status in (200, 201):
+                                        await dm_channel.send("A new verification code has been sent to your phone. Please enter the new code, type `resend` to get another code, or type `cancel` to stop.")
+                                    else:
+                                        text = await resp.text()
+                                        await dm_channel.send(
+                                            embed=discord.Embed(
+                                                title="Twilio Error",
+                                                description=f"Could not resend verification code. ({resp.status})\n{text}",
+                                                color=discord.Color.red()
+                                            )
+                                        )
+                        except Exception as e:
+                            await dm_channel.send(
+                                embed=discord.Embed(
+                                    title="Twilio Error",
+                                    description=f"An error occurred while resending the verification code: {e}",
+                                    color=discord.Color.red()
+                                )
+                            )
+                        continue  # Don't count as an attempt
+                    code = code_msg.content.strip()
+                    # Verify code with Twilio
+                    try:
+                        tokens = await self.bot.get_shared_api_tokens("twilio")
+                        verify_sid = tokens.get("verify_sid")
+                        url = f"https://verify.twilio.com/v2/Services/{verify_sid}/VerificationCheck"
+                        data = {
+                            "To": phone_number,
+                            "Code": code
+                        }
+                        async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(account_sid, auth_token)) as session:
+                            async with session.post(url, data=data, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                                # Defensive: check for JSON decode error
+                                try:
+                                    result = await resp.json()
+                                except Exception as e:
+                                    await dm_channel.send(
+                                        embed=discord.Embed(
+                                            title="Twilio Error",
+                                            description=f"Could not decode Twilio response: {e}",
+                                            color=discord.Color.red()
+                                        )
+                                    )
+                                    attempts += 1
+                                    if attempts >= max_attempts:
+                                        await dm_channel.send("Too many failed attempts. Application cancelled.")
+                                        return
+                                    continue
+                                if resp.status in (200, 201) and result.get("status") == "approved":
+                                    await dm_channel.send(
+                                        embed=discord.Embed(
+                                            title="Phone verified",
+                                            description="Your verification was successful. Thanks for helping us fight fraud.",
+                                            color=0x2bbd8e
+                                        )
+                                    )
+                                    answers["phone_number"] = phone_number
+                                    break
+                                else:
+                                    await dm_channel.send(
+                                        embed=discord.Embed(
+                                            title="Verification Failed",
+                                            description="The code you entered is incorrect. Please try again, type `resend` to get a new code, or `cancel` to stop.",
+                                            color=discord.Color.red()
+                                        )
+                                    )
+                                    attempts += 1
+                                    if attempts >= max_attempts:
+                                        await dm_channel.send("Too many failed attempts. Application cancelled.")
+                                        return
+                                    continue
+                        break
+                    except Exception as e:
+                        await dm_channel.send(
+                            embed=discord.Embed(
+                                title="Twilio Error",
+                                description=f"An error occurred while verifying the code: {e}",
+                                color=discord.Color.red()
+                            )
+                        )
+                        attempts += 1
+                        if attempts >= max_attempts:
+                            await dm_channel.send("Too many failed attempts. Application cancelled.")
+                            return
+                        continue
+                else:
+                    continue  # If not broken out of, ask for phone again
+                break  # Phone verified, break out of phone loop
+
+            # Send application to applications channel
+            guild = interaction.guild
+            channel_id = await self.config.guild(guild).applications_channel()
+            channel = guild.get_channel(channel_id) if (guild and channel_id) else None
+            if not channel:
+                await dm_channel.send(
+                    embed=discord.Embed(
+                        title="Applications Channel Not Set",
+                        description="Applications channel is not set. Please contact an admin.",
+                        color=discord.Color.red()
+                    )
+                )
+                return
+
+            embed = discord.Embed(
+                title="New HomeworkAI sign-up",
+                color=0xfffffe,
+            )
+            embed.add_field(name="User", value=f"{user.mention} (`{user.id}`)", inline=False)
+            embed.add_field(name="First name", value=answers["first_name"], inline=True)
+            embed.add_field(name="Last name", value=answers["last_name"], inline=True)
+            embed.add_field(name="Billing email", value=answers["billing_email"], inline=False)
+            embed.add_field(name="Phone number", value=answers["phone_number"], inline=False)
+            embed.add_field(name="Grade", value=answers.get("grade", "N/A"), inline=True)
+            embed.add_field(name="Intended use", value=answers.get("intended_use", "N/A"), inline=True)
+
+            # Send with action buttons
+            view = self.ApplicationActionView(self, user, answers)
+            msg = await channel.send(embed=embed, view=view)
+            view.message = msg
+
+            await self.config.user(user).applied.set(True)
+            await self.config.user(user).phone_number.set(answers["phone_number"])
+            await self.config.user(user).phone_verified.set(True)
+            # Clear denied flag on new application
+            await self.config.user(user).denied.set(False)
+            await dm_channel.send(
+                embed=discord.Embed(
+                    title="Thanks! You're in the queue!",
+                    description="We need to review your signup request to make sure everything looks good here.\n\nThis can take up to 8 hours, and you'll be notified of any updates via your DM's.",
+                    color=0x2bbd8e
+                )
+            )
+        except Exception as e:
+            try:
+                await dm_channel.send(
+                    embed=discord.Embed(
+                        title="Application Error",
+                        description=f"An error occurred: {e}",
+                        color=discord.Color.red()
+                    )
+                )
+            except Exception:
+                pass
+
+    # --- HomeworkAI Question Commands ---
+
+    class RatingView(discord.ui.View):
+        def __init__(self, cog, ctx, prompt_type, guild_id, *, timeout=120):
+            super().__init__(timeout=timeout)
+            self.cog = cog
+            self.ctx = ctx
+            self.prompt_type = prompt_type
+            self.guild_id = guild_id
+            self.upvoted = False
+            self.downvoted = False
+
+        @discord.ui.button(label="👍", style=discord.ButtonStyle.success, custom_id="homeworkai_upvote")
+        async def upvote(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if self.upvoted:
+                await interaction.response.send_message("You already upvoted this answer.", ephemeral=True)
+                return
+            self.upvoted = True
+            await self.cog._increment_stat(self.guild_id, "upvotes")
+            await self.cog._update_stats_channel(self.ctx.guild)
+            await interaction.response.send_message("Thank you for your feedback! 👍", ephemeral=True)
+
+        @discord.ui.button(label="👎", style=discord.ButtonStyle.danger, custom_id="homeworkai_downvote")
+        async def downvote(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if self.downvoted:
+                await interaction.response.send_message("You already downvoted this answer.", ephemeral=True)
+                return
+            self.downvoted = True
+            await self.cog._increment_stat(self.guild_id, "downvotes")
+            await self.cog._update_stats_channel(self.ctx.guild)
+            await interaction.response.send_message("Thank you for your feedback! 👎", ephemeral=True)
+
+    async def _increment_stat(self, guild_id, stat):
+        guild = self.bot.get_guild(guild_id)
+        if not guild:
+            return
+        stats = await self.config.guild(guild).stats()
+        stats[stat] = stats.get(stat, 0) + 1
+        await self.config.guild(guild).stats.set(stats)
+
+    async def _increment_usage(self, guild, prompt_type):
+        stats = await self.config.guild(guild).stats()
+        stats[prompt_type] = stats.get(prompt_type, 0) + 1
+        await self.config.guild(guild).stats.set(stats)
+        await self._update_stats_channel(guild)
+
+    async def _send_homeworkai_response(
+        self,
+        ctx: commands.Context,
+        question: str,
+        image_url: str,
+        prompt_type: str
+    ):
+        """
+        Helper for ask/answer/explain commands.
+        prompt_type: "ask", "answer", or "explain"
+        """
+        customer_id = await self.config.user(ctx.author).customer_id()
+        if not customer_id:
+            embed = discord.Embed(
+                title="Billing Profile Required",
+                description="You need to set up a billing profile to use HomeworkAI. Please contact service support for assistance.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
+            return
+
+        # Give the customer role if not already present
+        if ctx.guild:
+            try:
+                member = ctx.guild.get_member(ctx.author.id)
+                if member:
+                    role = ctx.guild.get_role(CUSTOMER_ROLE_ID)
+                    if role and role not in member.roles:
+                        await member.add_roles(role, reason="Granted HomeworkAI customer role (has customer_id)")
+            except Exception:
+                pass
+
+        openai_key = await self.get_openai_key()
+        if not openai_key:
+            embed = discord.Embed(
+                title="OpenAI API Key Not Configured",
+                description="OpenAI API key is not configured. Please contact an administrator.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed)
+            return
+
+        if not question and not image_url:
+            embed = discord.Embed(
+                title="No Question or Image Provided",
+                description="Please provide a question or attach an image.",
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+            return
+
+        # Prompt engineering for each command type
+        if prompt_type == "ask":
+            system_prompt = (
+                "You are HomeworkAI, an expert homework assistant. "
+                "Answer the user's question as clearly and concisely as possible. Format math formulas using markdown, and final results inside a ```codeblock``` using standard expression indicators instead of spelling out math expressions."
+                "If the user attaches an image, analyze it and provide a helpful, accurate answer."
+            )
+        elif prompt_type == "answer":
+            system_prompt = (
+                "You are HomeworkAI, an expert at answering multiple choice and comparison questions. "
+                "If the user provides a list of options or a multiple choice question, "
+                "explain your reasoning concisely and accurately, and select the best answer. "
+                "If the user attaches an image, analyze it for relevant information."
+            )
+        elif prompt_type == "explain":
+            system_prompt = (
+                "You are HomeworkAI, an expert tutor. "
+                "Provide a detailed, step-by-step explanation or tutorial for the user's question. "
+                "If the user attaches an image, use it to help explain the answer in depth."
+            )
+        else:
+            system_prompt = "You are HomeworkAI, an expert homework assistant."
+
+        async with ctx.typing():
+            try:
+                headers = {
+                    "Authorization": f"Bearer {openai_key}",
+                    "Content-Type": "application/json"
+                }
+                if image_url:
+                    user_content = [
+                        {"type": "text", "text": question or "Please analyze this image."},
+                        {"type": "image_url", "image_url": {"url": image_url}}
+                    ]
+                else:
+                    user_content = question
+
+                if image_url:
+                    payload = {
+                        "model": "gpt-4.1",
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_content}
+                        ],
+                        "max_tokens": 1024
+                    }
+                else:
+                    payload = {
+                        "model": "gpt-4.1",
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": question}
+                        ],
+                        "max_tokens": 1024
+                    }
+                endpoint = "https://api.openai.com/v1/chat/completions"
+
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(endpoint, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+                        if resp.status != 200:
+                            text = await resp.text()
+                            embed = discord.Embed(
+                                title="OpenAI API Error",
+                                description=f"Status: {resp.status}\n{text}",
+                                color=discord.Color.red()
+                            )
+                            await ctx.send(embed=embed)
+                            return
+                        data = await resp.json()
+                        answer = None
+                        try:
+                            answer = data["choices"][0]["message"]["content"]
+                        except Exception:
+                            embed = discord.Embed(
+                                title="Unexpected OpenAI Response",
+                                description="OpenAI API returned an unexpected response.",
+                                color=discord.Color.red()
+                            )
+                            await ctx.send(embed=embed)
+                            return
+
+                        # Compose the DM embed
+                        # Truncate answer if needed
+                        max_answer_len = 1900
+                        if len(answer) > max_answer_len:
+                            answer = answer[:max_answer_len] + "\n\n*Response truncated.*"
+
+                        # Compose the question section
+                        if question:
+                            question_section = question
+                        elif image_url:
+                            question_section = "*(No text question provided, image attached)*"
+                        else:
+                            question_section = "N/A"
+
+                        # Title and field names per command
+                        if prompt_type == "ask":
+                            embed_title = "Your HomeworkAI Answer"
+                            field_name = "You asked"
+                        elif prompt_type == "answer":
+                            embed_title = "HomeworkAI Multiple Choice/Comparison Answer"
+                            field_name = "Your question"
+                        elif prompt_type == "explain":
+                            embed_title = "HomeworkAI Step-by-Step Explanation"
+                            field_name = "Your question"
+                        else:
+                            embed_title = "Your HomeworkAI Answer"
+                            field_name = "You asked"
+
+                        embed = discord.Embed(
+                            title=embed_title,
+                            color=discord.Color.blurple()
+                        )
+                        # Truncate question_section to 1024 for embed field
+                        embed.add_field(
+                            name=field_name,
+                            value=question_section if len(question_section) < 1024 else question_section[:1020] + "...",
+                            inline=False
+                        )
+                        if image_url:
+                            embed.set_image(url=image_url)
+                        # Truncate answer to 1024 for embed field (Discord API limit)
+                        answer_field_value = answer if len(answer) <= 1024 else answer[:1020] + "..."
+                        embed.add_field(
+                            name="HomeworkAI says...",
+                            value=answer_field_value,
+                            inline=False
+                        )
+
+                        # Try to DM the user
+                        try:
+                            view = self.RatingView(self, ctx, prompt_type, ctx.guild.id if ctx.guild else None)
+                            await ctx.author.send(embed=embed, view=view)
+                            await ctx.send(
+                                embed=discord.Embed(
+                                    title="Finished thinking!",
+                                    description="Check your DM's for the answer",
+                                    color=0x2bbd8e
+                                )
+                            )
+                        except discord.Forbidden:
+                            await ctx.send(
+                                embed=discord.Embed(
+                                    title="Unable to DM",
+                                    description="I couldn't send you a DM. Please enable DMs from server members and try again.",
+                                    color=discord.Color.red()
+                                )
+                            )
+                        except Exception as e:
+                            await ctx.send(
+                                embed=discord.Embed(
+                                    title="DM Error",
+                                    description=f"An error occurred while sending your answer in DMs: {e}",
+                                    color=discord.Color.red()
+                                )
+                            )
+
+            except Exception as e:
+                embed = discord.Embed(
+                    title="OpenAI Error",
+                    description=f"An error occurred while contacting OpenAI: {e}",
+                    color=discord.Color.red()
+                )
+                await ctx.send(embed=embed)
+
+    @commands.hybrid_command(name="ask", with_app_command=True)
+    async def ask(self, ctx: commands.Context, *, question: str = None):
+        """
+        Ask HomeworkAI an open-ended question (text or attach an image).
+        The answer will be sent to you in DMs.
+        """
+        # Check if the user has a customer_id set
+        customer_id = await self.config.user(ctx.author).customer_id()
+        if not customer_id:
+            embed = discord.Embed(
+                title="Access Required",
+                description=(
+                    "You don't have access to HomeworkAI yet.\n\n"
+                    "To apply for access, please use the `/onboard` command.\n"
+                    "Once approved, you'll be able to use HomeworkAI features."
+                ),
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+            return
+
+        image_url = None
+        # For slash commands, attachments are in ctx.interaction.data if present
+        attachments = []
+        if hasattr(ctx, "interaction") and ctx.interaction is not None:
+            # Try to get attachments from the interaction (for slash)
+            data = getattr(ctx.interaction, "data", {})
+            resolved = data.get("resolved", {}) if data else {}
+            attachments = list(resolved.get("attachments", {}).values()) if resolved else []
+        if not attachments and ctx.message and ctx.message.attachments:
+            attachments = ctx.message.attachments
+        for att in attachments:
+            # Discord.py's Attachment object or dict from interaction
+            content_type = getattr(att, "content_type", None) or att.get("content_type") if isinstance(att, dict) else None
+            url = getattr(att, "url", None) or att.get("url") if isinstance(att, dict) else None
+            if content_type and content_type.startswith("image/"):
+                image_url = url
+                break
+
+        # --- Stripe Meter Event Logging ---
+        try:
+            stripe_key = await self.get_stripe_key()
+            if stripe_key and customer_id:
+                # Use current UTC timestamp as int
+                timestamp = int(time.time())
+                meter_url = "https://api.stripe.com/v1/billing/meter_events"
+                data = {
+                    "event_name": "ask",
+                    "timestamp": timestamp,
+                    "payload[stripe_customer_id]": customer_id,
+                }
+                auth = aiohttp.BasicAuth(stripe_key)
+                async with aiohttp.ClientSession(auth=auth) as session:
+                    async with session.post(meter_url, data=data, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        # Optionally, you could log or handle errors here
+                        pass
+        except Exception as e:
+            # Optionally log the error, but don't block the command
+            pass
+
+        if ctx.guild:
+            await self._increment_usage(ctx.guild, "ask")
+
+        await self._send_homeworkai_response(ctx, question, image_url, prompt_type="ask")
+
+    @commands.hybrid_command(name="answer", with_app_command=True)
+    async def answer(self, ctx: commands.Context, *, question: str = None):
+        """
+        Ask HomeworkAI to answer a multiple choice or comparison question.
+        The answer will be sent to you in DMs.
+        """
+        # Check if the user has a customer_id set
+        customer_id = await self.config.user(ctx.author).customer_id()
+        if not customer_id:
+            embed = discord.Embed(
+                title="Access Required",
+                description=(
+                    "You don't have access to HomeworkAI yet.\n\n"
+                    "To apply for access, please use the `/onboard` command.\n"
+                    "Once approved, you'll be able to use HomeworkAI features."
+                ),
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+            return
+
+        image_url = None
+        # For slash commands, attachments are in ctx.interaction.data if present
+        attachments = []
+        if hasattr(ctx, "interaction") and ctx.interaction is not None:
+            data = getattr(ctx.interaction, "data", {})
+            resolved = data.get("resolved", {}) if data else {}
+            attachments = list(resolved.get("attachments", {}).values()) if resolved else []
+        if not attachments and ctx.message and ctx.message.attachments:
+            attachments = ctx.message.attachments
+        for att in attachments:
+            content_type = getattr(att, "content_type", None) or att.get("content_type") if isinstance(att, dict) else None
+            url = getattr(att, "url", None) or att.get("url") if isinstance(att, dict) else None
+            if content_type and content_type.startswith("image/"):
+                image_url = url
+                break
+
+        # --- Stripe Meter Event Logging ---
+        try:
+            stripe_key = await self.get_stripe_key()
+            if stripe_key and customer_id:
+                timestamp = int(time.time())
+                meter_url = "https://api.stripe.com/v1/billing/meter_events"
+                data = {
+                    "event_name": "answer",
+                    "timestamp": timestamp,
+                    "payload[stripe_customer_id]": customer_id,
+                }
+                auth = aiohttp.BasicAuth(stripe_key)
+                async with aiohttp.ClientSession(auth=auth) as session:
+                    async with session.post(meter_url, data=data, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        pass
+        except Exception as e:
+            pass
+
+        if ctx.guild:
+            await self._increment_usage(ctx.guild, "answer")
+
+        await self._send_homeworkai_response(ctx, question, image_url, prompt_type="answer")
+
+    @commands.hybrid_command(name="explain", with_app_command=True)
+    async def explain(self, ctx: commands.Context, *, question: str = None):
+        """
+        Ask HomeworkAI for a detailed, step-by-step explanation or tutorial.
+        The answer will be sent to you in DMs.
+        """
+        # Check if the user has a customer_id set
+        customer_id = await self.config.user(ctx.author).customer_id()
+        if not customer_id:
+            embed = discord.Embed(
+                title="Access Required",
+                description=(
+                    "You don't have access to HomeworkAI yet.\n\n"
+                    "To apply for access, please use the `/onboard` command.\n"
+                    "Once approved, you'll be able to use HomeworkAI features."
+                ),
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+            return
+
+        image_url = None
+        # For slash commands, attachments are in ctx.interaction.data if present
+        attachments = []
+        if hasattr(ctx, "interaction") and ctx.interaction is not None:
+            data = getattr(ctx.interaction, "data", {})
+            resolved = data.get("resolved", {}) if data else {}
+            attachments = list(resolved.get("attachments", {}).values()) if resolved else []
+        if not attachments and ctx.message and ctx.message.attachments:
+            attachments = ctx.message.attachments
+        for att in attachments:
+            content_type = getattr(att, "content_type", None) or att.get("content_type") if isinstance(att, dict) else None
+            url = getattr(att, "url", None) or att.get("url") if isinstance(att, dict) else None
+            if content_type and content_type.startswith("image/"):
+                image_url = url
+                break
+
+        # --- Stripe Meter Event Logging ---
+        try:
+            stripe_key = await self.get_stripe_key()
+            if stripe_key and customer_id:
+                timestamp = int(time.time())
+                meter_url = "https://api.stripe.com/v1/billing/meter_events"
+                data = {
+                    "event_name": "explain",
+                    "timestamp": timestamp,
+                    "payload[stripe_customer_id]": customer_id,
+                }
+                auth = aiohttp.BasicAuth(stripe_key)
+                async with aiohttp.ClientSession(auth=auth) as session:
+                    async with session.post(meter_url, data=data, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        pass
+        except Exception as e:
+            pass
+
+        if ctx.guild:
+            await self._increment_usage(ctx.guild, "explain")
+
+        await self._send_homeworkai_response(ctx, question, image_url, prompt_type="explain")
+
+    @commands.hybrid_command(name="billing", with_app_command=True)
+    async def billing(self, ctx: commands.Context):
+        """
+        View payments, dues, invoices, and update your payment method on-file
+        """
+        await ctx.defer(ephemeral=True)
+        customer_id = await self.config.user(ctx.author).customer_id()
+        if not customer_id:
+            # Remove the customer role if present
+            if ctx.guild:
+                try:
+                    member = ctx.guild.get_member(ctx.author.id)
+                    if member:
+                        role = ctx.guild.get_role(CUSTOMER_ROLE_ID)
+                        if role and role in member.roles:
+                            await member.remove_roles(role, reason="Removed HomeworkAI customer role (no billing profile)")
+                except Exception:
+                    pass
+
+            embed = discord.Embed(
+                title="No Billing Profile",
+                description="You do not have a billing profile set up. Please contact support.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed, ephemeral=True)
+            return
+
+        # Give the customer role if not already present
+        if ctx.guild:
+            try:
+                member = ctx.guild.get_member(ctx.author.id)
+                if member:
+                    role = ctx.guild.get_role(CUSTOMER_ROLE_ID)
+                    if role and role not in member.roles:
+                        await member.add_roles(role, reason="Granted HomeworkAI customer role (billing command)")
+            except Exception:
+                pass
+
+        stripe_key = await self.get_stripe_key()
+        if not stripe_key:
+            embed = discord.Embed(
+                title="Stripe API Key Not Configured",
+                description="Stripe API key is not configured. Please contact an administrator.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed, ephemeral=True)
+            return
+
+        portal_url = None
+        try:
+            # Build the return_url as the URL for the channel the command was used in
+            # If in a guild, use the guild channel URL, else fallback to a default
+            if ctx.guild and ctx.channel:
+                return_url = f"https://discord.com/channels/{ctx.guild.id}/{ctx.channel.id}"
+            elif ctx.channel:
+                # For DMs, guild is None, so use @me for the guild id
+                return_url = f"https://discord.com/channels/@me/{ctx.channel.id}"
+            else:
+                return_url = "https://beehive.systems"
+
+            async with aiohttp.ClientSession() as session:
+                headers = {
+                    "Authorization": f"Bearer {stripe_key}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+                data = {
+                    "customer": customer_id,
+                    "return_url": return_url
+                }
+                async with session.post(
+                    "https://api.stripe.com/v1/billing_portal/sessions",
+                    data=data,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as resp:
+                    if resp.status != 200:
+                        text = await resp.text()
+                        embed = discord.Embed(
+                            title="Stripe API Error",
+                            description=f"Status: {resp.status}\n{text}",
+                            color=discord.Color.red()
+                        )
+                        await ctx.send(embed=embed, ephemeral=True)
+                        return
+                    try:
+                        result = await resp.json()
+                    except Exception as e:
+                        embed = discord.Embed(
+                            title="Stripe API Error",
+                            description=f"Could not decode Stripe response: {e}",
+                            color=discord.Color.red()
+                        )
+                        await ctx.send(embed=embed, ephemeral=True)
+                        return
+                    portal_url = result.get("url")
+        except Exception as e:
+            embed = discord.Embed(
+                title="Stripe Error",
+                description=f"An error occurred while contacting Stripe: {e}",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed, ephemeral=True)
+            return
+
+        if portal_url:
+            embed = discord.Embed(
+                title="Here's your sign-in link",
+                description=f"[You can manage your billing by clicking here]({portal_url})\n\n**Do not share this link**",
+                color=discord.Color.blurple()
+            )
+            await ctx.send(embed=embed, ephemeral=True)
+        else:
+            embed = discord.Embed(
+                title="Billing Portal Error",
+                description="Could not generate a billing portal link. Please contact support.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed, ephemeral=True)
