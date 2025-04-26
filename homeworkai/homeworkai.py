@@ -217,12 +217,12 @@ class HomeworkAI(commands.Cog):
             color=discord.Color.blurple(),
             description="Statistics for HomeworkAI usage and answer ratings in this server."
         )
-        embed.add_field(name="Ask Uses", value=str(stats.get("ask", 0)), inline=True)
-        embed.add_field(name="Answer Uses", value=str(stats.get("answer", 0)), inline=True)
-        embed.add_field(name="Explain Uses", value=str(stats.get("explain", 0)), inline=True)
+        embed.add_field(name="Asks solved", value=str(stats.get("ask", 0)), inline=True)
+        embed.add_field(name="Answers generated", value=str(stats.get("answer", 0)), inline=True)
+        embed.add_field(name="Explainations given", value=str(stats.get("explain", 0)), inline=True)
         embed.add_field(name="👍 Upvotes", value=str(stats.get("upvotes", 0)), inline=True)
         embed.add_field(name="👎 Downvotes", value=str(stats.get("downvotes", 0)), inline=True)
-        embed.set_footer(text="Stats update live as users interact with HomeworkAI.\nInvite friends! For every 10 users you invite, you get $1 promotional credit.")
+        embed.set_footer(text="Stats update live as users interact with HomeworkAI.\nInvite friends! After onboarding, every 10 users you invite gets you $1 of free HomeworkAI usage")
 
         msg = None
         if msg_id:
