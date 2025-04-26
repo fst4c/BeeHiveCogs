@@ -1863,7 +1863,7 @@ class HomeworkAI(commands.Cog):
             await ctx.send(embed=embed, ephemeral=True)
         else:
             embed = discord.Embed(
-                title="Billing Portal Error",
+                title="Something went wrong...",
                 description="Could not generate a billing portal link. Please contact support.",
                 color=discord.Color.red()
             )
