@@ -181,7 +181,7 @@ class HomeworkAI(commands.Cog):
             else:
                 value = str(price)
             embed.add_field(name=label, value=value, inline=False)
-        embed.set_footer(text="Prices are per command use and may change with notice.\nWant free usage? Onboard, then invite your friends! For every 10 users you invite who onboard, you get $1 of automatic free usage credit.")
+        embed.set_footer(text="Prices are per command use and may change with notice.\nWant free usage? Onboard, then invite your friends! For every 10 users you invite who onboard, you get $1 of automatic free usage credit.\nNot signed up? You'll unfortunately miss out on this free perk.")
 
         # Try to edit the previous pricing message if it exists, else send a new one
         msg_id = await self.config.guild(guild).pricing_message_id()
