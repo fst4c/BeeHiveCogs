@@ -213,7 +213,7 @@ class HomeworkAI(commands.Cog):
         msg_id = await self.config.guild(guild).stats_message_id()
         embed = discord.Embed(
             title="HomeworkAI Usage & Ratings",
-            color=discord.Color.blurple(),
+            color=0x476b89,
             description="Statistics for HomeworkAI usage and answer ratings in this server."
         )
         embed.add_field(name="Asks solved", value=str(stats.get("ask", 0)), inline=True)
@@ -367,7 +367,7 @@ class HomeworkAI(commands.Cog):
                     embed = discord.Embed(
                         title="You brought a friend!",
                         description=f"Thanks for inviting {member.mention} to HomeworkAI!\n\nIf they sign up and complete onboarding, you'll get $1 of free HomeworkAI usage as our way of saying thank you.\n\nDon't forget to remind them to **/signup**.",
-                        color=0x2bbd8e
+                        color=0x476b89
                     )
                     await user.send(embed=embed)
             except Exception:
@@ -405,74 +405,39 @@ class HomeworkAI(commands.Cog):
 
     @homeworkaiset.command()
     @commands.admin_or_permissions(manage_guild=True)
-    async def setapplications(self, ctx, channel: discord.TextChannel):
+    async def pendingchannel(self, ctx, channel: discord.TextChannel):
         """Set the channel where HomeworkAI applications are sent."""
         await self.config.guild(ctx.guild).applications_channel.set(channel.id)
         embed = discord.Embed(
-            title="Applications Channel Set",
+            title="Pending signups channel set",
             description=f"Applications channel set to {channel.mention}.",
-            color=discord.Color.green()
+            color=-0x2bbd8e
         )
         await ctx.send(embed=embed)
 
     @homeworkaiset.command()
     @commands.admin_or_permissions(manage_guild=True)
-    async def setpricing(self, ctx, channel: discord.TextChannel):
+    async def pricingchannel(self, ctx, channel: discord.TextChannel):
         """Set the channel where HomeworkAI pricing is displayed and update the pricing message."""
         await self.config.guild(ctx.guild).pricing_channel.set(channel.id)
         await self._update_pricing_channel(ctx.guild)
         embed = discord.Embed(
-            title="Pricing Channel Set",
+            title="Pricing channel set",
             description=f"Pricing channel set to {channel.mention}. The pricing message has been updated.",
-            color=discord.Color.green()
+            color=0x2bbd8e
         )
         await ctx.send(embed=embed)
 
     @homeworkaiset.command()
     @commands.admin_or_permissions(manage_guild=True)
-    async def setstats(self, ctx, channel: discord.TextChannel):
+    async def statchannel(self, ctx, channel: discord.TextChannel):
         """Set the channel where HomeworkAI usage and rating statistics are displayed and update the stats message."""
         await self.config.guild(ctx.guild).stats_channel.set(channel.id)
         await self._update_stats_channel(ctx.guild)
         embed = discord.Embed(
-            title="Stats Channel Set",
+            title="Statistics channel set",
             description=f"Stats channel set to {channel.mention}. The stats message has been updated.",
-            color=discord.Color.green()
-        )
-        await ctx.send(embed=embed)
-
-    @homeworkaiset.command()
-    @commands.admin_or_permissions(manage_guild=True)
-    async def setprice(self, ctx, command: str, price: str):
-        """
-        Set the price for a HomeworkAI command (ask, answer, explain).
-        Example: [p]homeworkaiset setprice ask $0.12
-        """
-        command = command.lower()
-        if command not in DEFAULT_PRICES:
-            await ctx.send(f"Invalid command. Valid options: {', '.join(DEFAULT_PRICES.keys())}")
-            return
-        prices = await self.config.guild(ctx.guild).prices()
-        prices[command] = price
-        await self.config.guild(ctx.guild).prices.set(prices)
-        await self._update_pricing_channel(ctx.guild)
-        embed = discord.Embed(
-            title="Price Updated",
-            description=f"Price for `{command}` set to `{price}`. Pricing message updated.",
-            color=discord.Color.green()
-        )
-        await ctx.send(embed=embed)
-
-    @homeworkaiset.command()
-    @commands.admin_or_permissions(manage_guild=True)
-    async def resetprices(self, ctx):
-        """Reset all HomeworkAI command prices to their defaults and update the pricing message."""
-        await self.config.guild(ctx.guild).prices.set(DEFAULT_PRICES.copy())
-        await self._update_pricing_channel(ctx.guild)
-        embed = discord.Embed(
-            title="Prices Reset",
-            description="All HomeworkAI command prices have been reset to their defaults. Pricing message updated.",
-            color=discord.Color.green()
+            color=0x2bbd8e
         )
         await ctx.send(embed=embed)
 
@@ -489,9 +454,9 @@ class HomeworkAI(commands.Cog):
         })
         await self._update_stats_channel(ctx.guild)
         embed = discord.Embed(
-            title="Stats Reset",
+            title="Statistics reset",
             description="All HomeworkAI usage and rating statistics have been reset for this server.",
-            color=discord.Color.green()
+            color=0x2bbd8e
         )
         await ctx.send(embed=embed)
 
@@ -538,7 +503,7 @@ class HomeworkAI(commands.Cog):
                         "All answers are sent to you in DMs for privacy.\n\n"
                         f"To manage your billing or connect your payment method, visit our [billing portal]({self.billing_portal_url})"
                     ),
-                    color=discord.Color.green()
+                    color=0x476b89
                 )
                 await user.send(embed=embed)
             except Exception:
@@ -550,7 +515,7 @@ class HomeworkAI(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @homeworkaiset.command(name="removecustomerid")
+    @homeworkaiset.command()
     @commands.is_owner()
     async def delcid(self, ctx, user: discord.User):
         """
@@ -580,7 +545,7 @@ class HomeworkAI(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @homeworkaiset.command(name="resetcogdata")
+    @homeworkaiset.command(name="resetdata")
     @commands.is_owner()
     async def resetmodule(self, ctx):
         """
