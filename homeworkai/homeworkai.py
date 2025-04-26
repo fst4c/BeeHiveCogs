@@ -76,49 +76,64 @@ class HomeworkAI(commands.Cog):
         self.bot.loop.create_task(self._initialize_invite_tracking())
 
         # --- Custom Status Cycling ---
-        self._status_cycle_task = self.bot.loop.create_task(self._cycle_status())
         self._status_cycle_index = 0
+        self._status_cycle_task = self.bot.loop.create_task(self._cycle_status())
 
     async def _cycle_status(self):
         await self.bot.wait_until_ready()
+        # Use ActivityType.playing, watching, and listening for status cycling
+        status_list = [
+            (discord.ActivityType.watching, lambda: self._get_pricing_status()),
+            (discord.ActivityType.watching, lambda: self._get_stats_status()),
+            (discord.ActivityType.playing, lambda: "🤖 Try /ask, /answer, /explain"),
+        ]
         while True:
             try:
-                # Gather pricing info for status
-                pricing_status = None
-                for guild in self.bot.guilds:
-                    prices = await self.config.guild(guild).prices()
-                    if prices:
-                        pricing_status = " | ".join(f"{cmd}: {price}" for cmd, price in prices.items())
-                        break
-                if not pricing_status:
-                    pricing_status = "ask $0.10 | answer $0.15 | explain $0.20"
-
-                # Gather stats info for status
-                stats_status = None
-                for guild in self.bot.guilds:
-                    stats = await self.config.guild(guild).stats()
-                    if stats:
-                        stats_status = f"Ask: {stats.get('ask',0)} | Ans: {stats.get('answer',0)} | Exp: {stats.get('explain',0)}"
-                        break
-                if not stats_status:
-                    stats_status = "Ask: 0 | Ans: 0 | Exp: 0"
-
-                # Commands info for status
-                commands_status = "Try /ask, /answer, /explain"
-
-                # Cycle through the three statuses using ActivityType.custom
-                status_list = [
-                    (discord.ActivityType.custom, f"💲 {pricing_status}"),
-                    (discord.ActivityType.custom, f"📊 {stats_status}"),
-                    (discord.ActivityType.custom, f"🤖 {commands_status}"),
-                ]
-                activity_type, status_text = status_list[self._status_cycle_index % len(status_list)]
-                # discord.ActivityType.custom requires the 'name' kwarg to be the status text
+                idx = self._status_cycle_index % len(status_list)
+                activity_type, status_func = status_list[idx]
+                # Await the status string if it's a coroutine, else just get the string
+                if asyncio.iscoroutinefunction(status_func):
+                    status_text = await status_func()
+                else:
+                    status_text = status_func()
+                # If the status string is a coroutine (e.g. returns coroutine), await it
+                if asyncio.iscoroutine(status_text):
+                    status_text = await status_text
                 await self.bot.change_presence(activity=discord.Activity(type=activity_type, name=status_text))
                 self._status_cycle_index += 1
             except Exception:
                 pass
             await asyncio.sleep(30)  # Change status every 30 seconds
+
+    async def _get_pricing_status(self):
+        # Gather pricing info for status
+        pricing_status = None
+        for guild in self.bot.guilds:
+            try:
+                prices = await self.config.guild(guild).prices()
+                if prices:
+                    pricing_status = " | ".join(f"{cmd}: {price}" for cmd, price in prices.items())
+                    break
+            except Exception:
+                continue
+        if not pricing_status:
+            pricing_status = "ask $0.10 | answer $0.15 | explain $0.20"
+        return f"💲 {pricing_status}"
+
+    async def _get_stats_status(self):
+        # Gather stats info for status
+        stats_status = None
+        for guild in self.bot.guilds:
+            try:
+                stats = await self.config.guild(guild).stats()
+                if stats:
+                    stats_status = f"Ask: {stats.get('ask',0)} | Ans: {stats.get('answer',0)} | Exp: {stats.get('explain',0)}"
+                    break
+            except Exception:
+                continue
+        if not stats_status:
+            stats_status = "Ask: 0 | Ans: 0 | Exp: 0"
+        return f"📊 {stats_status}"
 
     async def _initialize_invite_tracking(self):
         await self.bot.wait_until_ready()
@@ -141,8 +156,8 @@ class HomeworkAI(commands.Cog):
         # Restart status cycling on reload
         if hasattr(self, "_status_cycle_task"):
             self._status_cycle_task.cancel()
-        self._status_cycle_task = self.bot.loop.create_task(self._cycle_status())
         self._status_cycle_index = 0
+        self._status_cycle_task = self.bot.loop.create_task(self._cycle_status())
 
     async def _maybe_update_all_pricing_channels(self):
         # Wait for bot to be ready
