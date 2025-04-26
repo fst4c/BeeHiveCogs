@@ -828,7 +828,7 @@ class HomeworkAI(commands.Cog):
             modal.message = self.message
             await interaction.response.send_modal(modal)
 
-    @discord.app_commands.command(name="signup", description="Start using HomeworkAI")
+    @discord.app_commands.command(name="signup", description="Sign up for HomeworkAI")
     async def signup(self, interaction: discord.Interaction):
         """
         Slash command: Apply to use HomeworkAI.
@@ -851,19 +851,18 @@ class HomeworkAI(commands.Cog):
             embed = discord.Embed(
                 title="Can't get what you already have",
                 description="You're already a HomeworkAI user. Go ask it some questions or something.",
-                color=0x2bbd8e
+                color=0x476b89
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
-        # If denied, allow reapplication (no block)
-
+        
         # Try to DM the user
         try:
             await interaction.response.send_message(
                 embed=discord.Embed(
                     title="Let's do this",
                     description="Signup started, check your messages to continue in private.",
-                    color=discord.Color.blurple()
+                    color=0x476b89
                 ),
                 ephemeral=True
             )
@@ -903,7 +902,7 @@ class HomeworkAI(commands.Cog):
                         ":wave: **Hi there!**\n\nLet's get you set up to use HomeworkAI.\n"
                         "Please answer the following questions. You can type `cancel` to stop the sign-up."
                     ),
-                    color=discord.Color.blurple()
+                    color=0x476b89
                 )
             )
             for key, prompt in questions:
@@ -912,7 +911,7 @@ class HomeworkAI(commands.Cog):
                         embed=discord.Embed(
                             title="Question",
                             description=prompt,
-                            color=discord.Color.blurple()
+                            color=0x476b89
                         )
                     )
                     try:
@@ -1009,7 +1008,7 @@ class HomeworkAI(commands.Cog):
                     embed=discord.Embed(
                         title="Phone Number",
                         description="Please enter your **mobile phone number** in international format (e.g., `+12345678901`). We'll use this solely for verification and billing; your information is **never** sold or shared.",
-                        color=discord.Color.blurple()
+                        color=0x476b89
                     )
                 )
                 try:
@@ -1087,7 +1086,7 @@ class HomeworkAI(commands.Cog):
                     embed=discord.Embed(
                         title="Check your phone",
                         description="A verification code has been sent to you.\n\nPlease respond with the code to verify yourself.\n\n- Type **`resend`** to get a new code\n- Type **`cancel`** to cancel your signup.",
-                        color=discord.Color.blurple()
+                        color=0x476b89
                     )
                 )
                 attempts = 0
@@ -1131,7 +1130,7 @@ class HomeworkAI(commands.Cog):
                                             embed=discord.Embed(
                                                 title="Verification code sent",
                                                 description="A verification code has been sent to your phone.\n\nPlease respond with the code\n\n- Type **`resend`** to get a new code\n- Type **`cancel`** to cancel your signup.",
-                                                color=discord.Color.blurple()
+                                                color=0x476b89
                                             )
                                         )
                                     else:
@@ -1201,7 +1200,7 @@ class HomeworkAI(commands.Cog):
                                         embed=discord.Embed(
                                             title="That wasn't right",
                                             description="The code you entered doesn't match the code we sent you.\nPlease try again, type **`resend`** to get a new code, or **`cancel`** to stop.",
-                                            color=discord.Color.red()
+                                            color=0xff4545
                                         )
                                     )
                                     attempts += 1
@@ -1254,8 +1253,8 @@ class HomeworkAI(commands.Cog):
                 return
 
             embed = discord.Embed(
-                title="New HomeworkAI sign-up",
-                color=0xfffffe,
+                title="New sign-up pending",
+                color=0x476b89,
             )
             embed.add_field(name="User", value=f"{user.mention} (`{user.id}`)", inline=False)
             embed.add_field(name="First name", value=answers["first_name"], inline=True)
@@ -1279,7 +1278,7 @@ class HomeworkAI(commands.Cog):
                 embed=discord.Embed(
                     title="Thanks! You're in the queue!",
                     description="We need to review your signup request to make sure everything looks good here.\n\nThis can take up to 8 hours, and you'll be notified of any updates via your DM's.",
-                    color=0x2bbd8e
+                    color=0x476b89
                 )
             )
         except Exception as e:
