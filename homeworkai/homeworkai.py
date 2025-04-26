@@ -161,9 +161,9 @@ class HomeworkAI(commands.Cog):
         )
         # Map command names to their slash command mention format
         command_mentions = {
-            "ask": "</ask:>",
-            "answer": "</answer:>",
-            "explain": "</explain:>",
+            "ask": "</ask:1364653272194875545>",
+            "answer": "</answer:1364669240912904192>",
+            "explain": "</explain:1364669240912904193>",
         }
         for cmd, price in prices.items():
             if cmd == "ask":
