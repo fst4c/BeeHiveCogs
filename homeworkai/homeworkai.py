@@ -860,14 +860,22 @@ class HomeworkAI(commands.Cog):
         # Try to DM the user
         try:
             await interaction.response.send_message(
-                "Please check your DMs to complete your HomeworkAI application.",
+                embed=discord.Embed(
+                    title="Check Your DMs",
+                    description="Please check your DMs to complete your HomeworkAI application.",
+                    color=discord.Color.blurple()
+                ),
                 ephemeral=True
             )
             dm_channel = await user.create_dm()
         except Exception:
             try:
                 await interaction.followup.send(
-                    "I couldn't DM you. Please enable DMs from server members and try again.",
+                    embed=discord.Embed(
+                        title="Unable to DM",
+                        description="I couldn't DM you. Please enable DMs from server members and try again.",
+                        color=discord.Color.red()
+                    ),
                     ephemeral=True
                 )
             except Exception:
@@ -890,7 +898,7 @@ class HomeworkAI(commands.Cog):
         try:
             await dm_channel.send(
                 embed=discord.Embed(
-                    title="HomeworkAI onboarding",
+                    title="HomeworkAI Onboarding",
                     description=(
                         ":wave: **Hi there!**\n\nLet's get you set up to use HomeworkAI.\n"
                         "Please answer the following questions. You can type `cancel` to stop the sign-up."
@@ -900,34 +908,82 @@ class HomeworkAI(commands.Cog):
             )
             for key, prompt in questions:
                 while True:
-                    await dm_channel.send(prompt)
+                    await dm_channel.send(
+                        embed=discord.Embed(
+                            title="Question",
+                            description=prompt,
+                            color=discord.Color.blurple()
+                        )
+                    )
                     try:
                         msg = await self.bot.wait_for("message", check=check, timeout=120)
                     except asyncio.TimeoutError:
-                        await dm_channel.send("You took too long to respond. Application cancelled.")
+                        await dm_channel.send(
+                            embed=discord.Embed(
+                                title="Timeout",
+                                description="You took too long to respond. Application cancelled.",
+                                color=discord.Color.red()
+                            )
+                        )
                         return
                     if msg.content.lower().strip() == "cancel":
-                        await dm_channel.send("Application cancelled.")
+                        await dm_channel.send(
+                            embed=discord.Embed(
+                                title="Cancelled",
+                                description="Application cancelled.",
+                                color=discord.Color.orange()
+                            )
+                        )
                         return
                     if key == "billing_email":
                         # Basic email validation
                         if "@" not in msg.content or "." not in msg.content:
-                            await dm_channel.send("That doesn't look like a valid email. Please try again or type `cancel`.")
+                            await dm_channel.send(
+                                embed=discord.Embed(
+                                    title="Invalid Email",
+                                    description="That doesn't look like a valid email. Please try again or type `cancel`.",
+                                    color=discord.Color.red()
+                                )
+                            )
                             continue
                     if key in ("first_name", "last_name"):
                         if not msg.content.strip() or len(msg.content.strip()) > 50:
-                            await dm_channel.send("Please provide a valid name (max 50 characters). Try again or type `cancel`.")
+                            await dm_channel.send(
+                                embed=discord.Embed(
+                                    title="Invalid Name",
+                                    description="Please provide a valid name (max 50 characters). Try again or type `cancel`.",
+                                    color=discord.Color.red()
+                                )
+                            )
                             continue
                     if key == "billing_email" and len(msg.content.strip()) > 100:
-                        await dm_channel.send("Email is too long (max 100 characters). Try again or type `cancel`.")
+                        await dm_channel.send(
+                            embed=discord.Embed(
+                                title="Email Too Long",
+                                description="Email is too long (max 100 characters). Try again or type `cancel`.",
+                                color=discord.Color.red()
+                            )
+                        )
                         continue
                     if key == "grade":
                         if not msg.content.strip() or len(msg.content.strip()) > 50:
-                            await dm_channel.send("Please provide a valid grade (max 50 characters). Try again or type `cancel`.")
+                            await dm_channel.send(
+                                embed=discord.Embed(
+                                    title="Invalid Grade",
+                                    description="Please provide a valid grade (max 50 characters). Try again or type `cancel`.",
+                                    color=discord.Color.red()
+                                )
+                            )
                             continue
                     if key == "intended_use":
                         if not msg.content.strip() or len(msg.content.strip()) > 200:
-                            await dm_channel.send("Please provide a brief description (max 200 characters). Try again or type `cancel`.")
+                            await dm_channel.send(
+                                embed=discord.Embed(
+                                    title="Description Too Long",
+                                    description="Please provide a brief description (max 200 characters). Try again or type `cancel`.",
+                                    color=discord.Color.red()
+                                )
+                            )
                             continue
                     answers[key] = msg.content.strip()
                     break
@@ -946,24 +1002,45 @@ class HomeworkAI(commands.Cog):
                 return
 
             # Ask for phone number
-            
             phone_pattern = re.compile(r"^\+?[1-9]\d{1,14}$")  # E.164 format
 
             while True:
                 await dm_channel.send(
-                    "Please enter your **mobile phone number** in international format (e.g., `+12345678901`). This will be used for verification and important notifications. Landlines and VOIP numbers are not accepted."
+                    embed=discord.Embed(
+                        title="Phone Number",
+                        description="Please enter your **mobile phone number** in international format (e.g., `+12345678901`). This will be used for verification and important notifications. Landlines and VOIP numbers are not accepted.",
+                        color=discord.Color.blurple()
+                    )
                 )
                 try:
                     msg = await self.bot.wait_for("message", check=check, timeout=120)
                 except asyncio.TimeoutError:
-                    await dm_channel.send("You took too long to respond. Application cancelled.")
+                    await dm_channel.send(
+                        embed=discord.Embed(
+                            title="Timeout",
+                            description="You took too long to respond. Application cancelled.",
+                            color=discord.Color.red()
+                        )
+                    )
                     return
                 if msg.content.lower().strip() == "cancel":
-                    await dm_channel.send("Application cancelled.")
+                    await dm_channel.send(
+                        embed=discord.Embed(
+                            title="Cancelled",
+                            description="Application cancelled.",
+                            color=discord.Color.orange()
+                        )
+                    )
                     return
                 phone_number = msg.content.strip()
                 if not phone_pattern.match(phone_number):
-                    await dm_channel.send("That doesn't look like a valid phone number in international format. Please try again or type `cancel`.")
+                    await dm_channel.send(
+                        embed=discord.Embed(
+                            title="Invalid Phone Number",
+                            description="That doesn't look like a valid phone number in international format. Please try again or type `cancel`.",
+                            color=discord.Color.red()
+                        )
+                    )
                     continue
 
                 # Send verification code via Twilio Verify API
@@ -1007,7 +1084,11 @@ class HomeworkAI(commands.Cog):
                     continue
 
                 await dm_channel.send(
-                    "A verification code has been sent to your phone. Please enter the code you received, type `resend` to get a new code, or type `cancel` to stop."
+                    embed=discord.Embed(
+                        title="Verification Code Sent",
+                        description="A verification code has been sent to your phone. Please enter the code you received, type `resend` to get a new code, or type `cancel` to stop.",
+                        color=discord.Color.blurple()
+                    )
                 )
                 attempts = 0
                 max_attempts = 3
@@ -1015,11 +1096,23 @@ class HomeworkAI(commands.Cog):
                     try:
                         code_msg = await self.bot.wait_for("message", check=check, timeout=120)
                     except asyncio.TimeoutError:
-                        await dm_channel.send("You took too long to respond. Application cancelled.")
+                        await dm_channel.send(
+                            embed=discord.Embed(
+                                title="Timeout",
+                                description="You took too long to respond. Application cancelled.",
+                                color=discord.Color.red()
+                            )
+                        )
                         return
                     code_content = code_msg.content.lower().strip()
                     if code_content == "cancel":
-                        await dm_channel.send("Application cancelled.")
+                        await dm_channel.send(
+                            embed=discord.Embed(
+                                title="Cancelled",
+                                description="Application cancelled.",
+                                color=discord.Color.orange()
+                            )
+                        )
                         return
                     if code_content == "resend":
                         # Resend the code
@@ -1034,7 +1127,13 @@ class HomeworkAI(commands.Cog):
                             async with aiohttp.ClientSession(auth=aiohttp.BasicAuth(account_sid, auth_token)) as session:
                                 async with session.post(url, data=data, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                                     if resp.status in (200, 201):
-                                        await dm_channel.send("A new verification code has been sent to your phone. Please enter the new code, type `resend` to get another code, or type `cancel` to stop.")
+                                        await dm_channel.send(
+                                            embed=discord.Embed(
+                                                title="Verification code sent",
+                                                description="A verification code has been sent to your phone.\n\nPlease respond with the code\n\n- Type **`resend`** to get a new code\n- Type **`cancel`** to cancel your signup.",
+                                                color=discord.Color.blurple()
+                                            )
+                                        )
                                     else:
                                         text = await resp.text()
                                         await dm_channel.send(
@@ -1078,14 +1177,20 @@ class HomeworkAI(commands.Cog):
                                     )
                                     attempts += 1
                                     if attempts >= max_attempts:
-                                        await dm_channel.send("Too many failed attempts. Application cancelled.")
+                                        await dm_channel.send(
+                                            embed=discord.Embed(
+                                                title="Too Many Attempts",
+                                                description="Too many failed attempts. Application cancelled.",
+                                                color=discord.Color.red()
+                                            )
+                                        )
                                         return
                                     continue
                                 if resp.status in (200, 201) and result.get("status") == "approved":
                                     await dm_channel.send(
                                         embed=discord.Embed(
-                                            title="Phone verified",
-                                            description="Your verification was successful. Thanks for helping us fight fraud.",
+                                            title="Thanks, you're verified",
+                                            description="Thanks for helping us fight fraud and fake users. We'll never sell or share this information - with advertisers, parents, or schools.",
                                             color=0x2bbd8e
                                         )
                                     )
@@ -1094,28 +1199,40 @@ class HomeworkAI(commands.Cog):
                                 else:
                                     await dm_channel.send(
                                         embed=discord.Embed(
-                                            title="Verification Failed",
-                                            description="The code you entered is incorrect. Please try again, type `resend` to get a new code, or `cancel` to stop.",
+                                            title="That wasn't right",
+                                            description="The code you entered doesn't match the code we sent you.\nPlease try again, type **`resend`** to get a new code, or **`cancel`** to stop.",
                                             color=discord.Color.red()
                                         )
                                     )
                                     attempts += 1
                                     if attempts >= max_attempts:
-                                        await dm_channel.send("Too many failed attempts. Application cancelled.")
+                                        await dm_channel.send(
+                                            embed=discord.Embed(
+                                                title="Your application cannot be processed at this time",
+                                                description="You failed verification too many times. We're unable to continue with your sign-up at this time.\n\nPlease try again later.",
+                                                color=0xff4545
+                                            )
+                                        )
                                         return
                                     continue
                         break
                     except Exception as e:
                         await dm_channel.send(
                             embed=discord.Embed(
-                                title="Twilio Error",
+                                title="Telephony error",
                                 description=f"An error occurred while verifying the code: {e}",
-                                color=discord.Color.red()
+                                color=0xff4545
                             )
                         )
                         attempts += 1
                         if attempts >= max_attempts:
-                            await dm_channel.send("Too many failed attempts. Application cancelled.")
+                            await dm_channel.send(
+                                embed=discord.Embed(
+                                    title="Your application cannot be processed at this time",
+                                    description="You failed verification too many times. We're unable to continue with your sign-up at this time.\n\nPlease try again later.",
+                                    color=0xff4545
+                                )
+                            )
                             return
                         continue
                 else:
