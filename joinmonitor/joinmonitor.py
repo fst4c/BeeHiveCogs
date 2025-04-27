@@ -231,13 +231,13 @@ class JoinMonitor(commands.Cog):
             channel = guild.get_channel(alerts_channel_id)
             if channel:
                 embed = discord.Embed(
-                    title="🚨 User Join Alert",
+                    title="Suspicious account joined the server",
                     description=f"{member.mention} (`{member.id}`) joined.",
-                    color=discord.Color.red(),
+                    color=0xff9144,
                     timestamp=datetime.utcnow()
                 )
-                embed.add_field(name="Reasons", value="\n".join(reasons), inline=False)
-                embed.add_field(name="Account Created", value=member.created_at.strftime("%Y-%m-%d %H:%M:%S UTC"))
+                embed.add_field(name="Flags", value="\n".join(reasons), inline=False)
+                embed.add_field(name="Account created", value=member.created_at.strftime("%Y-%m-%d %H:%M:%S UTC"))
                 embed.set_thumbnail(url=member.display_avatar.url if member.display_avatar else discord.Embed.Empty)
                 await channel.send(embed=embed)
 
