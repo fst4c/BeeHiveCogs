@@ -17,6 +17,7 @@ DEFAULT_PRICES = {
     "ask": "$0.10",
     "answer": "$0.15",
     "explain": "$0.20",
+    "outline": "$0.25",
 }
 
 # Stripe price IDs to subscribe new customers to
@@ -58,6 +59,7 @@ class HomeworkAI(commands.Cog):
                 "ask": 0,
                 "answer": 0,
                 "explain": 0,
+                "outline": 0,
                 "upvotes": 0,
                 "downvotes": 0,
             },
@@ -80,6 +82,7 @@ class HomeworkAI(commands.Cog):
             discord.Activity(type=discord.ActivityType.watching, name="for /ask"),
             discord.Activity(type=discord.ActivityType.watching, name="for /answer"),
             discord.Activity(type=discord.ActivityType.watching, name="for /explain"),
+            discord.Activity(type=discord.ActivityType.watching, name="for /outline"),
             discord.Activity(type=discord.ActivityType.streaming, name="homework answers", url="https://twitch.tv/homeworkai"),
             discord.CustomActivity(name="Use /signup to get started"),
         ]
@@ -160,6 +163,7 @@ class HomeworkAI(commands.Cog):
             "ask": "</ask:1364653272194875545>",
             "answer": "</answer:1364669240912904192>",
             "explain": "</explain:1364669240912904193>",
+            "outline": "</outline:1364669240912904194>",
         }
         for cmd, price in prices.items():
             if cmd == "ask":
@@ -168,6 +172,8 @@ class HomeworkAI(commands.Cog):
                 label = "Answer (best for Multiple Choice and Comparison)"
             elif cmd == "explain":
                 label = "Explain (best for Step-by-Step work)"
+            elif cmd == "outline":
+                label = "Outline (best for Paper Outlines)"
             else:
                 label = cmd.capitalize()
             mention = command_mentions.get(cmd)
@@ -214,7 +220,8 @@ class HomeworkAI(commands.Cog):
         )
         embed.add_field(name="Asks solved", value=str(stats.get("ask", 0)), inline=True)
         embed.add_field(name="Answers generated", value=str(stats.get("answer", 0)), inline=True)
-        embed.add_field(name="Explainations given", value=str(stats.get("explain", 0)), inline=True)
+        embed.add_field(name="Explanations given", value=str(stats.get("explain", 0)), inline=True)
+        embed.add_field(name="Outlines generated", value=str(stats.get("outline", 0)), inline=True)
         embed.add_field(name="👍 Upvotes", value=str(stats.get("upvotes", 0)), inline=True)
         embed.add_field(name="👎 Downvotes", value=str(stats.get("downvotes", 0)), inline=True)
         embed.set_footer(text="Stats update live as users interact with HomeworkAI.\nInvite friends! After onboarding, every 10 users you invite gets you $1 of free HomeworkAI usage")
@@ -445,6 +452,7 @@ class HomeworkAI(commands.Cog):
             "ask": 0,
             "answer": 0,
             "explain": 0,
+            "outline": 0,
             "upvotes": 0,
             "downvotes": 0,
         })
@@ -495,7 +503,8 @@ class HomeworkAI(commands.Cog):
                         "**How to use:**\n"
                         "- Use `/ask` to get answers to general questions (text or image supported).\n"
                         "- Use `/answer` for multiple choice or comparison questions (text or image supported).\n"
-                        "- Use `/explain` to get step-by-step explanations for your homework problems.\n\n"
+                        "- Use `/explain` to get step-by-step explanations for your homework problems.\n"
+                        "- Use `/outline` to generate an outline for your paper.\n\n"
                         "All answers are sent to you in DMs for privacy.\n\n"
                         f"To manage your billing or connect your payment method, visit our [billing portal]({self.billing_portal_url})"
                     ),
@@ -1347,8 +1356,8 @@ class HomeworkAI(commands.Cog):
         prompt_type: str
     ):
         """
-        Helper for ask/answer/explain commands.
-        prompt_type: "ask", "answer", or "explain"
+        Helper for ask/answer/explain/outline commands.
+        prompt_type: "ask", "answer", "explain", or "outline"
         """
         customer_id = await self.config.user(ctx.author).customer_id()
         if not customer_id:
@@ -1410,6 +1419,12 @@ class HomeworkAI(commands.Cog):
                 "Provide a detailed, step-by-step explanation or tutorial for the user's question. "
                 "If the user attaches an image, use it to help explain the answer in depth."
             )
+        elif prompt_type == "outline":
+            system_prompt = (
+                "You are HomeworkAI, an expert in creating outlines for academic papers. "
+                "Generate a structured outline based on the user's topic and the specified number of paragraphs. "
+                "Ensure the outline is logical and provides a clear framework for writing the paper."
+            )
         else:
             system_prompt = "You are HomeworkAI, an expert homework assistant."
 
@@ -1427,24 +1442,14 @@ class HomeworkAI(commands.Cog):
                 else:
                     user_content = question
 
-                if image_url:
-                    payload = {
-                        "model": "gpt-4.1",
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_content}
-                        ],
-                        "max_tokens": 1024
-                    }
-                else:
-                    payload = {
-                        "model": "gpt-4.1",
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": question}
-                        ],
-                        "max_tokens": 1024
-                    }
+                payload = {
+                    "model": "gpt-4.1",
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_content}
+                    ],
+                    "max_tokens": 1024
+                }
                 endpoint = "https://api.openai.com/v1/chat/completions"
 
                 async with aiohttp.ClientSession() as session:
@@ -1495,6 +1500,9 @@ class HomeworkAI(commands.Cog):
                         elif prompt_type == "explain":
                             embed_title = "HomeworkAI Step-by-Step Explanation"
                             field_name = "Your question"
+                        elif prompt_type == "outline":
+                            embed_title = "HomeworkAI Paper Outline"
+                            field_name = "Your topic"
                         else:
                             embed_title = "Your HomeworkAI Answer"
                             field_name = "You asked"
@@ -1748,6 +1756,54 @@ class HomeworkAI(commands.Cog):
             await self._increment_usage(ctx.guild, "explain")
 
         await self._send_homeworkai_response(ctx, question, image_url, prompt_type="explain")
+
+    @commands.hybrid_command(name="outline", with_app_command=True)
+    async def outline(self, ctx: commands.Context, paragraphs: int, *, topic: str):
+        """
+        Generate an outline for a paper based on the given topic and number of paragraphs.
+        The outline will be sent to you in DMs.
+        """
+        # Check if the user has a customer_id set
+        customer_id = await self.config.user(ctx.author).customer_id()
+        if not customer_id:
+            embed = discord.Embed(
+                title="Access Required",
+                description=(
+                    "You don't have access to HomeworkAI yet.\n\n"
+                    "To apply for access, please use the `/onboard` command.\n"
+                    "Once approved, you'll be able to use HomeworkAI features."
+                ),
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+            return
+
+        # --- Stripe Meter Event Logging ---
+        try:
+            stripe_key = await self.get_stripe_key()
+            if stripe_key and customer_id:
+                timestamp = int(time.time())
+                meter_url = "https://api.stripe.com/v1/billing/meter_events"
+                data = {
+                    "event_name": "outline",
+                    "timestamp": timestamp,
+                    "payload[stripe_customer_id]": customer_id,
+                }
+                headers = {
+                    "Authorization": f"Bearer {stripe_key}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(meter_url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        pass
+        except Exception as e:
+            pass
+
+        if ctx.guild:
+            await self._increment_usage(ctx.guild, "outline")
+
+        question = f"Generate an outline for a paper on the topic '{topic}' with {paragraphs} paragraphs."
+        await self._send_homeworkai_response(ctx, question, image_url=None, prompt_type="outline")
 
     @commands.hybrid_command(name="billing", with_app_command=True)
     async def billing(self, ctx: commands.Context):
