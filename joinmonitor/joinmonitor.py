@@ -53,7 +53,7 @@ class JoinMonitor(commands.Cog):
         """Join Monitor configuration commands."""
 
     @joinmonitor.command()
-    async def setalertschannel(self, ctx, channel: discord.TextChannel = None):
+    async def alerts(self, ctx, channel: discord.TextChannel = None):
         """Set the channel for join alerts."""
         await self.config.guild(ctx.guild).alerts_channel.set(channel.id if channel else None)
         if channel:
@@ -62,9 +62,24 @@ class JoinMonitor(commands.Cog):
             await ctx.send("Alerts channel cleared.")
 
     @joinmonitor.command()
-    async def setcriteria(self, ctx, *, criteria: str):
+    async def criteria(self, ctx, *, criteria: str):
         """
-        Set alert criteria. Example: min_account_age_days=2 flag_default_avatar=true
+        Set alert criteria for join alerts.
+
+        Example usage:
+            `[p]joinmonitor setcriteria min_account_age_days=2 flag_default_avatar=true`
+
+        **Available criteria:**
+        - `min_account_age_days` (int): Minimum account age in days required to not trigger an alert. Default: 3
+        - `flag_default_avatar` (bool): Flag users with the default avatar. Default: True
+        - `flag_no_badges` (bool): Flag users with no Discord profile badges. Default: True
+        - `flag_no_nitro` (bool): Flag users who do not have Nitro. Default: False
+        - `flag_spammer` (bool): Flag users marked as "spammer" by Discord. Default: True
+
+        **Boolean values** can be set as: true/false, yes/no, on/off
+
+        Example:
+            `[p]joinmonitor setcriteria min_account_age_days=1 flag_no_badges=false`
         """
         current = await self.config.guild(ctx.guild).alert_criteria()
         updates = {}
@@ -89,7 +104,7 @@ class JoinMonitor(commands.Cog):
         await ctx.send(f"Updated alert criteria: `{current}`")
 
     @joinmonitor.command()
-    async def setsurge(self, ctx, threshold: int = None, interval: int = None, level: str = None, cooldown: int = None, enabled: bool = None):
+    async def surge(self, ctx, threshold: int = None, interval: int = None, level: str = None, cooldown: int = None, enabled: bool = None):
         """
         Configure join surge detection.
         """
