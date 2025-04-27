@@ -50,24 +50,42 @@ class JoinMonitor(commands.Cog):
     @commands.guild_only()
     @checks.admin_or_permissions(manage_guild=True)
     async def joinmonitor(self, ctx):
-        """Join Monitor configuration commands."""
+        """
+        Join Monitor configuration commands.
+
+        Use subcommands to configure join alerts, alert criteria, and surge detection.
+
+        Example:
+            `[p]joinmonitor alerts #channel`
+            `[p]joinmonitor criteria min_account_age_days=2 flag_default_avatar=true`
+            `[p]joinmonitor surge threshold=10 interval=60 level=high cooldown=600 enabled=true`
+        """
 
     @joinmonitor.command()
     async def alerts(self, ctx, channel: discord.TextChannel = None):
-        """Set the channel for join alerts."""
+        """
+        Set or clear the channel for join alerts.
+
+        If a channel is provided, join alerts will be sent there.
+        If no channel is provided, join alerts will be disabled.
+
+        **Examples:**
+            `[p]joinmonitor alerts #alerts`
+            `[p]joinmonitor alerts` (to clear)
+        """
         await self.config.guild(ctx.guild).alerts_channel.set(channel.id if channel else None)
         if channel:
             await ctx.send(f"Alerts channel set to {channel.mention}.")
         else:
             await ctx.send("Alerts channel cleared.")
 
-    @joinmonitor.command()
+    @joinmonitor.command(name="criteria")
     async def criteria(self, ctx, *, criteria: str):
         """
         Set alert criteria for join alerts.
 
-        Example usage:
-            `[p]joinmonitor setcriteria min_account_age_days=2 flag_default_avatar=true`
+        This command allows you to specify which criteria should trigger a join alert.
+        You can set multiple criteria at once, separated by spaces.
 
         **Available criteria:**
         - `min_account_age_days` (int): Minimum account age in days required to not trigger an alert. Default: 3
@@ -78,8 +96,9 @@ class JoinMonitor(commands.Cog):
 
         **Boolean values** can be set as: true/false, yes/no, on/off
 
-        Example:
-            `[p]joinmonitor setcriteria min_account_age_days=1 flag_no_badges=false`
+        **Examples:**
+            `[p]joinmonitor criteria min_account_age_days=2 flag_default_avatar=true`
+            `[p]joinmonitor criteria flag_no_badges=false`
         """
         current = await self.config.guild(ctx.guild).alert_criteria()
         updates = {}
@@ -104,9 +123,32 @@ class JoinMonitor(commands.Cog):
         await ctx.send(f"Updated alert criteria: `{current}`")
 
     @joinmonitor.command()
-    async def surge(self, ctx, threshold: int = None, interval: int = None, level: str = None, cooldown: int = None, enabled: bool = None):
+    async def surge(
+        self,
+        ctx,
+        threshold: int = None,
+        interval: int = None,
+        level: str = None,
+        cooldown: int = None,
+        enabled: bool = None,
+    ):
         """
         Configure join surge detection.
+
+        This command allows you to configure how the bot detects and responds to a surge of new joins.
+
+        **Parameters:**
+        - `threshold` (int): Number of joins within the interval to trigger a surge. (Default: 5)
+        - `interval` (int): Time window in seconds to count joins for surge detection. (Default: 30)
+        - `level` (str): Verification level to set during a surge. One of: none, low, medium, high, very_high. (Default: high)
+        - `cooldown` (int): How long (in seconds) to keep the higher verification level after a surge. (Default: 300)
+        - `enabled` (bool): Enable or disable surge detection. (Default: True)
+
+        You can set one or more parameters at a time.
+
+        **Examples:**
+            `[p]joinmonitor surge threshold=10 interval=60`
+            `[p]joinmonitor surge level=very_high cooldown=600 enabled=false`
         """
         surge = await self.config.guild(ctx.guild).surge()
         if threshold is not None:
@@ -128,6 +170,12 @@ class JoinMonitor(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
+        """
+        Listener for member joins.
+
+        Evaluates the new member against alert criteria and sends an alert if needed.
+        Also checks for join surges and raises verification level if a surge is detected.
+        """
         guild = member.guild
         conf = self.config.guild(guild)
         alert_criteria = await conf.alert_criteria()
@@ -194,6 +242,9 @@ class JoinMonitor(commands.Cog):
                 await channel.send(embed=embed)
 
     async def _handle_surge(self, guild, conf, surge_conf, now_ts):
+        """
+        Internal: Handles raising the verification level during a join surge and notifying the alert channel.
+        """
         # Only act if not already in surge
         surge_active_until = await conf.surge_active_until()
         if surge_active_until and now_ts < surge_active_until:
@@ -227,6 +278,9 @@ class JoinMonitor(commands.Cog):
                 )
 
     async def _lower_verification_later(self, guild, conf, cooldown):
+        """
+        Internal: Lowers the verification level after the surge cooldown and notifies the alert channel.
+        """
         try:
             await asyncio.sleep(cooldown)
             last_level_str = await conf.last_verification_level()
