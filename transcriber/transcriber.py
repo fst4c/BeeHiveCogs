@@ -343,10 +343,27 @@ class Transcriber(commands.Cog):
                     description=f"A voice note from {message.author.mention} in {message.channel.mention} has been moderated.",
                     color=0xff4545
                 )
-                # Add the top 5 flags to the embed
+                # Show the top 3 scoring categories as unique embed fields, as percent
                 if flags:
-                    flag_details = "\n".join([f"{flag}: {score:.2f}" for flag, score in flags])
-                    embed.add_field(name="Scored categories", value=flag_details, inline=False)
+                    top_flags = flags[:3]
+                    for flag, score in top_flags:
+                        # Prettify flag name
+                        pretty_flag = flag.replace("_", " ").capitalize()
+                        # Emoji for severity
+                        if score >= 0.85:
+                            emoji = "🔴"
+                        elif score >= 0.6:
+                            emoji = "🟠"
+                        elif score >= 0.3:
+                            emoji = "🟡"
+                        else:
+                            emoji = "🟢"
+                        percent = f"{score:.2%}"
+                        embed.add_field(
+                            name=f"{emoji} {pretty_flag}",
+                            value=f"Score: **{percent}**",
+                            inline=False
+                        )
                 temp_file_path = None  # Initialize temp_file_path
                 try:
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_file:
