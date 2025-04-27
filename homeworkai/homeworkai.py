@@ -224,7 +224,7 @@ class HomeworkAI(commands.Cog):
         embed.add_field(name="Outlines generated", value=str(stats.get("outline", 0)), inline=True)
         embed.add_field(name="👍 Upvotes", value=str(stats.get("upvotes", 0)), inline=True)
         embed.add_field(name="👎 Downvotes", value=str(stats.get("downvotes", 0)), inline=True)
-        embed.set_footer(text="Stats update live as users interact with HomeworkAI.\nInvite friends! After onboarding, every 10 users you invite gets you $1 of free HomeworkAI usage")
+        embed.set_footer(text="Stats update live as users interact with HomeworkAI.\nInvite friends! After onboarding, every 10 users you invite gets you $1 of free HomeworkAI usage.")
 
         msg = None
         if msg_id:
@@ -414,7 +414,7 @@ class HomeworkAI(commands.Cog):
         embed = discord.Embed(
             title="Pending signups channel set",
             description=f"Applications channel set to {channel.mention}.",
-            color=-0x2bbd8e
+            color=0x2bbd8e  # Fixed: was negative, should be positive for green
         )
         await ctx.send(embed=embed)
 
@@ -617,7 +617,7 @@ class HomeworkAI(commands.Cog):
         async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
             await interaction.response.defer(ephemeral=True, thinking=True)
             # Only allow admins to approve
-            if not interaction.user.guild_permissions.manage_guild and not interaction.user.guild_permissions.administrator:
+            if not (getattr(interaction.user, "guild_permissions", None) and (interaction.user.guild_permissions.manage_guild or interaction.user.guild_permissions.administrator)):
                 await interaction.followup.send("You do not have permission to approve applications.", ephemeral=True)
                 return
 
@@ -788,7 +788,7 @@ class HomeworkAI(commands.Cog):
         @discord.ui.button(label="Deny", style=discord.ButtonStyle.danger, custom_id="homeworkai_deny")
         async def deny(self, interaction: discord.Interaction, button: discord.ui.Button):
             # Only allow admins to deny
-            if not interaction.user.guild_permissions.manage_guild and not interaction.user.guild_permissions.administrator:
+            if not (getattr(interaction.user, "guild_permissions", None) and (interaction.user.guild_permissions.manage_guild or interaction.user.guild_permissions.administrator)):
                 await interaction.response.send_message("You do not have permission to deny applications.", ephemeral=True)
                 return
 
@@ -1320,8 +1320,11 @@ class HomeworkAI(commands.Cog):
                 await interaction.response.send_message("You already upvoted this answer.", ephemeral=True)
                 return
             self.upvoted = True
-            await self.cog._increment_stat(self.guild_id, "upvotes")
-            await self.cog._update_stats_channel(self.ctx.guild)
+            if self.guild_id:
+                await self.cog._increment_stat(self.guild_id, "upvotes")
+                guild = self.cog.bot.get_guild(self.guild_id)
+                if guild:
+                    await self.cog._update_stats_channel(guild)
             await interaction.response.send_message("Thank you for your feedback! 👍", ephemeral=True)
 
         @discord.ui.button(label="👎", style=discord.ButtonStyle.danger, custom_id="homeworkai_downvote")
@@ -1330,8 +1333,11 @@ class HomeworkAI(commands.Cog):
                 await interaction.response.send_message("You already downvoted this answer.", ephemeral=True)
                 return
             self.downvoted = True
-            await self.cog._increment_stat(self.guild_id, "downvotes")
-            await self.cog._update_stats_channel(self.ctx.guild)
+            if self.guild_id:
+                await self.cog._increment_stat(self.guild_id, "downvotes")
+                guild = self.cog.bot.get_guild(self.guild_id)
+                if guild:
+                    await self.cog._update_stats_channel(guild)
             await interaction.response.send_message("Thank you for your feedback! 👎", ephemeral=True)
 
     async def _increment_stat(self, guild_id, stat):
