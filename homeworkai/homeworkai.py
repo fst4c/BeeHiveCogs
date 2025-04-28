@@ -163,7 +163,7 @@ class HomeworkAI(commands.Cog):
             "ask": "</ask:1364653272194875545>",
             "answer": "</answer:1364669240912904192>",
             "explain": "</explain:1364669240912904193>",
-            "outline": "</outline:1364669240912904194>",
+            "outline": "</outline:1366048730242875423>",
         }
         for cmd, price in prices.items():
             if cmd == "ask":
