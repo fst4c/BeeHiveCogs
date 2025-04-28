@@ -1767,10 +1767,9 @@ class HomeworkAI(commands.Cog):
         await self._send_homeworkai_response(ctx, question, image_url, prompt_type="explain")
 
     @commands.hybrid_command(name="outline", with_app_command=True)
-    async def outline(self, ctx: commands.Context, paragraphcount: int = commands.parameter(description="Number of paragraphs for the outline"), *, topic: str = commands.parameter(description="The topic for the outline")):
+    async def outline(self, ctx: commands.Context, paragraphcount: int, *, topic: str):
         """
-        Generate an outline for a paper based on the given topic and number of paragraphs.
-        The outline will be sent to you in DMs.
+        Generate an outline for a paper you've been asked to write
         """
         # Check if the user has a customer_id set
         customer_id = await self.config.user(ctx.author).customer_id()
