@@ -99,8 +99,10 @@ class HomeworkAI(commands.Cog):
         try:
             invites = await guild.invites()
             self._invite_code_cache[guild.id] = {invite.code: invite.uses for invite in invites}
-        except Exception:
+        except discord.Forbidden:
             self._invite_code_cache[guild.id] = {}
+        except Exception as e:
+            print(f"Error caching invites for guild {guild.id}: {e}")
 
     async def cog_load(self):
         await self._maybe_update_all_pricing_channels()
@@ -114,16 +116,16 @@ class HomeworkAI(commands.Cog):
         for guild in self.bot.guilds:
             try:
                 await self._update_pricing_channel(guild)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Error updating pricing channel for guild {guild.id}: {e}")
 
     async def _maybe_update_all_stats_channels(self):
         await self.bot.wait_until_ready()
         for guild in self.bot.guilds:
             try:
                 await self._update_stats_channel(guild)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Error updating stats channel for guild {guild.id}: {e}")
 
     async def _periodic_stats_update(self):
         await self.bot.wait_until_ready()
@@ -131,8 +133,8 @@ class HomeworkAI(commands.Cog):
             for guild in self.bot.guilds:
                 try:
                     await self._update_stats_channel(guild)
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Error updating stats channel for guild {guild.id}: {e}")
             await asyncio.sleep(120)  # Update every 120 seconds
 
     async def _cycle_status(self):
@@ -142,8 +144,8 @@ class HomeworkAI(commands.Cog):
                 activity = self._status_cycle[self._status_index]
                 await self.bot.change_presence(activity=activity)
                 self._status_index = (self._status_index + 1) % len(self._status_cycle)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Error cycling status: {e}")
             await asyncio.sleep(30)  # Change status every 30 seconds
 
     async def _update_pricing_channel(self, guild):
@@ -320,10 +322,9 @@ class HomeworkAI(commands.Cog):
                                 timeout=aiohttp.ClientTimeout(total=30)
                             ) as resp:
                                 if resp.status not in (200, 201):
-                                    # Log or handle errors here
-                                    pass
-                    except Exception:
-                        pass
+                                    print(f"Error granting credit: {resp.status}")
+                    except Exception as e:
+                        print(f"Error during credit grant: {e}")
                 await inviter_conf.invite_credits_granted.set(credits_granted + to_grant)
                 # Optionally, notify the user
                 try:
@@ -332,8 +333,8 @@ class HomeworkAI(commands.Cog):
                         await user.send(
                             f"🎉 You've earned ${to_grant}.00 in promotional credit for inviting new users to HomeworkAI! Thank you for spreading the word, keep it up and you'll keep earning credit."
                         )
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Error notifying user {inviter_id}: {e}")
 
     async def _find_inviter(self, member: discord.Member):
         """
@@ -360,8 +361,10 @@ class HomeworkAI(commands.Cog):
                 for invite in invites:
                     if invite.code == used_code and invite.inviter:
                         return invite.inviter.id
-        except Exception:
-            pass
+        except discord.Forbidden:
+            print(f"Permission error while accessing invites for guild {guild.id}")
+        except Exception as e:
+            print(f"Error finding inviter for member {member.id} in guild {guild.id}: {e}")
         return None
 
     @commands.Cog.listener()
@@ -387,8 +390,8 @@ class HomeworkAI(commands.Cog):
                         color=0x476b89
                     )
                     await user.send(embed=embed)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Error notifying inviter {inviter_id}: {e}")
 
     @commands.Cog.listener()
     async def on_member_update(self, before: discord.Member, after: discord.Member):
@@ -1514,24 +1517,24 @@ class HomeworkAI(commands.Cog):
 
                         # Title and field names per command
                         if prompt_type == "ask":
-                            embed_title = "Your HomeworkAI Answer"
+                            embed_title = "Your HomeworkAI response"
                             field_name = "You asked"
                         elif prompt_type == "answer":
-                            embed_title = "HomeworkAI Multiple Choice/Comparison Answer"
+                            embed_title = "HomeworkAI chose an answer"
                             field_name = "Your question"
                         elif prompt_type == "explain":
-                            embed_title = "HomeworkAI Step-by-Step Explanation"
+                            embed_title = "HomeworkAI generated an explanation"
                             field_name = "Your question"
                         elif prompt_type == "outline":
-                            embed_title = "HomeworkAI Paper Outline"
-                            field_name = "Your topic"
+                            embed_title = "HomeworkAI finished outlining your paper"
+                            field_name = "Your request"
                         else:
                             embed_title = "Your HomeworkAI Answer"
                             field_name = "You asked"
 
                         embed = discord.Embed(
                             title=embed_title,
-                            color=discord.Color.blurple()
+                            color=0xfffffe
                         )
                         # Truncate question_section to 1024 for embed field
                         embed.add_field(
@@ -1555,8 +1558,8 @@ class HomeworkAI(commands.Cog):
                             await ctx.author.send(embed=embed, view=view)
                             await ctx.send(
                                 embed=discord.Embed(
-                                    title="Finished thinking!",
-                                    description="Check your DM's for the answer",
+                                    title=":white_check_mark Done",
+                                    description="Check your messages",
                                     color=0x2bbd8e
                                 )
                             )
