@@ -282,7 +282,8 @@ class Transcriber(commands.Cog):
                         footer_text = f"{transcription_time_display} to transcribe"
                         if moderation_time_display != "is disabled":
                             footer_text += f", {moderation_time_display} to moderate"
-                        footer_text += ". AI can make mistakes, double-check for accuracy"
+                        word_count = len(transcription.split())
+                        footer_text += f". Counted {word_count} words.\n\nAI can make mistakes, double-check for accuracy."
                         embed.set_footer(text=footer_text)
                         embeds.append(embed)
 
