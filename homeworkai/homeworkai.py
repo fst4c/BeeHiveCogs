@@ -163,10 +163,10 @@ class HomeworkAI(commands.Cog):
             color=0x476b89
         )
         command_descriptions = {
-            "ask": "Ideal for General Questions",
-            "answer": "Perfect for Multiple Choice & Comparisons",
-            "explain": "Best for Step-by-Step Solutions",
-            "outline": "Great for Paper Outlines",
+            "ask": "Ask AI tutor any loose question you may have for any subject",
+            "answer": "Ask AI to help you solve a multiple choice or prompt based question",
+            "explain": "Ask AI to help explain something to you better",
+            "outline": "Ask AI to generate an outline for a paper you need to write.",
         }
         command_mentions = {
             "ask": "</ask:1364653272194875545>",
