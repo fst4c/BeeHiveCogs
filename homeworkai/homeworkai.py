@@ -155,10 +155,19 @@ class HomeworkAI(commands.Cog):
             return
 
         embed = discord.Embed(
-            title="HomeworkAI pricing",
-            description="Here are the current prices for each HomeworkAI feature. HomeworkAI is charged by usage, meaning you only pay for how much you use.",
+            title="📊 HomeworkAI Pricing",
+            description=(
+                "Discover the cost of using each HomeworkAI feature. "
+                "Charges are based on usage, ensuring you only pay for what you use."
+            ),
             color=0x476b89
         )
+        command_descriptions = {
+            "ask": "Ideal for General Questions",
+            "answer": "Perfect for Multiple Choice & Comparisons",
+            "explain": "Best for Step-by-Step Solutions",
+            "outline": "Great for Paper Outlines",
+        }
         command_mentions = {
             "ask": "</ask:1364653272194875545>",
             "answer": "</answer:1364669240912904192>",
@@ -166,23 +175,17 @@ class HomeworkAI(commands.Cog):
             "outline": "</outline:1366048730242875423>",
         }
         for cmd, price in prices.items():
-            if cmd == "ask":
-                label = "Ask (best for General Questions)"
-            elif cmd == "answer":
-                label = "Answer (best for Multiple Choice and Comparison)"
-            elif cmd == "explain":
-                label = "Explain (best for Step-by-Step work)"
-            elif cmd == "outline":
-                label = "Outline (best for Paper Outlines)"
-            else:
-                label = cmd.capitalize()
-            mention = command_mentions.get(cmd)
-            if mention:
-                value = f"{price} per {mention}"
-            else:
-                value = str(price)
-            embed.add_field(name=label, value=value, inline=False)
-        embed.set_footer(text="Prices are per command use and may change with notice.\n\nWant free usage? Sign up, then invite your friends!\nFor every 10 users you invite who onboard, you get $1 of automatic free usage credit towards any HomeworkAI feature.\n\nNot signed up? You're missing out in real time! Use /signup to get started.")
+            label = cmd.capitalize()
+            description = command_descriptions.get(cmd, "")
+            mention = command_mentions.get(cmd, "")
+            value = f"{description}\n**{price}** per use of {mention}"
+            embed.add_field(name=label, value=value, inline=True)
+        embed.set_footer(text=(
+            "Prices are subject to change with prior notice.\n\n"
+            "Earn free usage by inviting friends! For every 10 friends who join and onboard, "
+            "you receive $1 in free usage credit.\n\n"
+            "Not signed up yet? Use /signup to start benefiting from HomeworkAI!"
+        ))
 
         # Try to edit the previous pricing message if it exists, else send a new one
         msg_id = await self.config.guild(guild).pricing_message_id()
