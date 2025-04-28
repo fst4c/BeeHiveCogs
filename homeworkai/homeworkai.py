@@ -163,7 +163,7 @@ class HomeworkAI(commands.Cog):
             color=0x476b89
         )
         command_descriptions = {
-            "ask": "Ask AI tutor any loose question you may have for any subject",
+            "ask": "Ask AI any question for any subject of school",
             "answer": "Ask AI to help you solve a multiple choice or prompt based question",
             "explain": "Ask AI to help explain something to you better",
             "outline": "Ask AI to generate an outline for a paper you need to write.",
