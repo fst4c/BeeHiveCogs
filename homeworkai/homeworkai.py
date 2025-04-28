@@ -630,7 +630,7 @@ class HomeworkAI(commands.Cog):
             self.answers = answers
             self.message = None
 
-        @discord.ui.button(label="Approve", style=discord.ButtonStyle.success, custom_id="homeworkai_approve")
+        @discord.ui.button(label="Allow", style=discord.ButtonStyle.success, custom_id="homeworkai_approve")
         async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
             await interaction.response.defer(ephemeral=True, thinking=True)
             # Only allow admins to approve
@@ -871,7 +871,7 @@ class HomeworkAI(commands.Cog):
                 description="Our team is still reviewing your signup, this can take up to 8 hours.\n\nIf you have waited longer than this without a response, please open a ticket for an expedited review.",
                 color=discord.Color.orange()
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=False)
             return
         if customer_id:
             embed = discord.Embed(
@@ -879,7 +879,7 @@ class HomeworkAI(commands.Cog):
                 description="You're already a HomeworkAI user. Go ask it some questions or something.",
                 color=0x476b89
             )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=False)
             return
         
         # Try to DM the user
@@ -890,7 +890,7 @@ class HomeworkAI(commands.Cog):
                     description="Signup started, check your messages to continue in private.",
                     color=0x476b89
                 ),
-                ephemeral=True
+                ephemeral=False
             )
             dm_channel = await user.create_dm()
         except discord.Forbidden:
@@ -901,7 +901,7 @@ class HomeworkAI(commands.Cog):
                         description="I couldn't DM you. Please enable DMs from server members and try again.",
                         color=0xff4545
                     ),
-                    ephemeral=True
+                    ephemeral=False
                 )
             except discord.Forbidden:
                 pass
