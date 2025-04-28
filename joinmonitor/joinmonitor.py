@@ -1,7 +1,7 @@
 import discord
 from redbot.core import commands, Config, checks
 from redbot.core.bot import Red
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import asyncio
 
 class JoinMonitor(commands.Cog):
@@ -183,7 +183,7 @@ class JoinMonitor(commands.Cog):
         surge_conf = await conf.surge()
         join_timestamps = await conf.join_timestamps()
 
-        now = datetime.utcnow().timestamp()
+        now = datetime.now(timezone.utc).timestamp()
         join_timestamps.append(now)
         # Keep only recent joins within the interval
         interval = surge_conf.get("interval_seconds", 30)
@@ -200,7 +200,7 @@ class JoinMonitor(commands.Cog):
         reasons = []
         # 1. Account age
         min_age = alert_criteria.get("min_account_age_days", 3)
-        account_age = (datetime.utcnow() - member.created_at).days
+        account_age = (datetime.now(timezone.utc) - member.created_at).days
         if account_age < min_age:
             reasons.append(f"Account age: {account_age}d < {min_age}d")
 
@@ -234,7 +234,7 @@ class JoinMonitor(commands.Cog):
                     title="Suspicious account joined the server",
                     description=f"{member.mention} (`{member.id}`) joined.",
                     color=0xff9144,
-                    timestamp=datetime.utcnow()
+                    timestamp=datetime.now(timezone.utc)
                 )
                 embed.add_field(name="Flags", value="\n".join(reasons), inline=False)
                 embed.add_field(name="Account created", value=member.created_at.strftime("%Y-%m-%d %H:%M:%S UTC"))
