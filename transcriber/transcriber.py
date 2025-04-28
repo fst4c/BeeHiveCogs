@@ -279,11 +279,11 @@ class Transcriber(commands.Cog):
                     for i in range(0, len(transcription), max_length):
                         embed = discord.Embed(title="", description=transcription[i:i+max_length], color=highest_role_color)
                         embed.set_author(name=f"{message.author.display_name} said...", icon_url=message.author.avatar.url)
-                        footer_text = f"{transcription_time_display} to transcribe"
+                        word_count = len(transcription.split())
+                        footer_text = f"{transcription_time_display} to transcribe {word_count} words"
                         if moderation_time_display != "is disabled":
                             footer_text += f", {moderation_time_display} to moderate"
-                        word_count = len(transcription.split())
-                        footer_text += f". Counted {word_count} words.\n\nAI can make mistakes, double-check for accuracy."
+                        footer_text += f".\n\nAI can make mistakes, double-check for accuracy."
                         embed.set_footer(text=footer_text)
                         embeds.append(embed)
 
