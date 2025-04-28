@@ -193,12 +193,12 @@ class HomeworkAI(commands.Cog):
         if msg_id:
             try:
                 msg = await channel.fetch_message(msg_id)
-            except Exception:
+            except discord.NotFound:
                 msg = None
         if msg:
             try:
                 await msg.edit(embed=embed)
-            except Exception:
+            except discord.Forbidden:
                 # If can't edit, send new
                 msg = await channel.send(embed=embed)
                 await self.config.guild(guild).pricing_message_id.set(msg.id)
@@ -242,12 +242,12 @@ class HomeworkAI(commands.Cog):
         if msg_id:
             try:
                 msg = await channel.fetch_message(msg_id)
-            except Exception:
+            except discord.NotFound:
                 msg = None
         if msg:
             try:
                 await msg.edit(embed=embed)
-            except Exception:
+            except discord.Forbidden:
                 # If can't edit, send new
                 msg = await channel.send(embed=embed)
                 await self.config.guild(guild).stats_message_id.set(msg.id)
@@ -319,8 +319,9 @@ class HomeworkAI(commands.Cog):
                                 headers=headers,
                                 timeout=aiohttp.ClientTimeout(total=30)
                             ) as resp:
-                                # Optionally, you could log or handle errors here
-                                pass
+                                if resp.status not in (200, 201):
+                                    # Log or handle errors here
+                                    pass
                     except Exception:
                         pass
                 await inviter_conf.invite_credits_granted.set(credits_granted + to_grant)
@@ -504,7 +505,7 @@ class HomeworkAI(commands.Cog):
                 else:
                     if role in member.roles:
                         await member.remove_roles(role, reason="Removed HomeworkAI customer role (setcustomerid)")
-            except Exception:
+            except discord.Forbidden:
                 pass
 
         if not prev_id and customer_id:
@@ -524,7 +525,7 @@ class HomeworkAI(commands.Cog):
                     color=0x476b89
                 )
                 await user.send(embed=embed)
-            except Exception:
+            except discord.Forbidden:
                 pass
         embed = discord.Embed(
             title="Customer ID Set",
@@ -553,7 +554,7 @@ class HomeworkAI(commands.Cog):
             try:
                 if role in member.roles:
                     await member.remove_roles(role, reason="Removed HomeworkAI customer role (removecustomerid)")
-            except Exception:
+            except discord.Forbidden:
                 pass
 
         embed = discord.Embed(
@@ -742,7 +743,7 @@ class HomeworkAI(commands.Cog):
                 try:
                     if role not in member.roles:
                         await member.add_roles(role, reason="Granted HomeworkAI customer role (application approved)")
-                except Exception:
+                except discord.Forbidden:
                     pass
 
             # DM the user
@@ -766,7 +767,7 @@ class HomeworkAI(commands.Cog):
                         inline=False
                     )
                 await self.user.send(embed=embed)
-            except Exception:
+            except discord.Forbidden:
                 pass
 
             # Edit the application message to show approved
@@ -782,7 +783,7 @@ class HomeworkAI(commands.Cog):
                             inline=False
                         )
                     await self.message.edit(embed=embed, view=None)
-                except Exception:
+                except discord.Forbidden:
                     pass
 
             msg_text = f"Application for {self.user.mention} has been **approved** and a Stripe customer was created."
@@ -830,7 +831,7 @@ class HomeworkAI(commands.Cog):
                             color=discord.Color.red()
                         )
                         await self.user.send(embed=embed)
-                    except Exception:
+                    except discord.Forbidden:
                         pass
                     # Edit the application message to show denied
                     if self.message:
@@ -840,7 +841,7 @@ class HomeworkAI(commands.Cog):
                             embed.title = "HomeworkAI Application (Denied)"
                             embed.add_field(name="Denial Reason", value=self.reason.value, inline=False)
                             await self.message.edit(embed=embed, view=None)
-                        except Exception:
+                        except discord.Forbidden:
                             pass
                     await modal_interaction.response.send_message(f"Application for {self.user.mention} has been **denied**.", ephemeral=True)
 
@@ -889,7 +890,7 @@ class HomeworkAI(commands.Cog):
                 ephemeral=True
             )
             dm_channel = await user.create_dm()
-        except Exception:
+        except discord.Forbidden:
             try:
                 await interaction.followup.send(
                     embed=discord.Embed(
@@ -899,7 +900,7 @@ class HomeworkAI(commands.Cog):
                     ),
                     ephemeral=True
                 )
-            except Exception:
+            except discord.Forbidden:
                 pass
             return
 
@@ -1312,7 +1313,7 @@ class HomeworkAI(commands.Cog):
                         color=discord.Color.red()
                     )
                 )
-            except Exception:
+            except discord.Forbidden:
                 pass
 
     # --- HomeworkAI Question Commands ---
@@ -1396,7 +1397,7 @@ class HomeworkAI(commands.Cog):
                     role = ctx.guild.get_role(CUSTOMER_ROLE_ID)
                     if role and role not in member.roles:
                         await member.add_roles(role, reason="Granted HomeworkAI customer role (has customer_id)")
-            except Exception:
+            except discord.Forbidden:
                 pass
 
         openai_key = await self.get_openai_key()
@@ -1488,7 +1489,7 @@ class HomeworkAI(commands.Cog):
                         answer = None
                         try:
                             answer = data["choices"][0]["message"]["content"]
-                        except Exception:
+                        except KeyError:
                             embed = discord.Embed(
                                 title="Unexpected OpenAI Response",
                                 description="OpenAI API returned an unexpected response.",
@@ -1641,8 +1642,9 @@ class HomeworkAI(commands.Cog):
                 }
                 async with aiohttp.ClientSession() as session:
                     async with session.post(meter_url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                        # Optionally, you could log or handle errors here
-                        pass
+                        if resp.status not in (200, 201):
+                            # Log or handle errors here
+                            pass
         except Exception as e:
             # Optionally log the error, but don't block the command
             pass
@@ -1706,7 +1708,9 @@ class HomeworkAI(commands.Cog):
                 }
                 async with aiohttp.ClientSession() as session:
                     async with session.post(meter_url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                        pass
+                        if resp.status not in (200, 201):
+                            # Log or handle errors here
+                            pass
         except Exception as e:
             pass
 
@@ -1769,7 +1773,9 @@ class HomeworkAI(commands.Cog):
                 }
                 async with aiohttp.ClientSession() as session:
                     async with session.post(meter_url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                        pass
+                        if resp.status not in (200, 201):
+                            # Log or handle errors here
+                            pass
         except Exception as e:
             pass
 
@@ -1815,7 +1821,9 @@ class HomeworkAI(commands.Cog):
                 }
                 async with aiohttp.ClientSession() as session:
                     async with session.post(meter_url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                        pass
+                        if resp.status not in (200, 201):
+                            # Log or handle errors here
+                            pass
         except Exception as e:
             pass
 
@@ -1841,7 +1849,7 @@ class HomeworkAI(commands.Cog):
                         role = ctx.guild.get_role(CUSTOMER_ROLE_ID)
                         if role and role in member.roles:
                             await member.remove_roles(role, reason="Removed HomeworkAI customer role (no billing profile)")
-                except Exception:
+                except discord.Forbidden:
                     pass
 
             embed = discord.Embed(
@@ -1860,7 +1868,7 @@ class HomeworkAI(commands.Cog):
                     role = ctx.guild.get_role(CUSTOMER_ROLE_ID)
                     if role and role not in member.roles:
                         await member.add_roles(role, reason="Granted HomeworkAI customer role (billing command)")
-            except Exception:
+            except discord.Forbidden:
                 pass
 
         stripe_key = await self.get_stripe_key()
