@@ -17,7 +17,7 @@ DEFAULT_PRICES = {
     "ask": "$0.10",
     "answer": "$0.15",
     "explain": "$0.20",
-    "outline": "$0.25",
+    "outline": "$0.50",
 }
 
 # Stripe price IDs to subscribe new customers to
@@ -25,6 +25,7 @@ STRIPE_PRICE_IDS = [
     "price_1RH6qnRM8UTRBxZH0ynsEnQU",
     "price_1RH7u6RM8UTRBxZHtWar1C2Z",
     "price_1RH7unRM8UTRBxZHU80WXA3e",
+    "price_1RIke9RM8UTRBxZHBonGF3Yv"
 ]
 
 INVITE_CREDIT_AMOUNT = 100  # $1.00 in Stripe's "cents" (100 = $1.00)
