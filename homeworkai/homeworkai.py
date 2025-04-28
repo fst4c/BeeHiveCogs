@@ -155,10 +155,9 @@ class HomeworkAI(commands.Cog):
             return
 
         embed = discord.Embed(
-            title="📊 HomeworkAI Pricing",
+            title="What HomeworkAI costs",
             description=(
-                "Discover the cost of using each HomeworkAI feature. "
-                "Charges are based on usage, ensuring you only pay for what you use."
+                "HomeworkAI usage and charges are metered in real-time. You're only charged for what you use."
             ),
             color=0x476b89
         )
