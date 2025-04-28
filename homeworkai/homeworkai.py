@@ -1558,7 +1558,7 @@ class HomeworkAI(commands.Cog):
                             await ctx.author.send(embed=embed, view=view)
                             await ctx.send(
                                 embed=discord.Embed(
-                                    title=":white_check_mark Done",
+                                    title=":white_check_mark: Done",
                                     description="Check your messages",
                                     color=0x2bbd8e
                                 )
