@@ -215,20 +215,29 @@ class HomeworkAI(commands.Cog):
             return
 
         stats = await self.config.guild(guild).stats()
-        msg_id = await self.config.guild(guild).stats_message_id()
         embed = discord.Embed(
             title="HomeworkAI Usage & Ratings",
             color=0x476b89,
             description="Statistics for HomeworkAI usage and answer ratings in this server."
         )
-        embed.add_field(name="Asks solved", value=str(stats.get("ask", 0)), inline=True)
-        embed.add_field(name="Answers generated", value=str(stats.get("answer", 0)), inline=True)
-        embed.add_field(name="Explanations given", value=str(stats.get("explain", 0)), inline=True)
-        embed.add_field(name="Outlines generated", value=str(stats.get("outline", 0)), inline=True)
-        embed.add_field(name="👍 Upvotes", value=str(stats.get("upvotes", 0)), inline=True)
-        embed.add_field(name="👎 Downvotes", value=str(stats.get("downvotes", 0)), inline=True)
-        embed.set_footer(text="Stats update live as users interact with HomeworkAI.\nInvite friends! After onboarding, every 10 users you invite gets you $1 of free HomeworkAI usage.")
+        command_stats = {
+            "ask": "Asks solved",
+            "answer": "Answers generated",
+            "explain": "Explanations given",
+            "outline": "Outlines generated",
+            "upvotes": "👍 Upvotes",
+            "downvotes": "👎 Downvotes",
+        }
+        for cmd, label in command_stats.items():
+            value = str(stats.get(cmd, 0))
+            embed.add_field(name=label, value=value, inline=True)
+        embed.set_footer(text=(
+            "Stats update live as users interact with HomeworkAI.\n\n"
+            "Invite friends! After onboarding, every 10 users you invite gets you $1 of free HomeworkAI usage."
+        ))
 
+        # Try to edit the previous stats message if it exists, else send a new one
+        msg_id = await self.config.guild(guild).stats_message_id()
         msg = None
         if msg_id:
             try:
@@ -239,6 +248,7 @@ class HomeworkAI(commands.Cog):
             try:
                 await msg.edit(embed=embed)
             except Exception:
+                # If can't edit, send new
                 msg = await channel.send(embed=embed)
                 await self.config.guild(guild).stats_message_id.set(msg.id)
         else:
