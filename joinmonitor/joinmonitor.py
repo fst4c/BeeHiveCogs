@@ -237,7 +237,7 @@ class JoinMonitor(commands.Cog):
                     timestamp=datetime.now(timezone.utc)
                 )
                 embed.add_field(name="Flags", value="\n".join(reasons), inline=False)
-                embed.add_field(name="Account created", value=member.created_at.strftime("%Y-%m-%d %H:%M:%S UTC"))
+                embed.add_field(name="Account created", value=f"<t:{int(member.created_at.timestamp())}:F>")
                 embed.set_thumbnail(url=member.display_avatar.url if member.display_avatar else discord.Embed.Empty)
                 await channel.send(embed=embed)
 
