@@ -1432,7 +1432,9 @@ class HomeworkAI(commands.Cog):
             system_prompt = (
                 "You are HomeworkAI, an expert in creating outlines for academic papers. "
                 "Generate a structured outline based on the user's topic and the specified number of paragraphs. "
-                "Ensure the outline is logical and provides a clear framework for writing the paper."
+                "Structure the outline assuming the first paragraph will be an introduction, and the last paragraph will be a conclusion."
+                "Ensure the outline is logical and provides a clear framework for writing the paper. "
+                "Format the outline using Discord-compatible markdown."
             )
         else:
             system_prompt = "You are HomeworkAI, an expert homework assistant."
