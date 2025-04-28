@@ -1767,7 +1767,7 @@ class HomeworkAI(commands.Cog):
         await self._send_homeworkai_response(ctx, question, image_url, prompt_type="explain")
 
     @commands.hybrid_command(name="outline", with_app_command=True)
-    async def outline(self, ctx: commands.Context, paragraphs: int, *, topic: str):
+    async def outline(self, ctx: commands.Context, paragraphcount: int, *, topic: str):
         """
         Generate an outline for a paper based on the given topic and number of paragraphs.
         The outline will be sent to you in DMs.
@@ -1811,7 +1811,7 @@ class HomeworkAI(commands.Cog):
         if ctx.guild:
             await self._increment_usage(ctx.guild, "outline")
 
-        question = f"Generate an outline for a paper on the topic '{topic}' with {paragraphs} paragraphs."
+        question = f"Generate an outline for a paper on the topic '{topic}' with {paragraphcount} paragraphs."
         await self._send_homeworkai_response(ctx, question, image_url=None, prompt_type="outline")
 
     @commands.hybrid_command(name="billing", with_app_command=True)
