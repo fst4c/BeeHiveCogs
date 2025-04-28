@@ -725,7 +725,7 @@ class ChatSummary(commands.Cog):
                 "Content-Type": "application/json"
             }
             messages = [
-                {"role": "system", "content": "You are a chat summary generator. Use title-less bulletpoints where appropriate. Break activity down by hour."},
+                {"role": "system", "content": "You are a chat summary generator. Use title-less bulletpoints where appropriate. Include time references like NUM hours ago or NUM minutes ago so users understand how long has passed inbetween certain pieces of activity."},
                 {"role": "user", "content": f"Summarize the following chat messages: {messages_content}"}
             ]
             encoding = tiktoken.encoding_for_model(model)
