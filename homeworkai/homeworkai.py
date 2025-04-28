@@ -178,7 +178,7 @@ class HomeworkAI(commands.Cog):
             label = cmd.capitalize()
             description = command_descriptions.get(cmd, "")
             mention = command_mentions.get(cmd, "")
-            value = f"{description}\n**{price}** per use of {mention}"
+            value = f"{description}\n**{price}** per {mention}"
             embed.add_field(name=label, value=value, inline=True)
         embed.set_footer(text=(
             "Prices are subject to change with prior notice.\n\n"
