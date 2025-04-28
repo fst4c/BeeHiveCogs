@@ -10,7 +10,7 @@ import asyncio
 import re
 from collections import defaultdict
 
-CUSTOMER_ROLE_ID = 1364590138847400008  # The role to grant/revoke based on customer_id
+CUSTOMER_ROLE_ID = 1364590138847400008
 
 # Default prices for each command (USD, as string for formatting)
 DEFAULT_PRICES = {
