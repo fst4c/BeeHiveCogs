@@ -13,6 +13,16 @@ import logging
 
 log = logging.getLogger("red.beehive-cogs.antiphishing")
 
+def _strip_zero_width(s: str) -> str:
+    # Remove zero-width and invisible characters that may be used to obfuscate links
+    zero_width_chars = [
+        "\u200b", "\u200c", "\u200d", "\u2060", "\uFEFF",
+        "\u202a", "\u202b", "\u202c", "\u202d", "\u202e"
+    ]
+    for char in zero_width_chars:
+        s = s.replace(char, "")
+    return s
+
 class AntiPhishing(commands.Cog):
     """
     Guard users from malicious links and phishing attempts with customizable protection options.
@@ -61,25 +71,47 @@ class AntiPhishing(commands.Cog):
     def extract_urls(self, message: str) -> List[str]:
         """
         Extract URLs from a message using regex.
+        This function is designed to catch as many valid hyperlinks as possible, including those without schemes.
         """
-        url_pattern = re.compile(r'(https?://[^\s]+)')
-        zero_width_chars = ["\u200b", "\u200c", "\u200d", "\u2060", "\uFEFF"]
-        for char in zero_width_chars:
-            message = message.replace(char, "")
+        # Remove zero-width and invisible chars
+        message = _strip_zero_width(message)
 
-        matches = url_pattern.findall(message)
-        urls = []
-        for url in matches:
+        # Regex for URLs with scheme (http/https/ftp)
+        url_pattern = re.compile(
+            r'(?:(?:https?|ftp):\/\/)?'  # optional scheme
+            r'(?:\S+(?::\S*)?@)?'       # optional user:pass@
+            r'('
+                r'(?:(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})'  # domain
+                r'|'
+                r'(?:\d{1,3}\.){3}\d{1,3}'               # or IPv4
+                r'|'
+                r'\[[0-9a-fA-F:]+\]'                     # or IPv6
+            r')'
+            r'(?::\d{2,5})?'                             # optional port
+            r'(?:[/?#][^\s]*)?',                         # optional path/query/fragment
+            re.UNICODE
+        )
+
+        # Find all matches, including those without scheme
+        matches = url_pattern.finditer(message)
+        urls = set()
+        for match in matches:
+            url = match.group(0)
+            # If no scheme, add http:// for parsing
+            if not re.match(r'^(?:https?|ftp)://', url, re.I):
+                url_for_parse = "http://" + url
+            else:
+                url_for_parse = url
             try:
-                result = urlsplit(url)
-                if result.scheme in {"http", "https"} and result.netloc:
-                    reconstructed_url = urlunsplit(result)
-                    urls.append(reconstructed_url)
-                else:
-                    log.debug(f"Skipping invalid URL structure: {url}")
-            except ValueError as e:
+                result = urlsplit(url_for_parse)
+                # Only consider if we have a netloc (domain)
+                if result.netloc:
+                    # Reconstruct the URL as it appeared in the message
+                    # (If original had no scheme, keep as in message)
+                    urls.add(url)
+            except Exception as e:
                 log.debug(f"Error parsing potential URL '{url}': {e}")
-        return urls
+        return list(urls)
 
     def get_links(self, message: str) -> Optional[List[str]]:
         """
@@ -732,38 +764,61 @@ class AntiPhishing(commands.Cog):
 
         await self._process_links(message, links)
 
+    def _extract_all_domains(self, hostname: str) -> List[str]:
+        """
+        Given a hostname, return all possible domain candidates for blocklist matching.
+        E.g. for 'a.b.c.example.co.uk', returns:
+        ['a.b.c.example.co.uk', 'b.c.example.co.uk', 'c.example.co.uk', 'example.co.uk', 'co.uk']
+        """
+        # Remove trailing dot if present
+        hostname = hostname.rstrip(".")
+        parts = hostname.split(".")
+        domains = []
+        for i in range(len(parts)):
+            candidate = ".".join(parts[i:])
+            if len(candidate.split(".")) >= 2:
+                domains.append(candidate)
+        return domains
+
     async def _process_links(self, message: discord.Message, links: List[str]):
         """Processes extracted links and checks against blocklists."""
         for url in links:
             log.debug(f"Processing link: {url} from message {message.id}")
 
-            try:
-                hostname = urlsplit(url).netloc.lower()
-            except ValueError:
-                log.warning(f"Could not parse URL for hostname: {url}")
-                continue
+            # Remove zero-width/invisible chars from url
+            url_clean = _strip_zero_width(url)
 
-            if hostname in self.domains or hostname in self.domains_v2:
-                log.debug(f"Exact match found: {hostname}")
-                await self.handle_phishing(message, hostname)
-                continue
+            # Try to parse the URL, adding scheme if missing
+            if not re.match(r'^(?:https?|ftp)://', url_clean, re.I):
+                url_for_parse = "http://" + url_clean
+            else:
+                url_for_parse = url_clean
 
             try:
-                # Fix: Ensure the domain extraction considers subdomains
-                domain_match = re.search(r'([a-z0-9-]+\.[a-z0-9-]+\.[a-z]{2,})$', hostname)
-                if not domain_match:
-                    domain_match = re.search(r'([a-z0-9-]+\.[a-z]{2,})$', hostname)
-                if domain_match:
-                    registered_domain = domain_match.group(1).lower()
-                    if registered_domain in self.domains or registered_domain in self.domains_v2:
-                        log.debug(f"Registered domain match found: {registered_domain} (from {hostname})")
-                        await self.handle_phishing(message, registered_domain)
-                        continue
+                parsed = urlsplit(url_for_parse)
+                hostname = parsed.hostname.lower() if parsed.hostname else None
             except Exception as e:
-                log.error(f"Error extracting domain from hostname '{hostname}': {e}")
+                log.warning(f"Could not parse URL for hostname: {url_clean} ({e})")
                 continue
 
-            log.debug(f"No malicious domains found for URL: {url}")
+            if not hostname:
+                log.debug(f"No hostname found in URL: {url_clean}")
+                continue
+
+            # Try all possible domain candidates (from most specific to least)
+            domain_candidates = self._extract_all_domains(hostname)
+            found = False
+            for candidate in domain_candidates:
+                candidate_lc = candidate.lower()
+                if candidate_lc in self.domains or candidate_lc in self.domains_v2:
+                    log.debug(f"Blocklist match found: {candidate_lc} (from {hostname})")
+                    await self.handle_phishing(message, candidate_lc)
+                    found = True
+                    break
+            if found:
+                continue
+
+            log.debug(f"No malicious domains found for URL: {url_clean}")
 
 
 
