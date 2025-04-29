@@ -211,12 +211,8 @@ class JoinMonitor(commands.Cog):
 
         # 3. No badges
         if alert_criteria.get("flag_no_badges", True):
-            if not getattr(member, "public_flags", None) or not any(flag for flag in member.public_flags if flag):
-                reasons.append("No badges")
-            else:
-                # Check for booster or nitro badges
-                if not (member.premium_since or member.public_flags.booster or member.public_flags.nitro):
-                    reasons.append("No booster or nitro badges")
+            if not getattr(member, "public_flags", None) or not any(flag for flag in member.public_flags if flag) or not (member.premium_since or member.public_flags.booster or member.public_flags.nitro):
+                reasons.append("No badges or booster/nitro badges")
 
         # 4. No Nitro
         if alert_criteria.get("flag_no_nitro", False):
