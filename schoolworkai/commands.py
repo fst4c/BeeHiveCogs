@@ -10,7 +10,7 @@ async def ask_command(self, ctx, question):
 
     image_url = self._extract_image_url(ctx)
     await self._log_stripe_meter_event("ask", customer_id)
-    if ctx.guild:
+    if getattr(ctx, "guild", None):
         await self._increment_usage(ctx.guild, "ask")
     await self._send_schoolworkai_response(ctx, question, image_url, prompt_type="ask")
 
@@ -23,7 +23,7 @@ async def answer_command(self, ctx, question):
 
     image_url = self._extract_image_url(ctx)
     await self._log_stripe_meter_event("answer", customer_id)
-    if ctx.guild:
+    if getattr(ctx, "guild", None):
         await self._increment_usage(ctx.guild, "answer")
     await self._send_schoolworkai_response(ctx, question, image_url, prompt_type="answer")
 
@@ -36,7 +36,7 @@ async def explain_command(self, ctx, question):
 
     image_url = self._extract_image_url(ctx)
     await self._log_stripe_meter_event("explain", customer_id)
-    if ctx.guild:
+    if getattr(ctx, "guild", None):
         await self._increment_usage(ctx.guild, "explain")
     await self._send_schoolworkai_response(ctx, question, image_url, prompt_type="explain")
 
@@ -48,7 +48,7 @@ async def outline_command(self, ctx, paragraphcount, topic):
         return
 
     await self._log_stripe_meter_event("outline", customer_id)
-    if ctx.guild:
+    if getattr(ctx, "guild", None):
         await self._increment_usage(ctx.guild, "outline")
     question = f"Generate an outline for a paper on the topic '{topic}' with {paragraphcount} paragraphs."
     await self._send_schoolworkai_response(ctx, question, image_url=None, prompt_type="outline")
@@ -65,16 +65,22 @@ def _not_customer_embed(self):
 
 def _extract_image_url(self, ctx):
     attachments = []
+    # Check for interaction attachments
     if hasattr(ctx, "interaction") and ctx.interaction is not None:
         data = getattr(ctx.interaction, "data", {})
         resolved = data.get("resolved", {}) if data else {}
         attachments = list(resolved.get("attachments", {}).values()) if resolved else []
-    if not attachments and ctx.message and ctx.message.attachments:
+    # Check for message attachments
+    if not attachments and hasattr(ctx, "message") and ctx.message and hasattr(ctx.message, "attachments") and ctx.message.attachments:
         attachments = ctx.message.attachments
     for att in attachments:
-        content_type = getattr(att, "content_type", None) if not isinstance(att, dict) else att.get("content_type")
-        url = getattr(att, "url", None) if not isinstance(att, dict) else att.get("url")
-        if content_type and content_type.startswith("image/"):
+        if isinstance(att, dict):
+            content_type = att.get("content_type")
+            url = att.get("url")
+        else:
+            content_type = getattr(att, "content_type", None)
+            url = getattr(att, "url", None)
+        if content_type and str(content_type).startswith("image/"):
             return url
     return None
 
@@ -95,6 +101,9 @@ async def _log_stripe_meter_event(self, event_name, customer_id):
                 "Content-Type": "application/x-www-form-urlencoded"
             }
             async with aiohttp.ClientSession() as session:
-                await session.post(meter_url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=10))
+                try:
+                    await session.post(meter_url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=10))
+                except Exception:
+                    pass  # Log or handle post error if needed
     except Exception:
         pass
