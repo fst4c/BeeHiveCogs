@@ -3,7 +3,7 @@
     "adminelevation"
   ],
   "install_msg": "Ask AI-powered questions about your homework! Includes application, phone verification, and billing integration.",
-  "name": "HomeworkAI",
+  "name": "SchoolworkAI",
   "short": "AI-powered homework help with billing and application system.",
   "description": "Ask AI-powered questions about your homework! Includes application, phone verification, and billing integration.",
   "requirements": [],

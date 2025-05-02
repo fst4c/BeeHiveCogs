@@ -31,7 +31,7 @@ STRIPE_PRICE_IDS = [
 INVITE_CREDIT_AMOUNT = 100  # $1.00 in Stripe's "cents" (100 = $1.00)
 INVITE_CREDIT_PER = 10      # Every 10 invites = $1.00
 
-class HomeworkAI(commands.Cog):
+class SchoolworkAI(commands.Cog):
     """
     Use AI to get your homework done. It doesn't get any lazier than this, really.
     """
@@ -84,7 +84,7 @@ class HomeworkAI(commands.Cog):
             discord.Activity(type=discord.ActivityType.watching, name="for /answer"),
             discord.Activity(type=discord.ActivityType.watching, name="for /explain"),
             discord.Activity(type=discord.ActivityType.watching, name="for /outline"),
-            discord.Activity(type=discord.ActivityType.streaming, name="homework answers", url="https://twitch.tv/homeworkai"),
+            discord.Activity(type=discord.ActivityType.streaming, name="homework answers", url="https://twitch.tv/schoolworkai"),
             discord.CustomActivity(name="Use /signup to get started"),
         ]
         self._status_index = 0
@@ -158,9 +158,9 @@ class HomeworkAI(commands.Cog):
             return
 
         embed = discord.Embed(
-            title="What HomeworkAI costs",
+            title="What SchoolworkAI costs",
             description=(
-                "HomeworkAI usage and charges are metered in real-time. You're only charged for what you use."
+                "SchoolworkAI usage and charges are metered in real-time. You're only charged for what you use."
             ),
             color=0x476b89
         )
@@ -186,7 +186,7 @@ class HomeworkAI(commands.Cog):
             "Prices are subject to change with prior notice.\n\n"
             "Earn free usage by inviting friends! For every 10 friends who join and onboard, "
             "you receive $1 in free usage credit.\n\n"
-            "Not signed up yet? Use /signup to start benefiting from HomeworkAI!"
+            "Not signed up yet? Use /signup to start benefiting from SchoolworkAI!"
         ))
 
         # Try to edit the previous pricing message if it exists, else send a new one
@@ -218,9 +218,9 @@ class HomeworkAI(commands.Cog):
 
         stats = await self.config.guild(guild).stats()
         embed = discord.Embed(
-            title="HomeworkAI Usage & Ratings",
+            title="SchoolworkAI Usage & Ratings",
             color=0x476b89,
-            description="Statistics for HomeworkAI usage and answer ratings in this server."
+            description="Statistics for SchoolworkAI usage and answer ratings in this server."
         )
         command_stats = {
             "ask": "Asks solved",
@@ -234,8 +234,8 @@ class HomeworkAI(commands.Cog):
             value = str(stats.get(cmd, 0))
             embed.add_field(name=label, value=value, inline=True)
         embed.set_footer(text=(
-            "Stats update live as users interact with HomeworkAI.\n\n"
-            "Invite friends! After onboarding, every 10 users you invite gets you $1 of free HomeworkAI usage."
+            "Stats update live as users interact with SchoolworkAI.\n\n"
+            "Invite friends! After onboarding, every 10 users you invite gets you $1 of free SchoolworkAI usage."
         ))
 
         # Try to edit the previous stats message if it exists, else send a new one
@@ -331,7 +331,7 @@ class HomeworkAI(commands.Cog):
                     user = self.bot.get_user(inviter_id)
                     if user:
                         await user.send(
-                            f"🎉 You've earned ${to_grant}.00 in promotional credit for inviting new users to HomeworkAI! Thank you for spreading the word, keep it up and you'll keep earning credit."
+                            f"🎉 You've earned ${to_grant}.00 in promotional credit for inviting new users to SchoolworkAI! Thank you for spreading the word, keep it up and you'll keep earning credit."
                         )
                 except Exception as e:
                     print(f"Error notifying user {inviter_id}: {e}")
@@ -386,7 +386,7 @@ class HomeworkAI(commands.Cog):
                 if user:
                     embed = discord.Embed(
                         title="You brought a friend!",
-                        description=f"Thanks for inviting {member.mention} to HomeworkAI!\n\nIf they sign up and complete onboarding, you'll get $1 of free HomeworkAI usage as our way of saying thank you.\n\nDon't forget to remind them to **/signup**.",
+                        description=f"Thanks for inviting {member.mention} to SchoolworkAI!\n\nIf they sign up and complete onboarding, you'll get $1 of free SchoolworkAI usage as our way of saying thank you.\n\nDon't forget to remind them to **/signup**.",
                         color=0x476b89
                     )
                     await user.send(embed=embed)
@@ -413,20 +413,20 @@ class HomeworkAI(commands.Cog):
     # --- ADMIN/CONFIG/MANAGEMENT COMMAND GROUP ---
     @commands.group()
     @commands.guild_only()
-    async def homeworkai(self, ctx):
-        """HomeworkAI configuration commands."""
+    async def schoolworkai(self, ctx):
+        """SchoolworkAI configuration commands."""
 
-    @commands.group(name="homeworkaiset", invoke_without_command=True)
+    @commands.group(name="schoolworkaiset", invoke_without_command=True)
     @commands.guild_only()
-    async def homeworkaiset(self, ctx):
-        """HomeworkAI admin/configuration/management commands."""
+    async def schoolworkaiset(self, ctx):
+        """SchoolworkAI admin/configuration/management commands."""
         if ctx.invoked_subcommand is None:
             await ctx.send_help(ctx.command)
 
-    @homeworkaiset.command()
+    @schoolworkaiset.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def pendingchannel(self, ctx, channel: discord.TextChannel):
-        """Set the channel where HomeworkAI applications are sent."""
+        """Set the channel where SchoolworkAI applications are sent."""
         await self.config.guild(ctx.guild).applications_channel.set(channel.id)
         embed = discord.Embed(
             title="Pending signups channel set",
@@ -435,10 +435,10 @@ class HomeworkAI(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @homeworkaiset.command()
+    @schoolworkaiset.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def pricingchannel(self, ctx, channel: discord.TextChannel):
-        """Set the channel where HomeworkAI pricing is displayed and update the pricing message."""
+        """Set the channel where SchoolworkAI pricing is displayed and update the pricing message."""
         await self.config.guild(ctx.guild).pricing_channel.set(channel.id)
         await self._update_pricing_channel(ctx.guild)
         embed = discord.Embed(
@@ -448,10 +448,10 @@ class HomeworkAI(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @homeworkaiset.command()
+    @schoolworkaiset.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def statchannel(self, ctx, channel: discord.TextChannel):
-        """Set the channel where HomeworkAI usage and rating statistics are displayed and update the stats message."""
+        """Set the channel where SchoolworkAI usage and rating statistics are displayed and update the stats message."""
         await self.config.guild(ctx.guild).stats_channel.set(channel.id)
         await self._update_stats_channel(ctx.guild)
         embed = discord.Embed(
@@ -461,10 +461,10 @@ class HomeworkAI(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @homeworkaiset.command()
+    @schoolworkaiset.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def resetstats(self, ctx):
-        """Reset all HomeworkAI usage and rating statistics for this server."""
+        """Reset all SchoolworkAI usage and rating statistics for this server."""
         await self.config.guild(ctx.guild).stats.set({
             "ask": 0,
             "answer": 0,
@@ -476,12 +476,12 @@ class HomeworkAI(commands.Cog):
         await self._update_stats_channel(ctx.guild)
         embed = discord.Embed(
             title="Statistics reset",
-            description="All HomeworkAI usage and rating statistics have been reset for this server.",
+            description="All SchoolworkAI usage and rating statistics have been reset for this server.",
             color=0x2bbd8e
         )
         await ctx.send(embed=embed)
 
-    @homeworkaiset.command()
+    @schoolworkaiset.command()
     @commands.is_owner()
     async def setcid(self, ctx, user: discord.User, customer_id: str):
         """
@@ -504,19 +504,19 @@ class HomeworkAI(commands.Cog):
             try:
                 if customer_id:
                     if role not in member.roles:
-                        await member.add_roles(role, reason="Granted HomeworkAI customer role (setcustomerid)")
+                        await member.add_roles(role, reason="Granted SchoolworkAI customer role (setcustomerid)")
                 else:
                     if role in member.roles:
-                        await member.remove_roles(role, reason="Removed HomeworkAI customer role (setcustomerid)")
+                        await member.remove_roles(role, reason="Removed SchoolworkAI customer role (setcustomerid)")
             except discord.Forbidden:
                 pass
 
         if not prev_id and customer_id:
             try:
                 embed = discord.Embed(
-                    title="Welcome to HomeworkAI!",
+                    title="Welcome to SchoolworkAI!",
                     description=(
-                        "You now have access to HomeworkAI.\n\n"
+                        "You now have access to SchoolworkAI.\n\n"
                         "**How to use:**\n"
                         "- Use `/ask` to get answers to general questions (text or image supported).\n"
                         "- Use `/answer` for multiple choice or comparison questions (text or image supported).\n"
@@ -537,7 +537,7 @@ class HomeworkAI(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @homeworkaiset.command()
+    @schoolworkaiset.command()
     @commands.is_owner()
     async def delcid(self, ctx, user: discord.User):
         """
@@ -556,7 +556,7 @@ class HomeworkAI(commands.Cog):
                 continue
             try:
                 if role in member.roles:
-                    await member.remove_roles(role, reason="Removed HomeworkAI customer role (removecustomerid)")
+                    await member.remove_roles(role, reason="Removed SchoolworkAI customer role (removecustomerid)")
             except discord.Forbidden:
                 pass
 
@@ -567,17 +567,17 @@ class HomeworkAI(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @homeworkaiset.command(name="resetdata")
+    @schoolworkaiset.command(name="resetdata")
     @commands.is_owner()
     async def resetmodule(self, ctx):
         """
-        **OWNER ONLY**: Reset all HomeworkAI cog data (users and guilds).
+        **OWNER ONLY**: Reset all SchoolworkAI cog data (users and guilds).
         This will erase all stored customer IDs, applications, and configuration.
         """
         confirm_message = await ctx.send(
             embed=discord.Embed(
-                title="Reset HomeworkAI Data",
-                description="⚠️ **Are you sure you want to reset all HomeworkAI cog data?**\n"
+                title="Reset SchoolworkAI Data",
+                description="⚠️ **Are you sure you want to reset all SchoolworkAI cog data?**\n"
                             "This will erase all stored customer IDs, applications, and configuration for all users and guilds.\n\n"
                             "Type `CONFIRM RESET` within 30 seconds to proceed.",
                 color=discord.Color.red()
@@ -601,8 +601,8 @@ class HomeworkAI(commands.Cog):
             await self.config.clear_all()
             await ctx.send(
                 embed=discord.Embed(
-                    title="HomeworkAI Data Reset",
-                    description="All HomeworkAI cog data has been erased.",
+                    title="SchoolworkAI Data Reset",
+                    description="All SchoolworkAI cog data has been erased.",
                     color=discord.Color.green()
                 )
             )
@@ -630,7 +630,7 @@ class HomeworkAI(commands.Cog):
             self.answers = answers
             self.message = None
 
-        @discord.ui.button(label="Allow", style=discord.ButtonStyle.success, custom_id="homeworkai_approve")
+        @discord.ui.button(label="Allow", style=discord.ButtonStyle.success, custom_id="schoolworkai_approve")
         async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
             await interaction.response.defer(ephemeral=True, thinking=True)
             # Only allow admins to approve
@@ -745,19 +745,19 @@ class HomeworkAI(commands.Cog):
                     continue
                 try:
                     if role not in member.roles:
-                        await member.add_roles(role, reason="Granted HomeworkAI customer role (application approved)")
+                        await member.add_roles(role, reason="Granted SchoolworkAI customer role (application approved)")
                 except discord.Forbidden:
                     pass
 
             # DM the user
             try:
                 embed = discord.Embed(
-                    title="Welcome to HomeworkAI!",
+                    title="Welcome to SchoolworkAI!",
                     description=(
                         "Your signup has been **approved**! 🎉\n\n"
-                        "You now have access to HomeworkAI.\n\n"
+                        "You now have access to SchoolworkAI.\n\n"
                         "**How to use:**\n"
-                        "- Use the `ask` command in any server where HomeworkAI is enabled.\n"
+                        "- Use the `ask` command in any server where SchoolworkAI is enabled.\n"
                         "- You can ask questions by text or by attaching an image.\n\n"
                         f"**You still need to add a payment method to prevent service interruptions**.\n- [Click here to sign in and add one.]({self.cog.billing_portal_url})"
                     ),
@@ -778,7 +778,7 @@ class HomeworkAI(commands.Cog):
                 try:
                     embed = self.message.embeds[0]
                     embed.color = discord.Color.green()
-                    embed.title = "HomeworkAI application (Approved)"
+                    embed.title = "SchoolworkAI application (Approved)"
                     if subscription_errors:
                         embed.add_field(
                             name="Subscription Issues",
@@ -802,7 +802,7 @@ class HomeworkAI(commands.Cog):
                 if self.user.id in invited_users:
                     await self.cog._grant_invite_credits(user_id)
 
-        @discord.ui.button(label="Deny", style=discord.ButtonStyle.danger, custom_id="homeworkai_deny")
+        @discord.ui.button(label="Deny", style=discord.ButtonStyle.danger, custom_id="schoolworkai_deny")
         async def deny(self, interaction: discord.Interaction, button: discord.ui.Button):
             # Only allow admins to deny
             if not (getattr(interaction.user, "guild_permissions", None) and (interaction.user.guild_permissions.manage_guild or interaction.user.guild_permissions.administrator)):
@@ -829,7 +829,7 @@ class HomeworkAI(commands.Cog):
                     # DM the user
                     try:
                         embed = discord.Embed(
-                            title="HomeworkAI Application Denied",
+                            title="SchoolworkAI Application Denied",
                             description=f"Your application was denied for the following reason:\n\n> {self.reason.value}\n\nYou may submit a new application if you wish.",
                             color=discord.Color.red()
                         )
@@ -841,7 +841,7 @@ class HomeworkAI(commands.Cog):
                         try:
                             embed = self.message.embeds[0]
                             embed.color = discord.Color.red()
-                            embed.title = "HomeworkAI Application (Denied)"
+                            embed.title = "SchoolworkAI Application (Denied)"
                             embed.add_field(name="Denial Reason", value=self.reason.value, inline=False)
                             await self.message.edit(embed=embed, view=None)
                         except discord.Forbidden:
@@ -854,10 +854,10 @@ class HomeworkAI(commands.Cog):
             modal.message = self.message
             await interaction.response.send_modal(modal)
 
-    @discord.app_commands.command(name="signup", description="Sign up for HomeworkAI")
+    @discord.app_commands.command(name="signup", description="Sign up for SchoolworkAI")
     async def signup(self, interaction: discord.Interaction):
         """
-        Slash command: Apply to use HomeworkAI.
+        Slash command: Apply to use SchoolworkAI.
         Collects info via DM prompt-by-prompt, including phone number verification via Twilio.
         """
         user = interaction.user
@@ -876,7 +876,7 @@ class HomeworkAI(commands.Cog):
         if customer_id:
             embed = discord.Embed(
                 title="Can't get what you already have",
-                description="You're already a HomeworkAI user. Go ask it some questions or something.",
+                description="You're already a SchoolworkAI user. Go ask it some questions or something.",
                 color=0x476b89
             )
             await interaction.response.send_message(embed=embed, ephemeral=False)
@@ -916,16 +916,16 @@ class HomeworkAI(commands.Cog):
             ("last_name", "What is your **legal last name**?"),
             ("billing_email", "What is your **billing email address**? (This will be used for billing and notifications)"),
             ("grade", "What **grade** are you in? (e.g., 9th, 10th, college freshman, etc.)"),
-            ("intended_use", "What do you **intend to use HomeworkAI for**? (e.g., math homework, essay help, general study, etc.)"),
+            ("intended_use", "What do you **intend to use SchoolworkAI for**? (e.g., math homework, essay help, general study, etc.)"),
         ]
         answers = {}
 
         try:
             await dm_channel.send(
                 embed=discord.Embed(
-                    title="HomeworkAI Onboarding",
+                    title="SchoolworkAI Onboarding",
                     description=(
-                        ":wave: **Hi there!**\n\nLet's get you set up to use HomeworkAI.\n"
+                        ":wave: **Hi there!**\n\nLet's get you set up to use SchoolworkAI.\n"
                         "Please answer the following questions. You can type `cancel` to stop the sign-up."
                     ),
                     color=0x476b89
@@ -1319,7 +1319,7 @@ class HomeworkAI(commands.Cog):
             except discord.Forbidden:
                 pass
 
-    # --- HomeworkAI Question Commands ---
+    # --- SchoolworkAI Question Commands ---
 
     class RatingView(discord.ui.View):
         def __init__(self, cog, ctx, prompt_type, guild_id, *, timeout=120):
@@ -1331,7 +1331,7 @@ class HomeworkAI(commands.Cog):
             self.upvoted = False
             self.downvoted = False
 
-        @discord.ui.button(label="👍", style=discord.ButtonStyle.success, custom_id="homeworkai_upvote")
+        @discord.ui.button(label="👍", style=discord.ButtonStyle.success, custom_id="schoolworkai_upvote")
         async def upvote(self, interaction: discord.Interaction, button: discord.ui.Button):
             if self.upvoted:
                 await interaction.response.send_message("You already upvoted this answer.", ephemeral=True)
@@ -1344,7 +1344,7 @@ class HomeworkAI(commands.Cog):
                     await self.cog._update_stats_channel(guild)
             await interaction.response.send_message("Thank you for your feedback! 👍", ephemeral=True)
 
-        @discord.ui.button(label="👎", style=discord.ButtonStyle.danger, custom_id="homeworkai_downvote")
+        @discord.ui.button(label="👎", style=discord.ButtonStyle.danger, custom_id="schoolworkai_downvote")
         async def downvote(self, interaction: discord.Interaction, button: discord.ui.Button):
             if self.downvoted:
                 await interaction.response.send_message("You already downvoted this answer.", ephemeral=True)
@@ -1371,7 +1371,7 @@ class HomeworkAI(commands.Cog):
         await self.config.guild(guild).stats.set(stats)
         await self._update_stats_channel(guild)
 
-    async def _send_homeworkai_response(
+    async def _send_schoolworkai_response(
         self,
         ctx: commands.Context,
         question: str,
@@ -1386,7 +1386,7 @@ class HomeworkAI(commands.Cog):
         if not customer_id:
             embed = discord.Embed(
                 title="Billing Profile Required",
-                description="You need to set up a billing profile to use HomeworkAI. Please contact service support for assistance.",
+                description="You need to set up a billing profile to use SchoolworkAI. Please contact service support for assistance.",
                 color=discord.Color.red()
             )
             await ctx.send(embed=embed)
@@ -1399,7 +1399,7 @@ class HomeworkAI(commands.Cog):
                 if member:
                     role = ctx.guild.get_role(CUSTOMER_ROLE_ID)
                     if role and role not in member.roles:
-                        await member.add_roles(role, reason="Granted HomeworkAI customer role (has customer_id)")
+                        await member.add_roles(role, reason="Granted SchoolworkAI customer role (has customer_id)")
             except discord.Forbidden:
                 pass
 
@@ -1425,33 +1425,33 @@ class HomeworkAI(commands.Cog):
         # Prompt engineering for each command type
         if prompt_type == "ask":
             system_prompt = (
-                "You are HomeworkAI, an expert homework assistant. "
+                "You are SchoolworkAI, an expert homework assistant. "
                 "Answer the user's question as clearly and concisely as possible. Format math formulas using markdown, and final results inside a ```codeblock``` using standard expression indicators instead of spelling out math expressions."
                 "If the user attaches an image, analyze it and provide a helpful, accurate answer."
             )
         elif prompt_type == "answer":
             system_prompt = (
-                "You are HomeworkAI, an expert at answering multiple choice and comparison questions. "
+                "You are SchoolworkAI, an expert at answering multiple choice and comparison questions. "
                 "If the user provides a list of options or a multiple choice question, "
                 "explain your reasoning concisely and accurately, and select the best answer. "
                 "If the user attaches an image, analyze it for relevant information."
             )
         elif prompt_type == "explain":
             system_prompt = (
-                "You are HomeworkAI, an expert tutor. "
+                "You are SchoolworkAI, an expert tutor. "
                 "Provide a detailed, step-by-step explanation or tutorial for the user's question. "
                 "If the user attaches an image, use it to help explain the answer in depth."
             )
         elif prompt_type == "outline":
             system_prompt = (
-                "You are HomeworkAI, an expert in creating outlines for academic papers. "
+                "You are SchoolworkAI, an expert in creating outlines for academic papers. "
                 "Generate a structured outline based on the user's topic and the specified number of paragraphs. "
                 "Structure the outline assuming the first paragraph will be an introduction, and the last paragraph will be a conclusion."
                 "Ensure the outline is logical and provides a clear framework for writing the paper. "
                 "Format the outline using Discord-compatible markdown."
             )
         else:
-            system_prompt = "You are HomeworkAI, an expert homework assistant."
+            system_prompt = "You are SchoolworkAI, an expert homework assistant."
 
         async with ctx.typing():
             try:
@@ -1517,19 +1517,19 @@ class HomeworkAI(commands.Cog):
 
                         # Title and field names per command
                         if prompt_type == "ask":
-                            embed_title = "Your HomeworkAI response"
+                            embed_title = "Your SchoolworkAI response"
                             field_name = "You asked"
                         elif prompt_type == "answer":
-                            embed_title = "HomeworkAI chose an answer"
+                            embed_title = "SchoolworkAI chose an answer"
                             field_name = "Your question"
                         elif prompt_type == "explain":
-                            embed_title = "HomeworkAI generated an explanation"
+                            embed_title = "SchoolworkAI generated an explanation"
                             field_name = "Your question"
                         elif prompt_type == "outline":
-                            embed_title = "HomeworkAI finished outlining your paper"
+                            embed_title = "SchoolworkAI finished outlining your paper"
                             field_name = "Your request"
                         else:
-                            embed_title = "Your HomeworkAI Answer"
+                            embed_title = "Your SchoolworkAI Answer"
                             field_name = "You asked"
 
                         embed = discord.Embed(
@@ -1547,7 +1547,7 @@ class HomeworkAI(commands.Cog):
                         # Truncate answer to 1024 for embed field (Discord API limit)
                         answer_field_value = answer if len(answer) <= 1024 else answer[:1020] + "..."
                         embed.add_field(
-                            name="HomeworkAI says...",
+                            name="SchoolworkAI says...",
                             value=answer_field_value,
                             inline=False
                         )
@@ -1591,17 +1591,17 @@ class HomeworkAI(commands.Cog):
     @commands.hybrid_command(name="ask", with_app_command=True)
     async def ask(self, ctx: commands.Context, *, question: str = None):
         """
-        Ask HomeworkAI an open-ended question (text or attach an image).
+        Ask SchoolworkAI an open-ended question (text or attach an image).
         The answer will be sent to you in DMs.
         """
         # Check if the user has a customer_id set
         customer_id = await self.config.user(ctx.author).customer_id()
         if not customer_id:
             embed = discord.Embed(
-                title="You're not a HomeworkAI user yet",
+                title="You're not a SchoolworkAI user yet",
                 description=(
                     "Get started with </signup:1365562353076146206> to sign up and start getting answers.\n\n"
-                    "Power through homework faster with HomeworkAI. Get answers, explanations, and more no matter where the question is."
+                    "Power through homework faster with SchoolworkAI. Get answers, explanations, and more no matter where the question is."
                 ),
                 color=0xff4545
             )
@@ -1655,12 +1655,12 @@ class HomeworkAI(commands.Cog):
         if ctx.guild:
             await self._increment_usage(ctx.guild, "ask")
 
-        await self._send_homeworkai_response(ctx, question, image_url, prompt_type="ask")
+        await self._send_schoolworkai_response(ctx, question, image_url, prompt_type="ask")
 
     @commands.hybrid_command(name="answer", with_app_command=True)
     async def answer(self, ctx: commands.Context, *, question: str = None):
         """
-        Ask HomeworkAI to answer a multiple choice or comparison question.
+        Ask SchoolworkAI to answer a multiple choice or comparison question.
         The answer will be sent to you in DMs.
         """
         # Check if the user has a customer_id set
@@ -1669,9 +1669,9 @@ class HomeworkAI(commands.Cog):
             embed = discord.Embed(
                 title="Access Required",
                 description=(
-                    "You don't have access to HomeworkAI yet.\n\n"
+                    "You don't have access to SchoolworkAI yet.\n\n"
                     "To apply for access, please use the `/onboard` command.\n"
-                    "Once approved, you'll be able to use HomeworkAI features."
+                    "Once approved, you'll be able to use SchoolworkAI features."
                 ),
                 color=discord.Color.orange()
             )
@@ -1720,12 +1720,12 @@ class HomeworkAI(commands.Cog):
         if ctx.guild:
             await self._increment_usage(ctx.guild, "answer")
 
-        await self._send_homeworkai_response(ctx, question, image_url, prompt_type="answer")
+        await self._send_schoolworkai_response(ctx, question, image_url, prompt_type="answer")
 
     @commands.hybrid_command(name="explain", with_app_command=True)
     async def explain(self, ctx: commands.Context, *, question: str = None):
         """
-        Ask HomeworkAI for a detailed, step-by-step explanation or tutorial.
+        Ask SchoolworkAI for a detailed, step-by-step explanation or tutorial.
         The answer will be sent to you in DMs.
         """
         # Check if the user has a customer_id set
@@ -1734,9 +1734,9 @@ class HomeworkAI(commands.Cog):
             embed = discord.Embed(
                 title="Access Required",
                 description=(
-                    "You don't have access to HomeworkAI yet.\n\n"
+                    "You don't have access to SchoolworkAI yet.\n\n"
                     "To apply for access, please use the `/onboard` command.\n"
-                    "Once approved, you'll be able to use HomeworkAI features."
+                    "Once approved, you'll be able to use SchoolworkAI features."
                 ),
                 color=discord.Color.orange()
             )
@@ -1785,7 +1785,7 @@ class HomeworkAI(commands.Cog):
         if ctx.guild:
             await self._increment_usage(ctx.guild, "explain")
 
-        await self._send_homeworkai_response(ctx, question, image_url, prompt_type="explain")
+        await self._send_schoolworkai_response(ctx, question, image_url, prompt_type="explain")
 
     @commands.hybrid_command(name="outline", with_app_command=True)
     async def outline(self, ctx: commands.Context, paragraphcount: int, *, topic: str):
@@ -1798,9 +1798,9 @@ class HomeworkAI(commands.Cog):
             embed = discord.Embed(
                 title="Access Required",
                 description=(
-                    "You don't have access to HomeworkAI yet.\n\n"
+                    "You don't have access to SchoolworkAI yet.\n\n"
                     "To apply for access, please use the `/onboard` command.\n"
-                    "Once approved, you'll be able to use HomeworkAI features."
+                    "Once approved, you'll be able to use SchoolworkAI features."
                 ),
                 color=discord.Color.orange()
             )
@@ -1834,7 +1834,7 @@ class HomeworkAI(commands.Cog):
             await self._increment_usage(ctx.guild, "outline")
 
         question = f"Generate an outline for a paper on the topic '{topic}' with {paragraphcount} paragraphs."
-        await self._send_homeworkai_response(ctx, question, image_url=None, prompt_type="outline")
+        await self._send_schoolworkai_response(ctx, question, image_url=None, prompt_type="outline")
 
     @commands.hybrid_command(name="billing", with_app_command=True)
     async def billing(self, ctx: commands.Context):
@@ -1851,13 +1851,13 @@ class HomeworkAI(commands.Cog):
                     if member:
                         role = ctx.guild.get_role(CUSTOMER_ROLE_ID)
                         if role and role in member.roles:
-                            await member.remove_roles(role, reason="Removed HomeworkAI customer role (no billing profile)")
+                            await member.remove_roles(role, reason="Removed SchoolworkAI customer role (no billing profile)")
                 except discord.Forbidden:
                     pass
 
             embed = discord.Embed(
                 title="You don't have a billing profile yet.",
-                description="Not a HomeworkAI user yet? Use </signup:1365562353076146206> to get started.",
+                description="Not a SchoolworkAI user yet? Use </signup:1365562353076146206> to get started.",
                 color=0xff4545
             )
             await ctx.send(embed=embed, ephemeral=True)
@@ -1870,7 +1870,7 @@ class HomeworkAI(commands.Cog):
                 if member:
                     role = ctx.guild.get_role(CUSTOMER_ROLE_ID)
                     if role and role not in member.roles:
-                        await member.add_roles(role, reason="Granted HomeworkAI customer role (billing command)")
+                        await member.add_roles(role, reason="Granted SchoolworkAI customer role (billing command)")
             except discord.Forbidden:
                 pass
 
