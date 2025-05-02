@@ -171,10 +171,10 @@ class SchoolworkAI(commands.Cog):
             "outline": "Ask AI to generate an outline for a paper you need to write.",
         }
         command_mentions = {
-            "ask": "</ask:1364653272194875545>",
-            "answer": "</answer:1364669240912904192>",
-            "explain": "</explain:1364669240912904193>",
-            "outline": "</outline:1366048730242875423>",
+            "ask": "</ask:1367827206226841685>",
+            "answer": "</answer:1367827206226841683>",
+            "explain": "</explain:1367827206226841689>",
+            "outline": "</outline:1367827206226841684>",
         }
         for cmd, price in prices.items():
             label = cmd.capitalize()
@@ -1600,7 +1600,7 @@ class SchoolworkAI(commands.Cog):
             embed = discord.Embed(
                 title="You're not a SchoolworkAI user yet",
                 description=(
-                    "Get started with </signup:1365562353076146206> to sign up and start getting answers.\n\n"
+                    "Get started with </signup:1367827206226841687> to sign up and start getting answers.\n\n"
                     "Power through homework faster with SchoolworkAI. Get answers, explanations, and more no matter where the question is."
                 ),
                 color=0xff4545
@@ -1857,7 +1857,7 @@ class SchoolworkAI(commands.Cog):
 
             embed = discord.Embed(
                 title="You don't have a billing profile yet.",
-                description="Not a SchoolworkAI user yet? Use </signup:1365562353076146206> to get started.",
+                description="Not a SchoolworkAI user yet? Use </signup:1367827206226841687> to get started.",
                 color=0xff4545
             )
             await ctx.send(embed=embed, ephemeral=True)
