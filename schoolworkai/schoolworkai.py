@@ -11,7 +11,7 @@ import re
 from collections import defaultdict
 from .commands import ask_command, answer_command, explain_command, outline_command
 from .views import RatingView, ApplicationActionView
-from .listeners import on_member_join as imported_on_member_join, on_member_update as imported_on_member_update, on_app_command_completion as imported_on_app_command_completion
+from .listeners import on_member_join, on_member_update, on_app_command_completion
 
 CUSTOMER_ROLE_ID = 1364590138847400008
 
@@ -373,15 +373,15 @@ class SchoolworkAI(commands.Cog):
     # Register listeners from listeners.py
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        await imported_on_member_join(self, member)
+        await on_member_join(self, member)
 
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
-        await imported_on_member_update(self, before, after)
+        await on_member_update(self, before, after)
 
     @commands.Cog.listener()
     async def on_app_command_completion(self, interaction, command):
-        await imported_on_app_command_completion(self, interaction, command)
+        await on_app_command_completion(self, interaction, command)
 
     # --- ADMIN/CONFIG/MANAGEMENT COMMAND GROUP ---
     @commands.group()
