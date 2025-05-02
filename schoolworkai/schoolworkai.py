@@ -9,9 +9,6 @@ import aiohttp
 import asyncio
 import re
 from collections import defaultdict
-from .commands import ask_command, answer_command, explain_command, outline_command
-from .views import RatingView, ApplicationActionView
-from .listeners import on_member_join, on_member_update, on_app_command_completion
 
 CUSTOMER_ROLE_ID = 1364590138847400008
 
@@ -370,18 +367,48 @@ class SchoolworkAI(commands.Cog):
             print(f"Error finding inviter for member {member.id} in guild {guild.id}: {e}")
         return None
 
-    # Register listeners from listeners.py
     @commands.Cog.listener()
-    async def on_member_join(self, member):
-        await on_member_join(self, member)
+    async def on_member_join(self, member: discord.Member):
+        """
+        Track invites and record who invited whom.
+        """
+        inviter_id = await self._find_inviter(member)
+        if inviter_id:
+            # Save the invited user to the inviter's invited_users list
+            inviter_conf = self.config.user_from_id(inviter_id)
+            invited_users = await inviter_conf.invited_users()
+            if member.id not in invited_users:
+                invited_users.append(member.id)
+                await inviter_conf.invited_users.set(invited_users)
+            # Optionally, notify the inviter
+            try:
+                user = self.bot.get_user(inviter_id)
+                if user:
+                    embed = discord.Embed(
+                        title="You brought a friend!",
+                        description=f"Thanks for inviting {member.mention} to SchoolworkAI!\n\nIf they sign up and complete onboarding, you'll get $1 of free SchoolworkAI usage as our way of saying thank you.\n\nDon't forget to remind them to **/signup**.",
+                        color=0x476b89
+                    )
+                    await user.send(embed=embed)
+            except Exception as e:
+                print(f"Error notifying inviter {inviter_id}: {e}")
 
     @commands.Cog.listener()
-    async def on_member_update(self, before, after):
-        await on_member_update(self, before, after)
-
-    @commands.Cog.listener()
-    async def on_app_command_completion(self, interaction, command):
-        await on_app_command_completion(self, interaction, command)
+    async def on_member_update(self, before: discord.Member, after: discord.Member):
+        """
+        When a member's roles or status change, check if they have just become a customer (i.e., completed onboarding).
+        If so, check if they were invited and grant invite credits if eligible.
+        """
+        # Only act if the user just got the customer role
+        before_roles = set(before.roles)
+        after_roles = set(after.roles)
+        customer_role = after.guild.get_role(CUSTOMER_ROLE_ID)
+        if customer_role and customer_role not in before_roles and customer_role in after_roles:
+            # See if this user was invited by someone
+            for inviter_id, inviteds in self._invite_cache.get(after.guild.id, {}).items():
+                if after.id in inviteds:
+                    await self._grant_invite_credits(inviter_id)
+                    break
 
     # --- ADMIN/CONFIG/MANAGEMENT COMMAND GROUP ---
     @commands.group()
@@ -588,7 +615,246 @@ class SchoolworkAI(commands.Cog):
                 )
             )
 
-    @commands.hybrid_command(name="signup", description="Sign up for SchoolworkAI", with_app_command=True)
+    @commands.Cog.listener()
+    async def on_app_command_completion(self, interaction: discord.Interaction, command: discord.app_commands.Command):
+        # This is a placeholder in case you want to handle app command completions
+        pass
+
+    # --- Application Approval/Deny Button Views ---
+
+    class ApplicationActionView(discord.ui.View):
+        def __init__(self, cog, user: discord.User, answers: dict, *, timeout=600):
+            super().__init__(timeout=timeout)
+            self.cog = cog
+            self.user = user
+            self.answers = answers
+            self.message = None
+
+        @discord.ui.button(label="Allow", style=discord.ButtonStyle.success, custom_id="schoolworkai_approve")
+        async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            # Only allow admins to approve
+            if not (getattr(interaction.user, "guild_permissions", None) and (interaction.user.guild_permissions.manage_guild or interaction.user.guild_permissions.administrator)):
+                await interaction.followup.send("You do not have permission to approve applications.", ephemeral=True)
+                return
+
+            # Create Stripe customer
+            stripe_key = await self.cog.get_stripe_key()
+            if not stripe_key:
+                await interaction.followup.send("Stripe API key is not configured. Please contact an administrator.", ephemeral=True)
+                return
+
+            # Check if already has customer_id
+            prev_customer_id = await self.cog.config.user(self.user).customer_id()
+            if prev_customer_id:
+                await interaction.followup.send("This user already has a customer ID.", ephemeral=True)
+                return
+
+            # Create Stripe customer
+            try:
+                async with aiohttp.ClientSession() as session:
+                    headers = {
+                        "Authorization": f"Bearer {stripe_key}",
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    }
+                    data = {
+                        "email": self.answers.get("billing_email"),
+                        "name": f"{self.answers.get('first_name', '')} {self.answers.get('last_name', '')}".strip(),
+                        "metadata[first_name]": self.answers.get("first_name", ""),
+                        "metadata[last_name]": self.answers.get("last_name", ""),
+                        "metadata[discord_id]": str(self.user.id),
+                        "metadata[phone_number]": self.answers.get("phone_number", ""),
+                        "metadata[grade]": self.answers.get("grade", ""),
+                        "metadata[intended_use]": self.answers.get("intended_use", ""),
+                    }
+                    async with session.post(
+                        "https://api.stripe.com/v1/customers",
+                        data=data,
+                        headers=headers,
+                        timeout=aiohttp.ClientTimeout(total=30)
+                    ) as resp:
+                        if resp.status not in (200, 201):
+                            text = await resp.text()
+                            await interaction.followup.send(
+                                f"Failed to create Stripe customer: {resp.status}\n{text}",
+                                ephemeral=True
+                            )
+                            return
+                        try:
+                            result = await resp.json()
+                        except Exception as e:
+                            await interaction.followup.send(
+                                f"Could not decode Stripe response: {e}",
+                                ephemeral=True
+                            )
+                            return
+                        customer_id = result.get("id")
+                        if not customer_id:
+                            await interaction.followup.send(
+                                "Stripe did not return a customer ID. Please check the logs.",
+                                ephemeral=True
+                            )
+                            return
+            except Exception as e:
+                await interaction.followup.send(
+                    f"An error occurred while creating the Stripe customer: {e}",
+                    ephemeral=True
+                )
+                return
+
+            # --- Automatically subscribe the customer to the required price IDs ---
+            subscription_errors = []
+            for price_id in STRIPE_PRICE_IDS:
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        headers = {
+                            "Authorization": f"Bearer {stripe_key}",
+                            "Content-Type": "application/x-www-form-urlencoded"
+                        }
+                        data = {
+                            "customer": customer_id,
+                            "items[0][price]": price_id,
+                        }
+                        async with session.post(
+                            "https://api.stripe.com/v1/subscriptions",
+                            data=data,
+                            headers=headers,
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as resp:
+                            if resp.status not in (200, 201):
+                                text = await resp.text()
+                                subscription_errors.append(f"Failed to subscribe to {price_id}: {resp.status} {text}")
+                except Exception as e:
+                    subscription_errors.append(f"Exception subscribing to {price_id}: {e}")
+
+            # Save customer_id and mark as not pending
+            await self.cog.config.user(self.user).customer_id.set(customer_id)
+            await self.cog.config.user(self.user).applied.set(False)
+            # Optionally, mark phone_verified again
+            await self.cog.config.user(self.user).phone_verified.set(True)
+            # Clear denied flag on approval
+            await self.cog.config.user(self.user).denied.set(False)
+
+            # Give customer role in all mutual guilds
+            for guild in self.cog.bot.guilds:
+                member = guild.get_member(self.user.id)
+                if not member:
+                    continue
+                role = guild.get_role(CUSTOMER_ROLE_ID)
+                if not role:
+                    continue
+                try:
+                    if role not in member.roles:
+                        await member.add_roles(role, reason="Granted SchoolworkAI customer role (application approved)")
+                except discord.Forbidden:
+                    pass
+
+            # DM the user
+            try:
+                embed = discord.Embed(
+                    title="Welcome to SchoolworkAI!",
+                    description=(
+                        "Your signup has been **approved**! 🎉\n\n"
+                        "You now have access to SchoolworkAI.\n\n"
+                        "**How to use:**\n"
+                        "- Use the `ask` command in any server where SchoolworkAI is enabled.\n"
+                        "- You can ask questions by text or by attaching an image.\n\n"
+                        f"**You still need to add a payment method to prevent service interruptions**.\n- [Click here to sign in and add one.]({self.cog.billing_portal_url})"
+                    ),
+                    color=0x476b89
+                )
+                if subscription_errors:
+                    embed.add_field(
+                        name="Subscription Issues",
+                        value="Some subscriptions could not be created automatically:\n" + "\n".join(subscription_errors),
+                        inline=False
+                    )
+                await self.user.send(embed=embed)
+            except discord.Forbidden:
+                pass
+
+            # Edit the application message to show approved
+            if self.message:
+                try:
+                    embed = self.message.embeds[0]
+                    embed.color = discord.Color.green()
+                    embed.title = "SchoolworkAI application (Approved)"
+                    if subscription_errors:
+                        embed.add_field(
+                            name="Subscription Issues",
+                            value="Some subscriptions could not be created automatically:\n" + "\n".join(subscription_errors),
+                            inline=False
+                        )
+                    await self.message.edit(embed=embed, view=None)
+                except discord.Forbidden:
+                    pass
+
+            msg_text = f"Application for {self.user.mention} has been **approved** and a Stripe customer was created."
+            if subscription_errors:
+                msg_text += "\n\nSome subscriptions could not be created automatically:\n" + "\n".join(subscription_errors)
+            await interaction.followup.send(msg_text, ephemeral=True)
+
+            # --- Invite Credit Granting: Check if this user was invited and grant credits if eligible ---
+            # Find all users who have this user in their invited_users list
+            for user_id in (u.id for u in self.cog.bot.users):
+                inviter_conf = self.cog.config.user_from_id(user_id)
+                invited_users = await inviter_conf.invited_users()
+                if self.user.id in invited_users:
+                    await self.cog._grant_invite_credits(user_id)
+
+        @discord.ui.button(label="Deny", style=discord.ButtonStyle.danger, custom_id="schoolworkai_deny")
+        async def deny(self, interaction: discord.Interaction, button: discord.ui.Button):
+            # Only allow admins to deny
+            if not (getattr(interaction.user, "guild_permissions", None) and (interaction.user.guild_permissions.manage_guild or interaction.user.guild_permissions.administrator)):
+                await interaction.response.send_message("You do not have permission to deny applications.", ephemeral=True)
+                return
+
+            # Ask for a reason via modal
+            class DenyReasonModal(discord.ui.Modal, title="Deny Application"):
+                reason = discord.ui.TextInput(
+                    label="Reason for denial",
+                    style=discord.TextStyle.paragraph,
+                    required=True,
+                    max_length=300,
+                    placeholder="Please provide a reason for denying this application."
+                )
+
+                async def on_submit(self, modal_interaction: discord.Interaction):
+                    # Save as denied, mark as not pending
+                    await self.cog.config.user(self.user).applied.set(False)
+                    # Optionally, clear phone_verified
+                    await self.cog.config.user(self.user).phone_verified.set(False)
+                    # Mark as denied so user can reapply
+                    await self.cog.config.user(self.user).denied.set(True)
+                    # DM the user
+                    try:
+                        embed = discord.Embed(
+                            title="SchoolworkAI Application Denied",
+                            description=f"Your application was denied for the following reason:\n\n> {self.reason.value}\n\nYou may submit a new application if you wish.",
+                            color=discord.Color.red()
+                        )
+                        await self.user.send(embed=embed)
+                    except discord.Forbidden:
+                        pass
+                    # Edit the application message to show denied
+                    if self.message:
+                        try:
+                            embed = self.message.embeds[0]
+                            embed.color = discord.Color.red()
+                            embed.title = "SchoolworkAI Application (Denied)"
+                            embed.add_field(name="Denial Reason", value=self.reason.value, inline=False)
+                            await self.message.edit(embed=embed, view=None)
+                        except discord.Forbidden:
+                            pass
+                    await modal_interaction.response.send_message(f"Application for {self.user.mention} has been **denied**.", ephemeral=True)
+
+            modal = DenyReasonModal()
+            modal.cog = self.cog
+            modal.user = self.user
+            modal.message = self.message
+            await interaction.response.send_modal(modal)
+
+    @discord.app_commands.command(name="signup", description="Sign up for SchoolworkAI")
     async def signup(self, interaction: discord.Interaction):
         """
         Slash command: Apply to use SchoolworkAI.
@@ -1025,7 +1291,7 @@ class SchoolworkAI(commands.Cog):
             embed.add_field(name="Intended use", value=answers.get("intended_use", "N/A"), inline=True)
 
             # Send with action buttons
-            view = ApplicationActionView(self, user, answers)
+            view = self.ApplicationActionView(self, user, answers)
             msg = await channel.send(embed=embed, view=view)
             view.message = msg
 
@@ -1052,6 +1318,44 @@ class SchoolworkAI(commands.Cog):
                 )
             except discord.Forbidden:
                 pass
+
+    # --- SchoolworkAI Question Commands ---
+
+    class RatingView(discord.ui.View):
+        def __init__(self, cog, ctx, prompt_type, guild_id, *, timeout=120):
+            super().__init__(timeout=timeout)
+            self.cog = cog
+            self.ctx = ctx
+            self.prompt_type = prompt_type
+            self.guild_id = guild_id
+            self.upvoted = False
+            self.downvoted = False
+
+        @discord.ui.button(label="👍", style=discord.ButtonStyle.success, custom_id="schoolworkai_upvote")
+        async def upvote(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if self.upvoted:
+                await interaction.response.send_message("You already upvoted this answer.", ephemeral=True)
+                return
+            self.upvoted = True
+            if self.guild_id:
+                await self.cog._increment_stat(self.guild_id, "upvotes")
+                guild = self.cog.bot.get_guild(self.guild_id)
+                if guild:
+                    await self.cog._update_stats_channel(guild)
+            await interaction.response.send_message("Thank you for your feedback! 👍", ephemeral=True)
+
+        @discord.ui.button(label="👎", style=discord.ButtonStyle.danger, custom_id="schoolworkai_downvote")
+        async def downvote(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if self.downvoted:
+                await interaction.response.send_message("You already downvoted this answer.", ephemeral=True)
+                return
+            self.downvoted = True
+            if self.guild_id:
+                await self.cog._increment_stat(self.guild_id, "downvotes")
+                guild = self.cog.bot.get_guild(self.guild_id)
+                if guild:
+                    await self.cog._update_stats_channel(guild)
+            await interaction.response.send_message("Thank you for your feedback! 👎", ephemeral=True)
 
     async def _increment_stat(self, guild_id, stat):
         guild = self.bot.get_guild(guild_id)
@@ -1250,7 +1554,7 @@ class SchoolworkAI(commands.Cog):
 
                         # Try to DM the user
                         try:
-                            view = RatingView(self, ctx, prompt_type, ctx.guild.id if ctx.guild else None)
+                            view = self.RatingView(self, ctx, prompt_type, ctx.guild.id if ctx.guild else None)
                             await ctx.author.send(embed=embed, view=view)
                             await ctx.send(
                                 embed=discord.Embed(
@@ -1286,19 +1590,251 @@ class SchoolworkAI(commands.Cog):
 
     @commands.hybrid_command(name="ask", with_app_command=True)
     async def ask(self, ctx: commands.Context, *, question: str = None):
-        await ask_command(self, ctx, question)
+        """
+        Ask SchoolworkAI an open-ended question (text or attach an image).
+        The answer will be sent to you in DMs.
+        """
+        # Check if the user has a customer_id set
+        customer_id = await self.config.user(ctx.author).customer_id()
+        if not customer_id:
+            embed = discord.Embed(
+                title="You're not a SchoolworkAI user yet",
+                description=(
+                    "Get started with </signup:1365562353076146206> to sign up and start getting answers.\n\n"
+                    "Power through homework faster with SchoolworkAI. Get answers, explanations, and more no matter where the question is."
+                ),
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
+            return
+
+        image_url = None
+        # For slash commands, attachments are in ctx.interaction.data if present
+        attachments = []
+        if hasattr(ctx, "interaction") and ctx.interaction is not None:
+            # Try to get attachments from the interaction (for slash)
+            data = getattr(ctx.interaction, "data", {})
+            resolved = data.get("resolved", {}) if data else {}
+            attachments = list(resolved.get("attachments", {}).values()) if resolved else []
+        if not attachments and ctx.message and ctx.message.attachments:
+            attachments = ctx.message.attachments
+        for att in attachments:
+            # Discord.py's Attachment object or dict from interaction
+            content_type = getattr(att, "content_type", None) if not isinstance(att, dict) else att.get("content_type")
+            url = getattr(att, "url", None) if not isinstance(att, dict) else att.get("url")
+            if content_type and content_type.startswith("image/"):
+                image_url = url
+                break
+
+        # --- Stripe Meter Event Logging ---
+        try:
+            stripe_key = await self.get_stripe_key()
+            if stripe_key and customer_id:
+                # Use current UTC timestamp as int
+                timestamp = int(time.time())
+                meter_url = "https://api.stripe.com/v1/billing/meter_events"
+                data = {
+                    "event_name": "ask",
+                    "timestamp": timestamp,
+                    "payload[stripe_customer_id]": customer_id,
+                }
+                # Stripe expects Bearer token, not BasicAuth for this endpoint
+                headers = {
+                    "Authorization": f"Bearer {stripe_key}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(meter_url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        if resp.status not in (200, 201):
+                            # Log or handle errors here
+                            pass
+        except Exception as e:
+            # Optionally log the error, but don't block the command
+            pass
+
+        if ctx.guild:
+            await self._increment_usage(ctx.guild, "ask")
+
+        await self._send_schoolworkai_response(ctx, question, image_url, prompt_type="ask")
 
     @commands.hybrid_command(name="answer", with_app_command=True)
     async def answer(self, ctx: commands.Context, *, question: str = None):
-        await answer_command(self, ctx, question)
+        """
+        Ask SchoolworkAI to answer a multiple choice or comparison question.
+        The answer will be sent to you in DMs.
+        """
+        # Check if the user has a customer_id set
+        customer_id = await self.config.user(ctx.author).customer_id()
+        if not customer_id:
+            embed = discord.Embed(
+                title="Access Required",
+                description=(
+                    "You don't have access to SchoolworkAI yet.\n\n"
+                    "To apply for access, please use the `/onboard` command.\n"
+                    "Once approved, you'll be able to use SchoolworkAI features."
+                ),
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+            return
+
+        image_url = None
+        # For slash commands, attachments are in ctx.interaction.data if present
+        attachments = []
+        if hasattr(ctx, "interaction") and ctx.interaction is not None:
+            data = getattr(ctx.interaction, "data", {})
+            resolved = data.get("resolved", {}) if data else {}
+            attachments = list(resolved.get("attachments", {}).values()) if resolved else []
+        if not attachments and ctx.message and ctx.message.attachments:
+            attachments = ctx.message.attachments
+        for att in attachments:
+            content_type = getattr(att, "content_type", None) if not isinstance(att, dict) else att.get("content_type")
+            url = getattr(att, "url", None) if not isinstance(att, dict) else att.get("url")
+            if content_type and content_type.startswith("image/"):
+                image_url = url
+                break
+
+        # --- Stripe Meter Event Logging ---
+        try:
+            stripe_key = await self.get_stripe_key()
+            if stripe_key and customer_id:
+                timestamp = int(time.time())
+                meter_url = "https://api.stripe.com/v1/billing/meter_events"
+                data = {
+                    "event_name": "answer",
+                    "timestamp": timestamp,
+                    "payload[stripe_customer_id]": customer_id,
+                }
+                headers = {
+                    "Authorization": f"Bearer {stripe_key}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(meter_url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        if resp.status not in (200, 201):
+                            # Log or handle errors here
+                            pass
+        except Exception as e:
+            pass
+
+        if ctx.guild:
+            await self._increment_usage(ctx.guild, "answer")
+
+        await self._send_schoolworkai_response(ctx, question, image_url, prompt_type="answer")
 
     @commands.hybrid_command(name="explain", with_app_command=True)
     async def explain(self, ctx: commands.Context, *, question: str = None):
-        await explain_command(self, ctx, question)
+        """
+        Ask SchoolworkAI for a detailed, step-by-step explanation or tutorial.
+        The answer will be sent to you in DMs.
+        """
+        # Check if the user has a customer_id set
+        customer_id = await self.config.user(ctx.author).customer_id()
+        if not customer_id:
+            embed = discord.Embed(
+                title="Access Required",
+                description=(
+                    "You don't have access to SchoolworkAI yet.\n\n"
+                    "To apply for access, please use the `/onboard` command.\n"
+                    "Once approved, you'll be able to use SchoolworkAI features."
+                ),
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+            return
+
+        image_url = None
+        # For slash commands, attachments are in ctx.interaction.data if present
+        attachments = []
+        if hasattr(ctx, "interaction") and ctx.interaction is not None:
+            data = getattr(ctx.interaction, "data", {})
+            resolved = data.get("resolved", {}) if data else {}
+            attachments = list(resolved.get("attachments", {}).values()) if resolved else []
+        if not attachments and ctx.message and ctx.message.attachments:
+            attachments = ctx.message.attachments
+        for att in attachments:
+            content_type = getattr(att, "content_type", None) if not isinstance(att, dict) else att.get("content_type")
+            url = getattr(att, "url", None) if not isinstance(att, dict) else att.get("url")
+            if content_type and content_type.startswith("image/"):
+                image_url = url
+                break
+
+        # --- Stripe Meter Event Logging ---
+        try:
+            stripe_key = await self.get_stripe_key()
+            if stripe_key and customer_id:
+                timestamp = int(time.time())
+                meter_url = "https://api.stripe.com/v1/billing/meter_events"
+                data = {
+                    "event_name": "explain",
+                    "timestamp": timestamp,
+                    "payload[stripe_customer_id]": customer_id,
+                }
+                headers = {
+                    "Authorization": f"Bearer {stripe_key}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(meter_url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        if resp.status not in (200, 201):
+                            # Log or handle errors here
+                            pass
+        except Exception as e:
+            pass
+
+        if ctx.guild:
+            await self._increment_usage(ctx.guild, "explain")
+
+        await self._send_schoolworkai_response(ctx, question, image_url, prompt_type="explain")
 
     @commands.hybrid_command(name="outline", with_app_command=True)
     async def outline(self, ctx: commands.Context, paragraphcount: int, *, topic: str):
-        await outline_command(self, ctx, paragraphcount, topic)
+        """
+        Generate an outline for a paper you've been asked to write
+        """
+        # Check if the user has a customer_id set
+        customer_id = await self.config.user(ctx.author).customer_id()
+        if not customer_id:
+            embed = discord.Embed(
+                title="Access Required",
+                description=(
+                    "You don't have access to SchoolworkAI yet.\n\n"
+                    "To apply for access, please use the `/onboard` command.\n"
+                    "Once approved, you'll be able to use SchoolworkAI features."
+                ),
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+            return
+
+        # --- Stripe Meter Event Logging ---
+        try:
+            stripe_key = await self.get_stripe_key()
+            if stripe_key and customer_id:
+                timestamp = int(time.time())
+                meter_url = "https://api.stripe.com/v1/billing/meter_events"
+                data = {
+                    "event_name": "outline",
+                    "timestamp": timestamp,
+                    "payload[stripe_customer_id]": customer_id,
+                }
+                headers = {
+                    "Authorization": f"Bearer {stripe_key}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                }
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(meter_url, data=data, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        if resp.status not in (200, 201):
+                            # Log or handle errors here
+                            pass
+        except Exception as e:
+            pass
+
+        if ctx.guild:
+            await self._increment_usage(ctx.guild, "outline")
+
+        question = f"Generate an outline for a paper on the topic '{topic}' with {paragraphcount} paragraphs."
+        await self._send_schoolworkai_response(ctx, question, image_url=None, prompt_type="outline")
 
     @commands.hybrid_command(name="billing", with_app_command=True)
     async def billing(self, ctx: commands.Context):
