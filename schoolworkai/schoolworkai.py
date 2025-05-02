@@ -588,7 +588,7 @@ class SchoolworkAI(commands.Cog):
                 )
             )
 
-    @discord.app_commands.command(name="signup", description="Sign up for SchoolworkAI")
+    @commands.hybrid_command(name="signup", description="Sign up for SchoolworkAI", with_app_command=True)
     async def signup(self, interaction: discord.Interaction):
         """
         Slash command: Apply to use SchoolworkAI.
