@@ -218,9 +218,8 @@ class AntiPhishing(commands.Cog):
 
         description = descriptions.get(action, "Unknown action configured.")
         colour = colours.get(action, 0xfffffe)
-        thumbnail_url = thumbnail_urls.get(action, "")
 
-        await self._send_embed(ctx, 'Settings changed', description, colour)
+        await self._send_embed(ctx, 'Settings changed', description, colour, "")
 
     @antiphishing.command()
     async def stats(self, ctx: Context):
