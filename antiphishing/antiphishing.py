@@ -176,10 +176,9 @@ class AntiPhishing(commands.Cog):
         await self.config.guild(ctx.guild).action.set(action)
         await self._send_action_confirmation(ctx, action)
 
-    async def _send_embed(self, ctx: Context, title: str, description: str, color: int, thumbnail_url: str):
+    async def _send_embed(self, ctx: Context, title: str, description: str, color: int):
         """Helper function to send consistent embeds."""
         embed = discord.Embed(title=title, description=description, colour=color)
-        embed.set_thumbnail(url=thumbnail_url)
         await ctx.send(embed=embed)
 
     async def _send_invalid_action_embed(self, ctx: Context):
@@ -194,8 +193,7 @@ class AntiPhishing(commands.Cog):
             "**`ban`** - Delete message and ban sender\n"
             "**`timeout`** - Delete message and temporarily time the user out **(Recommended)**\n\n"
             "Retry that command with one of the above options.",
-            0xff4545, # Red color for error
-            "https://www.beehive.systems/hubfs/Icon%20Packs/Red/close-circle.png"
+            0xff4545  # Red color for error
         )
 
     async def _send_action_confirmation(self, ctx: Context, action: str):
@@ -219,7 +217,7 @@ class AntiPhishing(commands.Cog):
         description = descriptions.get(action, "Unknown action configured.")
         colour = colours.get(action, 0xfffffe)
 
-        await self._send_embed(ctx, 'Settings changed', description, colour, "")
+        await self._send_embed(ctx, 'Settings changed', description, colour)
 
     @antiphishing.command()
     async def stats(self, ctx: Context):
@@ -272,12 +270,12 @@ class AntiPhishing(commands.Cog):
             await self.config.guild(ctx.guild).log_channel.set(channel.id)
             await self._send_embed(ctx, 'Settings changed',
                                    f"The logging channel has been set to {channel.mention}.",
-                                   0x2bbd8e, "https://www.beehive.systems/hubfs/Icon%20Packs/Green/check-circle.png")
+                                   0x2bbd8e)
         else:
             await self.config.guild(ctx.guild).log_channel.clear()
             await self._send_embed(ctx, 'Settings changed',
                                    "The logging channel has been cleared.",
-                                   0xffd966, "https://www.beehive.systems/hubfs/Icon%20Packs/Yellow/close.png")
+                                   0xffd966)
 
     @commands.admin_or_permissions()
     @antiphishing.command()
@@ -289,12 +287,12 @@ class AntiPhishing(commands.Cog):
             await self.config.guild(ctx.guild).staff_role.set(role.id)
             await self._send_embed(ctx, 'Settings changed',
                                    f"The staff role has been set to {role.mention}.",
-                                   0x2bbd8e, "https://www.beehive.systems/hubfs/Icon%20Packs/Green/check-circle.png")
+                                   0x2bbd8e)
         else:
             await self.config.guild(ctx.guild).staff_role.clear()
             await self._send_embed(ctx, 'Settings changed',
                                    "The staff role mention has been cleared.",
-                                    0xffd966, "https://www.beehive.systems/hubfs/Icon%20Packs/Yellow/close.png")
+                                    0xffd966)
 
     @commands.admin_or_permissions()
     @antiphishing.command()
@@ -305,13 +303,13 @@ class AntiPhishing(commands.Cog):
         if minutes < 1:
             await self._send_embed(ctx, 'Error: Invalid duration',
                                    "The timeout duration must be at least 1 minute.",
-                                   0xff4545, "https://www.beehive.systems/hubfs/Icon%20Packs/Red/close-circle.png")
+                                   0xff4545)
             return
 
         await self.config.guild(ctx.guild).timeout_duration.set(minutes)
         await self._send_embed(ctx, 'Settings changed',
                                f"The timeout duration is now set to **{minutes}** minutes.",
-                               0xffd966, "https://www.beehive.systems/hubfs/Icon%20Packs/Yellow/clock.png")
+                               0xffd966)
 
     @commands.admin_or_permissions()
     @antiphishing.command()
@@ -349,8 +347,7 @@ class AntiPhishing(commands.Cog):
                 ctx,
                 'Domain Not Found',
                 f"The domain `{domain}` is not in the blocklistv2.",
-                0xffd966,  # Yellow
-                "https://www.beehive.systems/hubfs/Icon%20Packs/Yellow/close.png"
+                0xffd966  # Yellow
             )
 
     @tasks.loop(minutes=15)
@@ -362,8 +359,8 @@ class AntiPhishing(commands.Cog):
         updated = False
 
         headers = {
-            "X-Identity": f"BeeHive AntiPhishing v{self.__version__} (Discord Bot; +https://github.com/BeeHive-Systems/BeeHive-Cogs)",
-            "User-Agent": f"BeeHive AntiPhishing v{self.__version__} (Discord Bot; +https://github.com/BeeHive-Systems/BeeHive-Cogs)"
+            "X-Identity": f"Red AntiPhishing v{self.__version__} (Discord Bot; +https://github.com/BeeHiveSafety/BeeHive-Cogs)",
+            "User-Agent": f"Red AntiPhishing v{self.__version__} (Discord Bot; +https://github.com/BeeHiveSafety/BeeHive-Cogs)"
         }
 
         # Fetch V1 list
@@ -578,7 +575,6 @@ class AntiPhishing(commands.Cog):
                 title="🚨 Dangerous link detected",
                 color=0xff4545, # Red
             )
-            embed.set_thumbnail(url="https://www.beehive.systems/hubfs/Icon%20Packs/Red/warning.png")
             embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
             embed.set_footer(text="Please alert staff if you believe this is an error.")
 
