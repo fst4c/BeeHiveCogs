@@ -536,6 +536,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         """
         pass
 
+    @commands.guild_only()
     @commands.admin_or_permissions(manage_guild=True)
     @honeypot.command()
     async def create(self, ctx: commands.Context) -> None:
