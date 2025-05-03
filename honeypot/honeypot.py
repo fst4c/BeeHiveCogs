@@ -524,7 +524,6 @@ class Honeypot(commands.Cog, name="Honeypot"):
             await logs_channel.send(content=ping_role.mention if ping_role else None, embed=embed, files=files if files else None)
 
     @commands.guild_only()
-    @commands.admin_or_permissions()
     @commands.group()
     async def honeypot(self, ctx: commands.Context) -> None:
         """
@@ -537,7 +536,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         """
         pass
 
-    @commands.admin_or_permissions()
+    @commands.admin_or_permissions(manage_guild=True)
     @honeypot.command()
     async def create(self, ctx: commands.Context) -> None:
         """
@@ -649,7 +648,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
             )
             await ctx.send(embed=embed)
 
-    @commands.admin_or_permissions()
+    @commands.admin_or_permissions(manage_guild=True)
     @honeypot.command()
     async def activate(self, ctx: commands.Context) -> None:
         """
@@ -666,7 +665,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
             )
             await ctx.send(embed=embed)
 
-    @commands.admin_or_permissions()
+    @commands.admin_or_permissions(manage_guild=True)
     @honeypot.command()
     async def disable(self, ctx: commands.Context) -> None:
         """
@@ -683,7 +682,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
             )
             await ctx.send(embed=embed)
 
-    @commands.admin_or_permissions()
+    @commands.admin_or_permissions(manage_guild=True)
     @honeypot.command()
     async def remove(self, ctx: commands.Context) -> None:
         """
@@ -724,7 +723,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
             await self.config.guild(ctx.guild).enabled.set(False)
 
-    @commands.admin_or_permissions()
+    @commands.admin_or_permissions(manage_guild=True)
     @honeypot.command()
     async def action(self, ctx: commands.Context, action: str) -> None:
         """
@@ -756,7 +755,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
             )
             await ctx.send(embed=embed)
 
-    @commands.admin_or_permissions()
+    @commands.admin_or_permissions(manage_guild=True)
     @honeypot.command()
     async def logs(self, ctx: commands.Context, channel: discord.TextChannel) -> None:
         """
@@ -773,7 +772,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
             )
             await ctx.send(embed=embed)
 
-    @commands.admin_or_permissions()
+    @commands.admin_or_permissions(manage_guild=True)
     @honeypot.command()
     async def settings(self, ctx: commands.Context) -> None:
         """
