@@ -124,19 +124,10 @@ class VirusTotal(commands.Cog):
                         pass
 
                     # Submit file for analysis, wait for completion
-                    # vt-py does not provide an async wait_for_completion, so we must poll
-                    analysis = await client.scan_file_async(file_bytes)
-                    while True:
-                        await asyncio.sleep(15)
-                        analysis_obj = await client.get_object_async(f"/analyses/{analysis.id}")
-                        status = analysis_obj.status
-                        if status == "completed":
-                            stats = analysis_obj.stats
-                            if stats.get("malicious", 0) > 0 or stats.get("suspicious", 0) > 0:
-                                await ctx.send(f"Alert: The file {attachment.filename} is flagged as malicious or suspicious.")
-                            break
-                        else:
-                            await asyncio.sleep(15)
+                    analysis = await client.scan_file(file_bytes, wait_for_completion=True)
+                    stats = analysis.stats
+                    if stats.get("malicious", 0) > 0 or stats.get("suspicious", 0) > 0:
+                        await ctx.send(f"Alert: The file {attachment.filename} is flagged as malicious or suspicious.")
                 except Exception as e:
                     log.error(f"Error in silent_scan: {e}")
 
@@ -302,26 +293,19 @@ class VirusTotal(commands.Cog):
                         pass
                     return
 
-                # Submit file for analysis (no filename kwarg), poll for completion
-                analysis = await client.scan_file_async(file_bytes)
-                while True:
-                    await asyncio.sleep(15)
-                    analysis_obj = await client.get_object_async(f"/analyses/{analysis.id}")
-                    attributes = analysis_obj.attributes
-                    if attributes.get("status") == "completed":
-                        break
-                    await asyncio.sleep(15)
-                stats = attributes.get("stats", {})
+                # Submit file for analysis, wait for completion
+                analysis = await client.scan_file(file_bytes, wait_for_completion=True)
+                stats = analysis.stats
                 malicious_count = stats.get("malicious", 0)
                 suspicious_count = stats.get("suspicious", 0)
                 undetected_count = stats.get("undetected", 0)
                 harmless_count = stats.get("harmless", 0)
                 failure_count = stats.get("failure", 0)
                 unsupported_count = stats.get("type-unsupported", 0)
-                meta = attributes.get("results", {}).get("file_info", {})
-                sha256 = meta.get("sha256") or attributes.get("sha256")
-                sha1 = meta.get("sha1") or attributes.get("sha1")
-                md5 = meta.get("md5") or attributes.get("md5")
+                meta = analysis.meta
+                sha256 = meta.get("sha256")
+                sha1 = meta.get("sha1")
+                md5 = meta.get("md5")
 
                 total_count = malicious_count + suspicious_count + undetected_count + harmless_count + failure_count + unsupported_count
                 safe_count = harmless_count + undetected_count
