@@ -106,8 +106,8 @@ class VirusTotal(commands.Cog):
                 try:
                     # Download the file
                     file_bytes = await attachment.read()
-                    # Submit file for analysis
-                    analysis = await client.scan_file_async(file_bytes, filename=attachment.filename)
+                    # Submit file for analysis (no filename kwarg)
+                    analysis = await client.scan_file_async(file_bytes)
                     # Poll for results
                     while True:
                         await asyncio.sleep(15)
@@ -250,7 +250,8 @@ class VirusTotal(commands.Cog):
         await self.send_info(ctx, "Starting analysis", "This could take a few minutes, please be patient. You'll be mentioned when results are available.")
         async with vt.Client(vt_key["api_key"]) as client:
             try:
-                analysis = await client.scan_file_async(file_bytes, filename=file_name)
+                # Submit file for analysis (no filename kwarg)
+                analysis = await client.scan_file_async(file_bytes)
                 if analysis and analysis.id:
                     await self.check_results(ctx, analysis.id, ctx.author.id, attachment.url, file_name)
                     try:
