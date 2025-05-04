@@ -253,14 +253,13 @@ class VirusTotal(commands.Cog):
         if attachment.size > 30 * 1024 * 1024:
             await self.send_error(ctx, "File too large", "The file you provided exceeds the 30MB size limit for analysis.")
             return
-        file_bytes = await attachment.read()
         file_name = attachment.filename
         await self.send_info(ctx, "Starting analysis", "This could take a few minutes, please be patient. You'll be mentioned when results are available.")
         
         # Use a separate thread to run blocking code
         loop = asyncio.get_running_loop()
         try:
-            analysis = await loop.run_in_executor(None, self._submit_file_for_analysis, vt_key, file_bytes)
+            analysis = await loop.run_in_executor(None, self._submit_file_for_analysis, vt_key, attachment)
             stats = analysis.stats
             malicious_count = stats.get("malicious", 0)
             suspicious_count = stats.get("suspicious", 0)
@@ -288,9 +287,10 @@ class VirusTotal(commands.Cog):
         except Exception as e:
             await self.send_error(ctx, "Failed to submit file", str(e))
 
-    def _submit_file_for_analysis(self, vt_key, file_bytes):
+    def _submit_file_for_analysis(self, vt_key, attachment):
         with vt.Client(vt_key["api_key"]) as client:
             # First, try to get info about the file by its hash
+            file_bytes = attachment.fp.read()
             sha256 = hashlib.sha256(file_bytes).hexdigest()
             file_obj = None
             try:
