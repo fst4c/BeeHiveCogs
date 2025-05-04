@@ -256,71 +256,73 @@ class VirusTotal(commands.Cog):
         file_bytes = await attachment.read()
         file_name = attachment.filename
         await self.send_info(ctx, "Starting analysis", "This could take a few minutes, please be patient. You'll be mentioned when results are available.")
-        async with vt.Client(vt_key["api_key"]) as client:
-            try:
-                # First, try to get info about the file by its hash
-                sha256 = hashlib.sha256(file_bytes).hexdigest()
-                file_obj = None
+        
+        # Use a separate thread to run blocking code
+        loop = asyncio.get_running_loop()
+        try:
+            analysis = await loop.run_in_executor(None, self._submit_file_for_analysis, vt_key, file_bytes)
+            stats = analysis.stats
+            malicious_count = stats.get("malicious", 0)
+            suspicious_count = stats.get("suspicious", 0)
+            undetected_count = stats.get("undetected", 0)
+            harmless_count = stats.get("harmless", 0)
+            failure_count = stats.get("failure", 0)
+            unsupported_count = stats.get("type-unsupported", 0)
+            meta = analysis.meta
+            sha256 = meta.get("sha256")
+            sha1 = meta.get("sha1")
+            md5 = meta.get("md5")
+
+            total_count = malicious_count + suspicious_count + undetected_count + harmless_count + failure_count + unsupported_count
+            safe_count = harmless_count + undetected_count
+            percent = round((malicious_count / total_count) * 100, 2) if total_count > 0 else 0
+            if sha256 and sha1 and md5:
+                await self.send_analysis_results(ctx, ctx.author.id, sha256, sha1, file_name, malicious_count, total_count, percent, safe_count)
+                self.log_submission(ctx.author.id, f"`{file_name or attachment.url}` - **{malicious_count}/{total_count}** - [View results](https://www.virustotal.com/gui/file/{sha256})")
                 try:
-                    file_obj = await client.get_object_async(f"/files/{sha256}")
-                except vt.error.APIError:
-                    file_obj = None
-                use_cached = False
-                if file_obj:
-                    last_analysis_date = getattr(file_obj, "last_analysis_date", None)
-                    import time
-                    if last_analysis_date and (time.time() - last_analysis_date < 86400):
-                        stats = getattr(file_obj, "last_analysis_stats", {})
-                        malicious_count = stats.get("malicious", 0)
-                        suspicious_count = stats.get("suspicious", 0)
-                        undetected_count = stats.get("undetected", 0)
-                        harmless_count = stats.get("harmless", 0)
-                        failure_count = stats.get("timeout", 0)
-                        unsupported_count = stats.get("type-unsupported", 0)
-                        total_count = malicious_count + suspicious_count + undetected_count + harmless_count + failure_count + unsupported_count
-                        safe_count = harmless_count + undetected_count
-                        percent = round((malicious_count / total_count) * 100, 2) if total_count > 0 else 0
-                        sha1 = getattr(file_obj, "sha1", None)
-                        md5 = getattr(file_obj, "md5", None)
-                        if sha256 and sha1 and md5:
-                            await self.send_analysis_results(ctx, ctx.author.id, sha256, sha1, file_name, malicious_count, total_count, percent, safe_count)
-                            self.log_submission(ctx.author.id, f"`{file_name}` - **{malicious_count}/{total_count}** - [View results](https://www.virustotal.com/gui/file/{sha256})")
-                            use_cached = True
-                if use_cached:
-                    try:
-                        await ctx.message.delete()
-                    except Exception:
-                        pass
-                    return
+                    await ctx.message.delete()
+                except Exception:
+                    pass
+            else:
+                raise ValueError("Required hash values not found in the analysis response.")
+        except Exception as e:
+            await self.send_error(ctx, "Failed to submit file", str(e))
 
-                # Submit file for analysis, wait for completion
-                analysis = await client.scan_file(file_bytes, wait_for_completion=True)
-                stats = analysis.stats
-                malicious_count = stats.get("malicious", 0)
-                suspicious_count = stats.get("suspicious", 0)
-                undetected_count = stats.get("undetected", 0)
-                harmless_count = stats.get("harmless", 0)
-                failure_count = stats.get("failure", 0)
-                unsupported_count = stats.get("type-unsupported", 0)
-                meta = analysis.meta
-                sha256 = meta.get("sha256")
-                sha1 = meta.get("sha1")
-                md5 = meta.get("md5")
+    def _submit_file_for_analysis(self, vt_key, file_bytes):
+        with vt.Client(vt_key["api_key"]) as client:
+            # First, try to get info about the file by its hash
+            sha256 = hashlib.sha256(file_bytes).hexdigest()
+            file_obj = None
+            try:
+                file_obj = client.get_object(f"/files/{sha256}")
+            except vt.error.APIError:
+                file_obj = None
+            use_cached = False
+            if file_obj:
+                last_analysis_date = getattr(file_obj, "last_analysis_date", None)
+                import time
+                if last_analysis_date and (time.time() - last_analysis_date < 86400):
+                    stats = getattr(file_obj, "last_analysis_stats", {})
+                    malicious_count = stats.get("malicious", 0)
+                    suspicious_count = stats.get("suspicious", 0)
+                    undetected_count = stats.get("undetected", 0)
+                    harmless_count = stats.get("harmless", 0)
+                    failure_count = stats.get("timeout", 0)
+                    unsupported_count = stats.get("type-unsupported", 0)
+                    total_count = malicious_count + suspicious_count + undetected_count + harmless_count + failure_count + unsupported_count
+                    safe_count = harmless_count + undetected_count
+                    percent = round((malicious_count / total_count) * 100, 2) if total_count > 0 else 0
+                    sha1 = getattr(file_obj, "sha1", None)
+                    md5 = getattr(file_obj, "md5", None)
+                    if sha256 and sha1 and md5:
+                        return file_obj
+                    use_cached = True
+            if use_cached:
+                return file_obj
 
-                total_count = malicious_count + suspicious_count + undetected_count + harmless_count + failure_count + unsupported_count
-                safe_count = harmless_count + undetected_count
-                percent = round((malicious_count / total_count) * 100, 2) if total_count > 0 else 0
-                if sha256 and sha1 and md5:
-                    await self.send_analysis_results(ctx, ctx.author.id, sha256, sha1, file_name, malicious_count, total_count, percent, safe_count)
-                    self.log_submission(ctx.author.id, f"`{file_name or attachment.url}` - **{malicious_count}/{total_count}** - [View results](https://www.virustotal.com/gui/file/{sha256})")
-                    try:
-                        await ctx.message.delete()
-                    except Exception:
-                        pass
-                else:
-                    raise ValueError("Required hash values not found in the analysis response.")
-            except Exception as e:
-                await self.send_error(ctx, "Failed to submit file", str(e))
+            # Submit file for analysis, wait for completion
+            analysis = client.scan_file(file_bytes, wait_for_completion=True)
+            return analysis
 
     async def send_error(self, ctx, title, description):
         guild = getattr(ctx, "guild", None)
