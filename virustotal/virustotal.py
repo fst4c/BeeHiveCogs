@@ -17,10 +17,8 @@ class VirusTotal(commands.Cog):
         self.submission_history = {}
 
     async def initialize(self):
-        # Fix: Use .all() safely and don't overwrite config with itself
         for guild in self.bot.guilds:
             guild_data = await self.config.guild(guild).all()
-            # Defensive: Only set if present in config
             if "auto_scan_enabled" in guild_data:
                 await self.config.guild(guild).auto_scan_enabled.set(guild_data["auto_scan_enabled"])
             if "submission_history" in guild_data:
@@ -67,12 +65,11 @@ class VirusTotal(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message):
         """Automatically scan files if auto_scan is enabled"""
-        # Fix: Ignore bot and webhook messages
         if message.author.bot or message.webhook_id is not None:
             return
         guild = message.guild
         if guild is None:
-            return  # Ignore messages not in a guild
+            return
 
         auto_scan_enabled = await self.config.guild(guild).auto_scan_enabled()
         if auto_scan_enabled and message.attachments:
@@ -81,7 +78,6 @@ class VirusTotal(commands.Cog):
                 await self.silent_scan(ctx, message.attachments)
 
     def extract_hashes(self, text):
-        """Extract potential file hashes from the text"""
         patterns = {
             'sha1': r'\b[0-9a-fA-F]{40}\b',
             'sha256': r'\b[0-9a-fA-F]{64}\b',
@@ -95,25 +91,23 @@ class VirusTotal(commands.Cog):
         return hashes
 
     async def silent_scan(self, ctx, attachments):
-        """Scan files silently and alert only if they're malicious or suspicious"""
         vt_key = await self.bot.get_shared_api_tokens("virustotal")
         if not vt_key.get("api_key"):
-            return  # No API key set, silently return
+            return
 
         async with aiohttp.ClientSession() as session:
             for attachment in attachments:
-                if attachment.size > 30 * 1024 * 1024:  # 30 MB limit
-                    continue  # Skip files that are too large
+                if attachment.size > 30 * 1024 * 1024:
+                    continue
 
                 try:
                     async with session.get(attachment.url) as response:
                         if response.status != 200:
-                            continue  # Skip files that can't be downloaded
+                            continue
 
                         file_content = await response.read()
                         file_name = attachment.filename
 
-                        # Fix: Use aiohttp's FormData for file upload
                         form = aiohttp.FormData()
                         form.add_field("file", file_content, filename=file_name)
 
@@ -123,22 +117,21 @@ class VirusTotal(commands.Cog):
                             data=form,
                         ) as vt_response:
                             if vt_response.status != 200:
-                                continue  # Skip files that can't be uploaded
+                                continue
 
                             data = await vt_response.json()
                             analysis_id = data.get("data", {}).get("id")
                             if not analysis_id:
-                                continue  # Skip files without a valid analysis ID
+                                continue
 
-                            # Check the analysis results
                             while True:
-                                await asyncio.sleep(15)  # Wait for the analysis to complete
+                                await asyncio.sleep(15)
                                 async with session.get(
                                     f"https://www.virustotal.com/api/v3/analyses/{analysis_id}",
                                     headers={"x-apikey": vt_key["api_key"]},
                                 ) as result_response:
                                     if result_response.status != 200:
-                                        break  # Don't continue forever if error
+                                        break
 
                                     result_data = await result_response.json()
                                     status = result_data.get("data", {}).get("attributes", {}).get("status")
@@ -148,7 +141,7 @@ class VirusTotal(commands.Cog):
                                             await ctx.send(f"Alert: The file {file_name} is flagged as malicious or suspicious.")
                                         break
                                     else:
-                                        await asyncio.sleep(15)  # Wait a bit before checking again
+                                        await asyncio.sleep(15)
                 except Exception as e:
                     log.error(f"Error in silent_scan: {e}")
 
@@ -202,31 +195,104 @@ class VirusTotal(commands.Cog):
                     await self.send_error(ctx, "Request timed out", "The bot was unable to complete the request due to a timeout.")
 
     async def submit_url_for_analysis(self, ctx, session, vt_key, file_url):
-        # Fix: VirusTotal expects url to be sent as x-www-form-urlencoded, not multipart
+        # VirusTotal expects the URL to be sent as x-www-form-urlencoded, and the returned ID is a base64-encoded URL id, not an analysis id.
         data = {"url": file_url}
         headers = {"x-apikey": vt_key["api_key"]}
         async with session.post("https://www.virustotal.com/api/v3/urls", headers=headers, data=data) as response:
             if response.status != 200:
                 raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status}", headers=response.headers)
             data = await response.json()
-            permalink = data.get("data", {}).get("id")
-            if permalink:
-                await ctx.send(f"Permalink: https://www.virustotal.com/gui/url/{permalink}")
-                await self.check_results(ctx, permalink, ctx.author.id, file_url, None)
+            url_id = data.get("data", {}).get("id")
+            if url_id:
+                # The returned id is a base64-encoded version of the URL, which is used for both permalink and for fetching the analysis
+                await ctx.send(f"Permalink: https://www.virustotal.com/gui/url/{url_id}")
+                await self.check_url_results(ctx, url_id, ctx.author.id, file_url)
             else:
-                raise ValueError("No permalink found in the response.")
+                raise ValueError("No URL ID found in the response.")
+
+    async def check_url_results(self, ctx, url_id, presid, file_url):
+        vt_key = await self.bot.get_shared_api_tokens("virustotal")
+        headers = {"x-apikey": vt_key["api_key"]}
+
+        async with aiohttp.ClientSession() as session:
+            try:
+                # Wait for the analysis to complete
+                while True:
+                    async with session.get(f'https://www.virustotal.com/api/v3/urls/{url_id}', headers=headers) as response:
+                        if response.status != 200:
+                            raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status}", headers=response.headers)
+                        data = await response.json()
+                        attributes = data.get("data", {}).get("attributes", {})
+                        status = attributes.get("last_analysis_stats", None)
+                        if status:
+                            break
+                        await asyncio.sleep(3)
+                stats = attributes.get("last_analysis_stats", {})
+                malicious_count = stats.get("malicious", 0)
+                suspicious_count = stats.get("suspicious", 0)
+                undetected_count = stats.get("undetected", 0)
+                harmless_count = stats.get("harmless", 0)
+                timeout_count = stats.get("timeout", 0)
+                # For URLs, hashes are not always present, so we use the URL itself for display
+                total_count = malicious_count + suspicious_count + undetected_count + harmless_count + timeout_count
+                safe_count = harmless_count + undetected_count
+                percent = round((malicious_count / total_count) * 100, 2) if total_count > 0 else 0
+                await self.send_url_analysis_results(ctx, presid, url_id, file_url, malicious_count, total_count, percent, safe_count)
+                self.log_submission(ctx.author.id, f"`{file_url}` - **{malicious_count}/{total_count}** - [View results](https://www.virustotal.com/gui/url/{url_id})")
+            except (aiohttp.ClientResponseError, ValueError) as e:
+                await self.send_error(ctx, "Analysis failed", str(e))
+            except asyncio.TimeoutError:
+                await self.send_error(ctx, "Request timed out", "The bot was unable to complete the request due to a timeout.")
+
+    async def send_url_analysis_results(self, ctx, presid, url_id, file_url, malicious_count, total_count, percent, safe_count):
+        content = f"||<@{presid}>||"
+        guild = getattr(ctx, "guild", None)
+        channel = getattr(ctx, "channel", None)
+        can_embed = guild and channel and channel.permissions_for(guild.me).embed_links
+        if can_embed:
+            embed = discord.Embed()
+            if malicious_count >= 11:
+                embed.title = "URL Analysis complete"
+                embed.description = f"**{int(percent)}%** of vendors rated this URL as dangerous! You should avoid this link completely."
+                embed.color = discord.Colour(0xff4545)
+                embed.set_footer(text=f"URL | {file_url}")
+            elif 1 < malicious_count < 11:
+                embed.title = "URL Analysis complete"
+                embed.description = f"**{int(percent)}%** of vendors rated this URL as dangerous. While there are malicious ratings available for this URL, there aren't many, so this could be a false positive. **You should investigate further before coming to a decision.**"
+                embed.color = discord.Colour(0xff9144)
+                embed.set_footer(text=f"URL | {file_url}")
+            else:
+                embed.title = "URL Analysis complete"
+                embed.color = discord.Colour(0x2BBD8E)
+                embed.description = f"**{safe_count}** vendors say this URL is safe"
+                embed.set_footer(text=f"{file_url}")
+            try:
+                button = discord.ui.Button(label="View results on VirusTotal", url=f"https://www.virustotal.com/gui/url/{url_id}", style=discord.ButtonStyle.url)
+                button2 = discord.ui.Button(label="Get a second opinion", url="https://discord.gg/6PbaH6AfvF", style=discord.ButtonStyle.url)
+                view = discord.ui.View()
+                view.add_item(button)
+                view.add_item(button2)
+                await ctx.send(content=content, embed=embed, view=view)
+            except Exception:
+                await ctx.send(content=content, embed=embed)
+        else:
+            if malicious_count >= 11:
+                await ctx.send(f"{content}\nURL Analysis complete: **{int(percent)}%** of vendors rated this URL as dangerous! You should avoid this link completely.\nView results on VirusTotal: https://www.virustotal.com/gui/url/{url_id}\nGet a second opinion: https://discord.gg/6PbaH6AfvF")
+            elif 1 < malicious_count < 11:
+                await ctx.send(f"{content}\nURL Analysis complete: **{int(percent)}%** of vendors rated this URL as dangerous. While there are malicious ratings available for this URL, there aren't many, so this could be a false positive. **You should investigate further before coming to a decision.**\nView results on VirusTotal: https://www.virustotal.com/gui/url/{url_id}\nGet a second opinion: https://discord.gg/6PbaH6AfvF")
+            else:
+                await ctx.send(f"{content}\nURL Analysis complete: **{safe_count}** vendors say this URL is safe\nView results on VirusTotal: https://www.virustotal.com/gui/url/{url_id}\nGet a second opinion: https://discord.gg/6PbaH6AfvF")
 
     async def submit_attachment_for_analysis(self, ctx, session, vt_key, attachment):
-        if attachment.size > 30 * 1024 * 1024:  # 30 MB limit
+        if attachment.size > 30 * 1024 * 1024:
             await self.send_error(ctx, "File too large", "The file you provided exceeds the 30MB size limit for analysis.")
             return
         async with session.get(attachment.url) as response:
             if response.status != 200:
                 raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status}", headers=response.headers)
             file_content = await response.read()
-            file_name = attachment.filename  # Get the file name from the attachment
+            file_name = attachment.filename
             await self.send_info(ctx, "Starting analysis", "This could take a few minutes, please be patient. You'll be mentioned when results are available.")
-            # Fix: Use aiohttp's FormData for file upload
             form = aiohttp.FormData()
             form.add_field("file", file_content, filename=file_name)
             async with session.post("https://www.virustotal.com/api/v3/files", headers={"x-apikey": vt_key["api_key"]}, data=form) as response:
@@ -236,7 +302,6 @@ class VirusTotal(commands.Cog):
                 analysis_id = data.get("data", {}).get("id")
                 if analysis_id:
                     await self.check_results(ctx, analysis_id, ctx.author.id, attachment.url, file_name)
-                    # Defensive: Only delete if possible
                     try:
                         await ctx.message.delete()
                     except Exception:
@@ -245,7 +310,6 @@ class VirusTotal(commands.Cog):
                     raise ValueError("No analysis ID found in the response.")
 
     async def send_error(self, ctx, title, description):
-        # Defensive: Check for ctx.guild and ctx.channel
         guild = getattr(ctx, "guild", None)
         channel = getattr(ctx, "channel", None)
         if guild and channel and channel.permissions_for(guild.me).embed_links:
@@ -270,7 +334,6 @@ class VirusTotal(commands.Cog):
 
         async with aiohttp.ClientSession() as session:
             try:
-                # Fix: Always get the latest data after status is completed
                 while True:
                     async with session.get(f'https://www.virustotal.com/api/v3/analyses/{analysis_id}', headers=headers) as response:
                         if response.status != 200:
@@ -287,7 +350,6 @@ class VirusTotal(commands.Cog):
                 harmless_count = stats.get("harmless", 0)
                 failure_count = stats.get("failure", 0)
                 unsupported_count = stats.get("type-unsupported", 0)
-                # Fix: Get hashes from meta if available, else from attributes
                 meta = data.get("meta", {}).get("file_info", {})
                 sha256 = meta.get("sha256") or attributes.get("sha256")
                 sha1 = meta.get("sha1") or attributes.get("sha1")
@@ -328,7 +390,6 @@ class VirusTotal(commands.Cog):
                 embed.color = discord.Colour(0x2BBD8E)
                 embed.description = f"**{safe_count}** vendors say this file is malware-free"
                 embed.set_footer(text=f"{sha1}")
-            # Defensive: Only add buttons if supported (discord.py 2.0+)
             try:
                 button = discord.ui.Button(label="View results on VirusTotal", url=f"https://www.virustotal.com/gui/file/{sha256}", style=discord.ButtonStyle.url)
                 button2 = discord.ui.Button(label="Get a second opinion", url="https://discord.gg/6PbaH6AfvF", style=discord.ButtonStyle.url)
