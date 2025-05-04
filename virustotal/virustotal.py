@@ -199,10 +199,8 @@ class VirusTotal(commands.Cog):
     async def submit_url_for_analysis(self, ctx, session, vt_key, file_url):
         # VirusTotal expects the URL to be sent as x-www-form-urlencoded, but aiohttp requires data to be a string or bytes for this.
         # Also, the content-type must be set to application/x-www-form-urlencoded.
-        # Additionally, the returned "id" is a base64-url-encoded version of the URL, not the analysis id.
-        # We must base64-url encode the URL ourselves to get the correct id for the GET endpoint.
-    
-
+        # The returned "id" is a base64-url-encoded version of the URL, not the analysis id.
+        # To get the analysis id, we must use the "analysis" relationship from the POST response.
         data = f"url={quote(file_url, safe='')}"
         headers = {
             "x-apikey": vt_key["api_key"],
@@ -219,26 +217,48 @@ class VirusTotal(commands.Cog):
             data = await response.json()
             # The returned id is a base64-url-encoded version of the URL (not the analysis id)
             url_id = data.get("data", {}).get("id")
-            if url_id:
+            # The analysis id is in the relationships/analysis/data/id field
+            analysis_id = None
+            try:
+                analysis_id = data["data"]["relationships"]["analysis"]["data"]["id"]
+            except Exception:
+                analysis_id = None
+            if url_id and analysis_id:
                 await ctx.send(f"Permalink: https://www.virustotal.com/gui/url/{url_id}")
-                await self.check_url_results(ctx, url_id, ctx.author.id, file_url)
+                await self.check_url_results(ctx, url_id, analysis_id, ctx.author.id, file_url)
+            elif url_id:
+                # Fallback: try to use url_id as analysis_id (old behavior, not recommended)
+                await ctx.send(f"Permalink: https://www.virustotal.com/gui/url/{url_id}")
+                await self.check_url_results(ctx, url_id, None, ctx.author.id, file_url)
             else:
                 raise ValueError("No URL ID found in the response.")
 
-    async def check_url_results(self, ctx, url_id, presid, file_url):
+    async def check_url_results(self, ctx, url_id, analysis_id, presid, file_url):
         vt_key = await self.bot.get_shared_api_tokens("virustotal")
         headers = {"x-apikey": vt_key["api_key"]}
 
         async with aiohttp.ClientSession() as session:
             try:
-                # Wait for the analysis to complete
+                # If we have an analysis_id, poll the /analyses/{analysis_id} endpoint for status
+                if analysis_id:
+                    while True:
+                        async with session.get(f'https://www.virustotal.com/api/v3/analyses/{analysis_id}', headers=headers) as response:
+                            if response.status != 200:
+                                raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status}", headers=response.headers)
+                            data = await response.json()
+                            attributes = data.get("data", {}).get("attributes", {})
+                            status = attributes.get("status")
+                            if status == "completed":
+                                break
+                            await asyncio.sleep(3)
+                    # After completion, get the latest stats from the url object
+                # Now get the latest stats from the url object
                 while True:
                     async with session.get(f'https://www.virustotal.com/api/v3/urls/{url_id}', headers=headers) as response:
                         if response.status != 200:
                             raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status}", headers=response.headers)
                         data = await response.json()
                         attributes = data.get("data", {}).get("attributes", {})
-                        # The analysis is ready if "last_analysis_stats" exists and is not empty
                         stats = attributes.get("last_analysis_stats", None)
                         if stats and isinstance(stats, dict) and stats:
                             break
