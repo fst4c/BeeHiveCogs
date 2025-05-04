@@ -1,6 +1,7 @@
 import asyncio
 import discord
 import logging
+import hashlib
 import re
 from redbot.core import commands, Config, checks
 import base64
@@ -106,9 +107,25 @@ class VirusTotal(commands.Cog):
                 try:
                     # Download the file
                     file_bytes = await attachment.read()
-                    # Submit file for analysis (no filename kwarg)
+                    # First, try to get info about the file by its hash
+                    sha256 = hashlib.sha256(file_bytes).hexdigest()
+                    try:
+                        file_obj = await client.get_object_async(f"/files/{sha256}")
+                        # If the file exists and the analysis is recent enough (let's say 1 day), use it
+                        last_analysis_date = getattr(file_obj, "last_analysis_date", None)
+                        import time
+                        if last_analysis_date and (time.time() - last_analysis_date < 86400):
+                            stats = getattr(file_obj, "last_analysis_stats", {})
+                            if stats.get("malicious", 0) > 0 or stats.get("suspicious", 0) > 0:
+                                await ctx.send(f"Alert: The file {attachment.filename} is flagged as malicious or suspicious (cached result).")
+                            continue  # Don't rescan if recent enough
+                    except vt.error.APIError:
+                        # File not found, proceed to scan
+                        pass
+
+                    # Submit file for analysis, wait for completion
+                    # vt-py does not provide an async wait_for_completion, so we must poll
                     analysis = await client.scan_file_async(file_bytes)
-                    # Poll for results
                     while True:
                         await asyncio.sleep(15)
                         analysis_obj = await client.get_object_async(f"/analyses/{analysis.id}")
@@ -250,16 +267,74 @@ class VirusTotal(commands.Cog):
         await self.send_info(ctx, "Starting analysis", "This could take a few minutes, please be patient. You'll be mentioned when results are available.")
         async with vt.Client(vt_key["api_key"]) as client:
             try:
-                # Submit file for analysis (no filename kwarg)
+                # First, try to get info about the file by its hash
+                sha256 = hashlib.sha256(file_bytes).hexdigest()
+                file_obj = None
+                try:
+                    file_obj = await client.get_object_async(f"/files/{sha256}")
+                except vt.error.APIError:
+                    file_obj = None
+                use_cached = False
+                if file_obj:
+                    last_analysis_date = getattr(file_obj, "last_analysis_date", None)
+                    import time
+                    if last_analysis_date and (time.time() - last_analysis_date < 86400):
+                        stats = getattr(file_obj, "last_analysis_stats", {})
+                        malicious_count = stats.get("malicious", 0)
+                        suspicious_count = stats.get("suspicious", 0)
+                        undetected_count = stats.get("undetected", 0)
+                        harmless_count = stats.get("harmless", 0)
+                        failure_count = stats.get("timeout", 0)
+                        unsupported_count = stats.get("type-unsupported", 0)
+                        total_count = malicious_count + suspicious_count + undetected_count + harmless_count + failure_count + unsupported_count
+                        safe_count = harmless_count + undetected_count
+                        percent = round((malicious_count / total_count) * 100, 2) if total_count > 0 else 0
+                        sha1 = getattr(file_obj, "sha1", None)
+                        md5 = getattr(file_obj, "md5", None)
+                        if sha256 and sha1 and md5:
+                            await self.send_analysis_results(ctx, ctx.author.id, sha256, sha1, file_name, malicious_count, total_count, percent, safe_count)
+                            self.log_submission(ctx.author.id, f"`{file_name}` - **{malicious_count}/{total_count}** - [View results](https://www.virustotal.com/gui/file/{sha256})")
+                            use_cached = True
+                if use_cached:
+                    try:
+                        await ctx.message.delete()
+                    except Exception:
+                        pass
+                    return
+
+                # Submit file for analysis (no filename kwarg), poll for completion
                 analysis = await client.scan_file_async(file_bytes)
-                if analysis and analysis.id:
-                    await self.check_results(ctx, analysis.id, ctx.author.id, attachment.url, file_name)
+                while True:
+                    await asyncio.sleep(15)
+                    analysis_obj = await client.get_object_async(f"/analyses/{analysis.id}")
+                    attributes = analysis_obj.attributes
+                    if attributes.get("status") == "completed":
+                        break
+                    await asyncio.sleep(15)
+                stats = attributes.get("stats", {})
+                malicious_count = stats.get("malicious", 0)
+                suspicious_count = stats.get("suspicious", 0)
+                undetected_count = stats.get("undetected", 0)
+                harmless_count = stats.get("harmless", 0)
+                failure_count = stats.get("failure", 0)
+                unsupported_count = stats.get("type-unsupported", 0)
+                meta = attributes.get("results", {}).get("file_info", {})
+                sha256 = meta.get("sha256") or attributes.get("sha256")
+                sha1 = meta.get("sha1") or attributes.get("sha1")
+                md5 = meta.get("md5") or attributes.get("md5")
+
+                total_count = malicious_count + suspicious_count + undetected_count + harmless_count + failure_count + unsupported_count
+                safe_count = harmless_count + undetected_count
+                percent = round((malicious_count / total_count) * 100, 2) if total_count > 0 else 0
+                if sha256 and sha1 and md5:
+                    await self.send_analysis_results(ctx, ctx.author.id, sha256, sha1, file_name, malicious_count, total_count, percent, safe_count)
+                    self.log_submission(ctx.author.id, f"`{file_name or attachment.url}` - **{malicious_count}/{total_count}** - [View results](https://www.virustotal.com/gui/file/{sha256})")
                     try:
                         await ctx.message.delete()
                     except Exception:
                         pass
                 else:
-                    raise ValueError("No analysis ID found in the response.")
+                    raise ValueError("Required hash values not found in the analysis response.")
             except Exception as e:
                 await self.send_error(ctx, "Failed to submit file", str(e))
 
@@ -291,7 +366,7 @@ class VirusTotal(commands.Cog):
                     attributes = analysis_obj.attributes
                     if attributes.get("status") == "completed":
                         break
-                    await asyncio.sleep(3)
+                    await asyncio.sleep(15)
                 stats = attributes.get("stats", {})
                 malicious_count = stats.get("malicious", 0)
                 suspicious_count = stats.get("suspicious", 0)
