@@ -5,6 +5,7 @@ import logging
 import re
 from redbot.core import commands, Config, checks
 import base64
+from urllib.parse import quote
 
 log = logging.getLogger("red.VirusTotal")
 
@@ -198,7 +199,11 @@ class VirusTotal(commands.Cog):
     async def submit_url_for_analysis(self, ctx, session, vt_key, file_url):
         # VirusTotal expects the URL to be sent as x-www-form-urlencoded, but aiohttp requires data to be a string or bytes for this.
         # Also, the content-type must be set to application/x-www-form-urlencoded.
-        data = f"url={aiohttp.helpers.quote(file_url, safe='')}"
+        # Additionally, the returned "id" is a base64-url-encoded version of the URL, not the analysis id.
+        # We must base64-url encode the URL ourselves to get the correct id for the GET endpoint.
+    
+
+        data = f"url={quote(file_url, safe='')}"
         headers = {
             "x-apikey": vt_key["api_key"],
             "Content-Type": "application/x-www-form-urlencoded"
@@ -212,6 +217,7 @@ class VirusTotal(commands.Cog):
                     err = ""
                 raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status} {err}", headers=response.headers)
             data = await response.json()
+            # The returned id is a base64-url-encoded version of the URL (not the analysis id)
             url_id = data.get("data", {}).get("id")
             if url_id:
                 await ctx.send(f"Permalink: https://www.virustotal.com/gui/url/{url_id}")
@@ -232,8 +238,9 @@ class VirusTotal(commands.Cog):
                             raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status}", headers=response.headers)
                         data = await response.json()
                         attributes = data.get("data", {}).get("attributes", {})
-                        status = attributes.get("last_analysis_stats", None)
-                        if status:
+                        # The analysis is ready if "last_analysis_stats" exists and is not empty
+                        stats = attributes.get("last_analysis_stats", None)
+                        if stats and isinstance(stats, dict) and stats:
                             break
                         await asyncio.sleep(3)
                 stats = attributes.get("last_analysis_stats", {})
