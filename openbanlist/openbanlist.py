@@ -175,6 +175,150 @@ class OpenBanList(commands.Cog):
                     embed.add_field(name=reason, value=f"**{count}** users", inline=False)
                 await ctx.send(embed=embed)
 
+    @commands.admin_or_permissions(manage_guild=True)
+    @banlist.command(name="scan")
+    async def scan(self, ctx):
+        """
+        Manually scan the server and take the configured action on any banned accounts found.
+        """
+        guild = ctx.guild
+        enabled = await self.config.guild(guild).enabled()
+        if not enabled:
+            embed = discord.Embed(
+                title="Banlist protection is disabled",
+                description="Enable banlist protection with `banlist enable` before scanning.",
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+            return
+
+        action = await self.config.guild(guild).action()
+        if action == "none":
+            embed = discord.Embed(
+                title="No action configured",
+                description="Set an action (`kick` or `ban`) with `banlist action <action>` before scanning.",
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+            return
+
+        log_channel_id = await self.config.guild(guild).log_channel()
+        log_channel = guild.get_channel(log_channel_id) if log_channel_id else None
+
+        await ctx.send("🔍 Scanning server for users on the OpenBanlist...")
+
+        async with self.session.get(self.banlist_url) as response:
+            if response.status != 200:
+                await ctx.send("Failed to fetch the banlist. Please try again later.")
+                return
+            banlist_data = await response.json()
+            ban_ids = {int(ban_info["reported_id"]): ban_info for ban_info in banlist_data.values()}
+
+        found = []
+        failed = []
+        for member in guild.members:
+            if member.bot:
+                continue
+            ban_info = ban_ids.get(member.id)
+            if ban_info:
+                try:
+                    if action == "kick":
+                        try:
+                            embed_dm = discord.Embed(
+                                title="You're unable to stay in this server",
+                                description="You have been removed from the server due to an active ban on OpenBanlist.",
+                                color=0xff4545
+                            )
+                            embed_dm.add_field(name="Appeal", value="To appeal, please visit [openbanlist.cc/appeal](https://openbanlist.cc/appeal).", inline=False)
+                            await member.send(embed=embed_dm)
+                        except discord.Forbidden:
+                            pass
+                        await member.kick(reason="Active ban detected on OpenBanlist (manual scan)")
+                        action_taken = "kicked"
+                    elif action == "ban":
+                        try:
+                            embed_dm = discord.Embed(
+                                title="You're unable to stay in this server",
+                                description="You have been banned from the server due to an active ban on OpenBanlist.",
+                                color=0xff4545
+                            )
+                            embed_dm.add_field(name="Appeal", value="To appeal, please visit [openbanlist.cc/appeal](https://openbanlist.cc/appeal).", inline=False)
+                            await member.send(embed=embed_dm)
+                        except discord.Forbidden:
+                            pass
+                        await member.ban(reason="Active ban detected on OpenBanlist (manual scan)")
+                        action_taken = "banned"
+                    else:
+                        action_taken = "none"
+                    found.append((member, ban_info, action_taken))
+                except discord.Forbidden:
+                    failed.append((member, ban_info))
+                    continue
+
+                # Log each action if log_channel is set
+                if log_channel:
+                    embed = discord.Embed(
+                        title="Banlist match found (manual scan)",
+                        description=f"{member.mention} ({member.id}) is actively listed on OpenBanlist.",
+                        color=0xff4545
+                    )
+                    embed.add_field(name="Action taken", value=action_taken, inline=False)
+                    embed.add_field(name="Ban reason", value=ban_info.get("ban_reason", "No reason provided"), inline=False)
+                    embed.add_field(name="Context", value=ban_info.get("context", "No context provided"), inline=False)
+                    embed.add_field(name="Reporter ID", value=ban_info.get("reporter_id", "Unknown"), inline=False)
+                    embed.add_field(name="Approver ID", value=ban_info.get("approver_id", "Unknown"), inline=False)
+                    embed.add_field(name="Appealable", value=str(ban_info.get("appealable", False)), inline=False)
+                    if ban_info.get("appealed", False):
+                        appeal_verdict = ban_info.get("appeal_verdict", "")
+                        if not appeal_verdict:
+                            appeal_status = "Pending"
+                        elif appeal_verdict == "accepted":
+                            appeal_status = "Accepted"
+                        elif appeal_verdict == "denied":
+                            appeal_status = "Denied"
+                        else:
+                            appeal_status = "Unknown"
+                        embed.add_field(name="Appeal status", value=appeal_status, inline=True)
+                        embed.add_field(name="Appeal verdict", value=ban_info.get("appeal_verdict", "No verdict provided"), inline=False)
+                        appeal_reason = ban_info.get("appeal_reason", "")
+                        if appeal_reason:
+                            embed.add_field(name="Appeal reason", value=appeal_reason, inline=False)
+                    evidence = ban_info.get("evidence", "")
+                    if evidence:
+                        embed.set_image(url=evidence)
+                    report_date = ban_info.get("report_date", "Unknown")
+                    ban_date = ban_info.get("ban_date", "Unknown")
+                    if report_date != "Unknown":
+                        embed.add_field(name="Report date", value=f"<t:{report_date}:F>", inline=False)
+                    else:
+                        embed.add_field(name="Report date", value="Unknown", inline=False)
+                    if ban_date != "Unknown":
+                        embed.add_field(name="Ban date", value=f"<t:{ban_date}:F>", inline=False)
+                    else:
+                        embed.add_field(name="Ban date", value="Unknown", inline=False)
+                    await log_channel.send(embed=embed)
+
+        summary_embed = discord.Embed(
+            title="OpenBanlist Scan Complete",
+            color=0x2bbd8e if found or failed else 0xfffffe
+        )
+        summary_embed.add_field(name="Total scanned", value=str(len(guild.members)), inline=True)
+        summary_embed.add_field(name="Matches found", value=str(len(found)), inline=True)
+        summary_embed.add_field(name="Failed actions", value=str(len(failed)), inline=True)
+        if found:
+            summary_embed.add_field(
+                name="Users affected",
+                value="\n".join(f"{m.mention} ({m.id}) - {a}" for m, _, a in found)[:1024],
+                inline=False
+            )
+        if failed:
+            summary_embed.add_field(
+                name="Failed to act on",
+                value="\n".join(f"{m.mention} ({m.id})" for m, _ in failed)[:1024],
+                inline=False
+            )
+        await ctx.send(embed=summary_embed)
+
     async def update_banlist_periodically(self):
         while True:
             await self.update_banlist()
