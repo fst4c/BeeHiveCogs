@@ -861,11 +861,11 @@ class Skysearch(commands.Cog):
                         "messages": [
                             {
                                 "role": "system",
-                                "content": "You are an AI summarizer inside a Discord bot feature. Produce text without titles or headings, and use markdown for styling like - bulletpoints where appropriate. Don't mention terrorist attacks or other world terrorism events. Don't mention the airport's name, ICAO or IATA."
+                                "content": "You are an AI summarizer inside a Discord bot feature. Produce whole text without formatting or breaks. Don't mention terrorist attacks or other world terrorism events. Don't mention the airport's name, ICAO or IATA."
                             },
                             {
                                 "role": "user",
-                                "content": f"Generate a summary of the airport named {airport_name}. Include 3 links as bulletpoints where I can read more about the airport"
+                                "content": f"Generate an informative summary of the airport named {airport_name}."
                             }
                         ]
                     }
@@ -888,7 +888,7 @@ class Skysearch(commands.Cog):
                 if google_street_view_api_key != "YOUR_API_KEY":
                     street_view_base_url = "https://maps.googleapis.com/maps/api/staticmap"
                     street_view_params = {
-                        "size": "1920x1080", # Width x Height
+                        "size": "800x500", # Width x Height
                         "zoom": "12",
                         "scale": "2", 
                         "center": f"{data1['latitude']},{data1['longitude']}",  # Latitude and Longitude as comma-separated string
