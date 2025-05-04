@@ -1,4 +1,3 @@
-import aiohttp
 import asyncio
 import discord
 import logging
@@ -6,6 +5,8 @@ import re
 from redbot.core import commands, Config, checks
 import base64
 from urllib.parse import quote
+
+import vt  # vt-py
 
 log = logging.getLogger("red.VirusTotal")
 
@@ -97,53 +98,28 @@ class VirusTotal(commands.Cog):
         if not vt_key.get("api_key"):
             return
 
-        async with aiohttp.ClientSession() as session:
+        async with vt.Client(vt_key["api_key"]) as client:
             for attachment in attachments:
                 if attachment.size > 30 * 1024 * 1024:
                     continue
 
                 try:
-                    async with session.get(attachment.url) as response:
-                        if response.status != 200:
-                            continue
-
-                        file_content = await response.read()
-                        file_name = attachment.filename
-
-                        form = aiohttp.FormData()
-                        form.add_field("file", file_content, filename=file_name)
-
-                        async with session.post(
-                            "https://www.virustotal.com/api/v3/files",
-                            headers={"x-apikey": vt_key["api_key"]},
-                            data=form,
-                        ) as vt_response:
-                            if vt_response.status != 200:
-                                continue
-
-                            data = await vt_response.json()
-                            analysis_id = data.get("data", {}).get("id")
-                            if not analysis_id:
-                                continue
-
-                            while True:
-                                await asyncio.sleep(15)
-                                async with session.get(
-                                    f"https://www.virustotal.com/api/v3/analyses/{analysis_id}",
-                                    headers={"x-apikey": vt_key["api_key"]},
-                                ) as result_response:
-                                    if result_response.status != 200:
-                                        break
-
-                                    result_data = await result_response.json()
-                                    status = result_data.get("data", {}).get("attributes", {}).get("status")
-                                    if status == "completed":
-                                        stats = result_data.get("data", {}).get("attributes", {}).get("stats", {})
-                                        if stats.get("malicious", 0) > 0 or stats.get("suspicious", 0) > 0:
-                                            await ctx.send(f"Alert: The file {file_name} is flagged as malicious or suspicious.")
-                                        break
-                                    else:
-                                        await asyncio.sleep(15)
+                    # Download the file
+                    file_bytes = await attachment.read()
+                    # Submit file for analysis
+                    analysis = await client.scan_file_async(file_bytes, filename=attachment.filename)
+                    # Poll for results
+                    while True:
+                        await asyncio.sleep(15)
+                        analysis_obj = await client.get_object_async(f"/analyses/{analysis.id}")
+                        status = analysis_obj.status
+                        if status == "completed":
+                            stats = analysis_obj.stats
+                            if stats.get("malicious", 0) > 0 or stats.get("suspicious", 0) > 0:
+                                await ctx.send(f"Alert: The file {attachment.filename} is flagged as malicious or suspicious.")
+                            break
+                        else:
+                            await asyncio.sleep(15)
                 except Exception as e:
                     log.error(f"Error in silent_scan: {e}")
 
@@ -161,47 +137,19 @@ class VirusTotal(commands.Cog):
                 await self.send_error(ctx, "No VirusTotal API Key set", "Your Red instance doesn't have an API key set for VirusTotal.\n\nUntil you add an API key using `[p]set api`, the VirusTotal API will refuse your requests and this cog won't work.")
                 return
 
-            async with aiohttp.ClientSession() as session:
+            async with vt.Client(vt_key["api_key"]) as client:
                 try:
-                    # --- REWRITE: Use x-www-form-urlencoded and expect the full URL object as described ---
-                    payload = {"url": file_url}
-                    headers = {
-                        "x-apikey": vt_key["api_key"],
-                        "accept": "application/json",
-                        "content-type": "application/x-www-form-urlencoded"
-                    }
-                    # aiohttp requires data to be a string or bytes for x-www-form-urlencoded, or a dict
-                    async with session.post(
-                        "https://www.virustotal.com/api/v3/urls",
-                        data=payload,
-                        headers=headers
-                    ) as response:
-                        if response.status != 200:
-                            try:
-                                err = await response.text()
-                            except Exception:
-                                err = ""
-                            raise aiohttp.ClientResponseError(
-                                response.request_info, response.history,
-                                status=response.status,
-                                message=f"HTTP error {response.status} {err}",
-                                headers=response.headers
-                            )
-                        data = await response.json()
-                        # The returned id is a base64-url-encoded version of the URL (not the analysis id)
-                        url_id = data.get("data", {}).get("id")
-                        if not url_id:
-                            raise ValueError("No URL ID found in the response.")
-                        # Announce permalink
-                        await ctx.send(f"Permalink: https://www.virustotal.com/gui/url/{url_id}")
-                        # Now poll for the full URL object (not analysis id, but /urls/{id})
-                        await self.check_url_results(ctx, url_id, ctx.author.id, file_url)
-                        # Optionally, log submission
-                        # self.log_submission(ctx.author.id, f"`{file_url}` - [View results](https://www.virustotal.com/gui/url/{url_id})")
-                except (aiohttp.ClientResponseError, ValueError) as e:
+                    # Submit the URL for analysis
+                    analysis = await client.scan_url_async(file_url)
+                    # The returned id is a base64-url-encoded version of the URL (not the analysis id)
+                    url_id = analysis.id
+                    if not url_id:
+                        raise ValueError("No URL ID found in the response.")
+                    await ctx.send(f"Permalink: https://www.virustotal.com/gui/url/{url_id}")
+                    # Now poll for the full URL object (not analysis id, but /urls/{id})
+                    await self.check_url_results(ctx, url_id, ctx.author.id, file_url)
+                except Exception as e:
                     await self.send_error(ctx, "Failed to submit URL", str(e))
-                except asyncio.TimeoutError:
-                    await self.send_error(ctx, "Request timed out", "The bot was unable to complete the request due to a timeout.")
 
     @scan.command(name="file")
     async def scan_file(self, ctx):
@@ -212,43 +160,33 @@ class VirusTotal(commands.Cog):
                 await self.send_error(ctx, "No VirusTotal API Key set", "Your Red instance doesn't have an API key set for VirusTotal.\n\nUntil you add an API key using `[p]set api`, the VirusTotal API will refuse your requests and this cog won't work.")
                 return
 
-            async with aiohttp.ClientSession() as session:
-                try:
-                    attachments = ctx.message.attachments
-                    if ctx.message.reference and not attachments:
-                        try:
-                            ref_message = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-                            attachments = ref_message.attachments
-                        except Exception:
-                            attachments = []
-                    if attachments:
-                        await self.submit_attachment_for_analysis(ctx, session, vt_key, attachments[0])
-                    else:
-                        await self.send_error(ctx, "No file provided", "The bot was unable to find content to submit for analysis!\nPlease provide one of the following when using this command:\n- Drag-and-drop a file less than 30mb in size\n- Reply to a message containing a file")
-                except (aiohttp.ClientResponseError, ValueError) as e:
-                    await self.send_error(ctx, "Failed to submit file", str(e))
-                except asyncio.TimeoutError:
-                    await self.send_error(ctx, "Request timed out", "The bot was unable to complete the request due to a timeout.")
+            try:
+                attachments = ctx.message.attachments
+                if ctx.message.reference and not attachments:
+                    try:
+                        ref_message = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+                        attachments = ref_message.attachments
+                    except Exception:
+                        attachments = []
+                if attachments:
+                    await self.submit_attachment_for_analysis(ctx, vt_key, attachments[0])
+                else:
+                    await self.send_error(ctx, "No file provided", "The bot was unable to find content to submit for analysis!\nPlease provide one of the following when using this command:\n- Drag-and-drop a file less than 30mb in size\n- Reply to a message containing a file")
+            except Exception as e:
+                await self.send_error(ctx, "Failed to submit file", str(e))
 
     async def check_url_results(self, ctx, url_id, presid, file_url):
         vt_key = await self.bot.get_shared_api_tokens("virustotal")
-        headers = {"x-apikey": vt_key["api_key"]}
-
-        async with aiohttp.ClientSession() as session:
+        async with vt.Client(vt_key["api_key"]) as client:
             try:
                 # Poll the /urls/{id} endpoint for analysis results
                 while True:
-                    async with session.get(f'https://www.virustotal.com/api/v3/urls/{url_id}', headers=headers) as response:
-                        if response.status != 200:
-                            raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status}", headers=response.headers)
-                        data = await response.json()
-                        attributes = data.get("data", {}).get("attributes", {})
-                        stats = attributes.get("last_analysis_stats", None)
-                        # The analysis may not be ready yet, so we check for stats
-                        if stats and isinstance(stats, dict) and stats:
-                            break
-                        await asyncio.sleep(3)
-                # Now parse the full URL object as described in the prompt
+                    url_obj = await client.get_object_async(f"/urls/{url_id}")
+                    attributes = url_obj.attributes
+                    stats = attributes.get("last_analysis_stats", None)
+                    if stats and isinstance(stats, dict) and stats:
+                        break
+                    await asyncio.sleep(3)
                 stats = attributes.get("last_analysis_stats", {})
                 malicious_count = stats.get("malicious", 0)
                 suspicious_count = stats.get("suspicious", 0)
@@ -259,14 +197,10 @@ class VirusTotal(commands.Cog):
                 safe_count = harmless_count + undetected_count
                 percent = round((malicious_count / total_count) * 100, 2) if total_count > 0 else 0
 
-                # Optionally, you could extract more fields from the URL object here, e.g. categories, title, etc.
-
                 await self.send_url_analysis_results(ctx, presid, url_id, file_url, malicious_count, total_count, percent, safe_count)
                 self.log_submission(ctx.author.id, f"`{file_url}` - **{malicious_count}/{total_count}** - [View results](https://www.virustotal.com/gui/url/{url_id})")
-            except (aiohttp.ClientResponseError, ValueError) as e:
+            except Exception as e:
                 await self.send_error(ctx, "Analysis failed", str(e))
-            except asyncio.TimeoutError:
-                await self.send_error(ctx, "Request timed out", "The bot was unable to complete the request due to a timeout.")
 
     async def send_url_analysis_results(self, ctx, presid, url_id, file_url, malicious_count, total_count, percent, safe_count):
         content = f"||<@{presid}>||"
@@ -307,31 +241,26 @@ class VirusTotal(commands.Cog):
             else:
                 await ctx.send(f"{content}\nURL Analysis complete: **{safe_count}** vendors say this URL is safe\nView results on VirusTotal: https://www.virustotal.com/gui/url/{url_id}\nGet a second opinion: https://discord.gg/6PbaH6AfvF")
 
-    async def submit_attachment_for_analysis(self, ctx, session, vt_key, attachment):
+    async def submit_attachment_for_analysis(self, ctx, vt_key, attachment):
         if attachment.size > 30 * 1024 * 1024:
             await self.send_error(ctx, "File too large", "The file you provided exceeds the 30MB size limit for analysis.")
             return
-        async with session.get(attachment.url) as response:
-            if response.status != 200:
-                raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status}", headers=response.headers)
-            file_content = await response.read()
-            file_name = attachment.filename
-            await self.send_info(ctx, "Starting analysis", "This could take a few minutes, please be patient. You'll be mentioned when results are available.")
-            form = aiohttp.FormData()
-            form.add_field("file", file_content, filename=file_name)
-            async with session.post("https://www.virustotal.com/api/v3/files", headers={"x-apikey": vt_key["api_key"]}, data=form) as response:
-                if response.status != 200:
-                    raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status}", headers=response.headers)
-                data = await response.json()
-                analysis_id = data.get("data", {}).get("id")
-                if analysis_id:
-                    await self.check_results(ctx, analysis_id, ctx.author.id, attachment.url, file_name)
+        file_bytes = await attachment.read()
+        file_name = attachment.filename
+        await self.send_info(ctx, "Starting analysis", "This could take a few minutes, please be patient. You'll be mentioned when results are available.")
+        async with vt.Client(vt_key["api_key"]) as client:
+            try:
+                analysis = await client.scan_file_async(file_bytes, filename=file_name)
+                if analysis and analysis.id:
+                    await self.check_results(ctx, analysis.id, ctx.author.id, attachment.url, file_name)
                     try:
                         await ctx.message.delete()
                     except Exception:
                         pass
                 else:
                     raise ValueError("No analysis ID found in the response.")
+            except Exception as e:
+                await self.send_error(ctx, "Failed to submit file", str(e))
 
     async def send_error(self, ctx, title, description):
         guild = getattr(ctx, "guild", None)
@@ -354,19 +283,14 @@ class VirusTotal(commands.Cog):
 
     async def check_results(self, ctx, analysis_id, presid, file_url, file_name):
         vt_key = await self.bot.get_shared_api_tokens("virustotal")
-        headers = {"x-apikey": vt_key["api_key"]}
-
-        async with aiohttp.ClientSession() as session:
+        async with vt.Client(vt_key["api_key"]) as client:
             try:
                 while True:
-                    async with session.get(f'https://www.virustotal.com/api/v3/analyses/{analysis_id}', headers=headers) as response:
-                        if response.status != 200:
-                            raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status}", headers=response.headers)
-                        data = await response.json()
-                        attributes = data.get("data", {}).get("attributes", {})
-                        if attributes.get("status") == "completed":
-                            break
-                        await asyncio.sleep(3)
+                    analysis_obj = await client.get_object_async(f"/analyses/{analysis_id}")
+                    attributes = analysis_obj.attributes
+                    if attributes.get("status") == "completed":
+                        break
+                    await asyncio.sleep(3)
                 stats = attributes.get("stats", {})
                 malicious_count = stats.get("malicious", 0)
                 suspicious_count = stats.get("suspicious", 0)
@@ -374,7 +298,7 @@ class VirusTotal(commands.Cog):
                 harmless_count = stats.get("harmless", 0)
                 failure_count = stats.get("failure", 0)
                 unsupported_count = stats.get("type-unsupported", 0)
-                meta = data.get("meta", {}).get("file_info", {})
+                meta = attributes.get("results", {}).get("file_info", {})
                 sha256 = meta.get("sha256") or attributes.get("sha256")
                 sha1 = meta.get("sha1") or attributes.get("sha1")
                 md5 = meta.get("md5") or attributes.get("md5")
@@ -387,10 +311,8 @@ class VirusTotal(commands.Cog):
                     self.log_submission(ctx.author.id, f"`{file_name or file_url}` - **{malicious_count}/{total_count}** - [View results](https://www.virustotal.com/gui/file/{sha256})")
                 else:
                     raise ValueError("Required hash values not found in the analysis response.")
-            except (aiohttp.ClientResponseError, ValueError) as e:
+            except Exception as e:
                 await self.send_error(ctx, "Analysis failed", str(e))
-            except asyncio.TimeoutError:
-                await self.send_error(ctx, "Request timed out", "The bot was unable to complete the request due to a timeout.")
 
     async def send_analysis_results(self, ctx, presid, sha256, sha1, file_name, malicious_count, total_count, percent, safe_count):
         content = f"||<@{presid}>||"
