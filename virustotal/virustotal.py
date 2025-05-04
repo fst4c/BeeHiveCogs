@@ -6,6 +6,8 @@ import re
 from redbot.core import commands, Config, checks
 import base64
 from urllib.parse import quote
+import tempfile
+import os
 
 import vt  # vt-py
 
@@ -256,10 +258,15 @@ class VirusTotal(commands.Cog):
         file_name = attachment.filename
         await self.send_info(ctx, "Starting analysis", "This could take a few minutes, please be patient. You'll be mentioned when results are available.")
         
-        # Use a separate thread to run blocking code
+        # Download the file to a temporary file and pass the path to the executor
         loop = asyncio.get_running_loop()
+        temp_file_path = None
         try:
-            analysis = await loop.run_in_executor(None, self._submit_file_for_analysis, vt_key, attachment)
+            file_bytes = await attachment.read()
+            with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                tmp.write(file_bytes)
+                temp_file_path = tmp.name
+            analysis = await loop.run_in_executor(None, self._submit_file_for_analysis, vt_key, temp_file_path)
             stats = analysis.stats
             malicious_count = stats.get("malicious", 0)
             suspicious_count = stats.get("suspicious", 0)
@@ -267,7 +274,9 @@ class VirusTotal(commands.Cog):
             harmless_count = stats.get("harmless", 0)
             failure_count = stats.get("failure", 0)
             unsupported_count = stats.get("type-unsupported", 0)
-            meta = analysis.meta
+            meta = getattr(analysis, "meta", None)
+            if meta is None:
+                meta = getattr(analysis, "attributes", {})
             sha256 = meta.get("sha256")
             sha1 = meta.get("sha1")
             md5 = meta.get("md5")
@@ -286,11 +295,18 @@ class VirusTotal(commands.Cog):
                 raise ValueError("Required hash values not found in the analysis response.")
         except Exception as e:
             await self.send_error(ctx, "Failed to submit file", str(e))
+        finally:
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.remove(temp_file_path)
+                except Exception:
+                    pass
 
-    def _submit_file_for_analysis(self, vt_key, attachment):
+    def _submit_file_for_analysis(self, vt_key, temp_file_path):
+        with open(temp_file_path, "rb") as f:
+            file_bytes = f.read()
         with vt.Client(vt_key["api_key"]) as client:
             # First, try to get info about the file by its hash
-            file_bytes = attachment.fp.read()
             sha256 = hashlib.sha256(file_bytes).hexdigest()
             file_obj = None
             try:
@@ -321,7 +337,8 @@ class VirusTotal(commands.Cog):
                 return file_obj
 
             # Submit file for analysis, wait for completion
-            analysis = client.scan_file(file_bytes, wait_for_completion=True)
+            with open(temp_file_path, "rb") as f:
+                analysis = client.scan_file(f, wait_for_completion=True)
             return analysis
 
     async def send_error(self, ctx, title, description):
