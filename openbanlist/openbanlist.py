@@ -299,7 +299,7 @@ class OpenBanList(commands.Cog):
                     await log_channel.send(embed=embed)
 
         summary_embed = discord.Embed(
-            title="OpenBanlist Scan Complete",
+            title="OpenBanlist scan complete",
             color=0x2bbd8e if found or failed else 0xfffffe
         )
         summary_embed.add_field(name="Total scanned", value=str(len(guild.members)), inline=True)
