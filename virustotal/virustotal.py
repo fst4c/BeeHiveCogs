@@ -163,7 +163,41 @@ class VirusTotal(commands.Cog):
 
             async with aiohttp.ClientSession() as session:
                 try:
-                    await self.submit_url_for_analysis(ctx, session, vt_key, file_url)
+                    # --- REWRITE: Use x-www-form-urlencoded and expect the full URL object as described ---
+                    payload = {"url": file_url}
+                    headers = {
+                        "x-apikey": vt_key["api_key"],
+                        "accept": "application/json",
+                        "content-type": "application/x-www-form-urlencoded"
+                    }
+                    # aiohttp requires data to be a string or bytes for x-www-form-urlencoded, or a dict
+                    async with session.post(
+                        "https://www.virustotal.com/api/v3/urls",
+                        data=payload,
+                        headers=headers
+                    ) as response:
+                        if response.status != 200:
+                            try:
+                                err = await response.text()
+                            except Exception:
+                                err = ""
+                            raise aiohttp.ClientResponseError(
+                                response.request_info, response.history,
+                                status=response.status,
+                                message=f"HTTP error {response.status} {err}",
+                                headers=response.headers
+                            )
+                        data = await response.json()
+                        # The returned id is a base64-url-encoded version of the URL (not the analysis id)
+                        url_id = data.get("data", {}).get("id")
+                        if not url_id:
+                            raise ValueError("No URL ID found in the response.")
+                        # Announce permalink
+                        await ctx.send(f"Permalink: https://www.virustotal.com/gui/url/{url_id}")
+                        # Now poll for the full URL object (not analysis id, but /urls/{id})
+                        await self.check_url_results(ctx, url_id, ctx.author.id, file_url)
+                        # Optionally, log submission
+                        # self.log_submission(ctx.author.id, f"`{file_url}` - [View results](https://www.virustotal.com/gui/url/{url_id})")
                 except (aiohttp.ClientResponseError, ValueError) as e:
                     await self.send_error(ctx, "Failed to submit URL", str(e))
                 except asyncio.TimeoutError:
@@ -196,63 +230,13 @@ class VirusTotal(commands.Cog):
                 except asyncio.TimeoutError:
                     await self.send_error(ctx, "Request timed out", "The bot was unable to complete the request due to a timeout.")
 
-    async def submit_url_for_analysis(self, ctx, session, vt_key, file_url):
-        # VirusTotal expects the URL to be sent as x-www-form-urlencoded, but aiohttp requires data to be a string or bytes for this.
-        # Also, the content-type must be set to application/x-www-form-urlencoded.
-        # The returned "id" is a base64-url-encoded version of the URL, not the analysis id.
-        # To get the analysis id, we must use the "analysis" relationship from the POST response.
-        data = f"url={quote(file_url, safe='')}"
-        headers = {
-            "x-apikey": vt_key["api_key"],
-            "Content-Type": "application/x-www-form-urlencoded"
-        }
-        async with session.post("https://www.virustotal.com/api/v3/urls", headers=headers, data=data) as response:
-            if response.status != 200:
-                # Try to get error message from response
-                try:
-                    err = await response.text()
-                except Exception:
-                    err = ""
-                raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status} {err}", headers=response.headers)
-            data = await response.json()
-            # The returned id is a base64-url-encoded version of the URL (not the analysis id)
-            url_id = data.get("data", {}).get("id")
-            # The analysis id is in the relationships/analysis/data/id field
-            analysis_id = None
-            try:
-                analysis_id = data["data"]["relationships"]["analysis"]["data"]["id"]
-            except Exception:
-                analysis_id = None
-            if url_id and analysis_id:
-                await ctx.send(f"Permalink: https://www.virustotal.com/gui/url/{url_id}")
-                await self.check_url_results(ctx, url_id, analysis_id, ctx.author.id, file_url)
-            elif url_id:
-                # Fallback: try to use url_id as analysis_id (old behavior, not recommended)
-                await ctx.send(f"Permalink: https://www.virustotal.com/gui/url/{url_id}")
-                await self.check_url_results(ctx, url_id, None, ctx.author.id, file_url)
-            else:
-                raise ValueError("No URL ID found in the response.")
-
-    async def check_url_results(self, ctx, url_id, analysis_id, presid, file_url):
+    async def check_url_results(self, ctx, url_id, presid, file_url):
         vt_key = await self.bot.get_shared_api_tokens("virustotal")
         headers = {"x-apikey": vt_key["api_key"]}
 
         async with aiohttp.ClientSession() as session:
             try:
-                # If we have an analysis_id, poll the /analyses/{analysis_id} endpoint for status
-                if analysis_id:
-                    while True:
-                        async with session.get(f'https://www.virustotal.com/api/v3/analyses/{analysis_id}', headers=headers) as response:
-                            if response.status != 200:
-                                raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status}", headers=response.headers)
-                            data = await response.json()
-                            attributes = data.get("data", {}).get("attributes", {})
-                            status = attributes.get("status")
-                            if status == "completed":
-                                break
-                            await asyncio.sleep(3)
-                    # After completion, get the latest stats from the url object
-                # Now get the latest stats from the url object
+                # Poll the /urls/{id} endpoint for analysis results
                 while True:
                     async with session.get(f'https://www.virustotal.com/api/v3/urls/{url_id}', headers=headers) as response:
                         if response.status != 200:
@@ -260,9 +244,11 @@ class VirusTotal(commands.Cog):
                         data = await response.json()
                         attributes = data.get("data", {}).get("attributes", {})
                         stats = attributes.get("last_analysis_stats", None)
+                        # The analysis may not be ready yet, so we check for stats
                         if stats and isinstance(stats, dict) and stats:
                             break
                         await asyncio.sleep(3)
+                # Now parse the full URL object as described in the prompt
                 stats = attributes.get("last_analysis_stats", {})
                 malicious_count = stats.get("malicious", 0)
                 suspicious_count = stats.get("suspicious", 0)
@@ -272,6 +258,9 @@ class VirusTotal(commands.Cog):
                 total_count = malicious_count + suspicious_count + undetected_count + harmless_count + timeout_count
                 safe_count = harmless_count + undetected_count
                 percent = round((malicious_count / total_count) * 100, 2) if total_count > 0 else 0
+
+                # Optionally, you could extract more fields from the URL object here, e.g. categories, title, etc.
+
                 await self.send_url_analysis_results(ctx, presid, url_id, file_url, malicious_count, total_count, percent, safe_count)
                 self.log_submission(ctx.author.id, f"`{file_url}` - **{malicious_count}/{total_count}** - [View results](https://www.virustotal.com/gui/url/{url_id})")
             except (aiohttp.ClientResponseError, ValueError) as e:
