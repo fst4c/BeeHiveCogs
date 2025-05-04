@@ -4,6 +4,7 @@ import discord
 import logging
 import re
 from redbot.core import commands, Config, checks
+import base64
 
 log = logging.getLogger("red.VirusTotal")
 
@@ -195,16 +196,24 @@ class VirusTotal(commands.Cog):
                     await self.send_error(ctx, "Request timed out", "The bot was unable to complete the request due to a timeout.")
 
     async def submit_url_for_analysis(self, ctx, session, vt_key, file_url):
-        # VirusTotal expects the URL to be sent as x-www-form-urlencoded, and the returned ID is a base64-encoded URL id, not an analysis id.
-        data = {"url": file_url}
-        headers = {"x-apikey": vt_key["api_key"]}
+        # VirusTotal expects the URL to be sent as x-www-form-urlencoded, but aiohttp requires data to be a string or bytes for this.
+        # Also, the content-type must be set to application/x-www-form-urlencoded.
+        data = f"url={aiohttp.helpers.quote(file_url, safe='')}"
+        headers = {
+            "x-apikey": vt_key["api_key"],
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
         async with session.post("https://www.virustotal.com/api/v3/urls", headers=headers, data=data) as response:
             if response.status != 200:
-                raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status}", headers=response.headers)
+                # Try to get error message from response
+                try:
+                    err = await response.text()
+                except Exception:
+                    err = ""
+                raise aiohttp.ClientResponseError(response.request_info, response.history, status=response.status, message=f"HTTP error {response.status} {err}", headers=response.headers)
             data = await response.json()
             url_id = data.get("data", {}).get("id")
             if url_id:
-                # The returned id is a base64-encoded version of the URL, which is used for both permalink and for fetching the analysis
                 await ctx.send(f"Permalink: https://www.virustotal.com/gui/url/{url_id}")
                 await self.check_url_results(ctx, url_id, ctx.author.id, file_url)
             else:
@@ -233,7 +242,6 @@ class VirusTotal(commands.Cog):
                 undetected_count = stats.get("undetected", 0)
                 harmless_count = stats.get("harmless", 0)
                 timeout_count = stats.get("timeout", 0)
-                # For URLs, hashes are not always present, so we use the URL itself for display
                 total_count = malicious_count + suspicious_count + undetected_count + harmless_count + timeout_count
                 safe_count = harmless_count + undetected_count
                 percent = round((malicious_count / total_count) * 100, 2) if total_count > 0 else 0
