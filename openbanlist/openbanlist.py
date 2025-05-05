@@ -116,14 +116,12 @@ class OpenBanList(commands.Cog):
                     await ctx.send(embed=embed)
                     return
 
-                # Check for active ban (no accepted appeal)
-                active_ban = None
-                for ban_info in user_bans:
-                    if ban_info.get("appeal_verdict", "").lower() != "accepted":
-                        active_ban = ban_info
-                        break
+                # Only consider bans that are still active (appeal_verdict is not "accepted")
+                active_bans = [ban_info for ban_info in user_bans if ban_info.get("appeal_verdict", "").lower() != "accepted"]
 
-                if active_ban:
+                if active_bans:
+                    # Show the first active ban (for display)
+                    active_ban = active_bans[0]
                     embed = discord.Embed(
                         title="OpenBanlist check",
                         description=f"> Uh oh! <@{user_id}> is listed in the **[OpenBanlist](https://openbanlist.cc)**",
@@ -413,15 +411,13 @@ class OpenBanList(commands.Cog):
 
                 # Find all bans for this member, if any
                 user_bans = [ban_info for ban_info in banlist_data.values() if member.id == int(ban_info["reported_id"])]
-                if user_bans:
-                    # Check for active ban (no accepted appeal)
-                    active_ban = None
-                    for ban_info in user_bans:
-                        if ban_info.get("appeal_verdict", "").lower() != "accepted":
-                            active_ban = ban_info
-                            break
+                # Only consider bans that are still active (appeal_verdict is not "accepted")
+                active_bans = [ban_info for ban_info in user_bans if ban_info.get("appeal_verdict", "").lower() != "accepted"]
 
-                    if active_ban:
+                if user_bans:
+                    if active_bans:
+                        # There is at least one active ban
+                        active_ban = active_bans[0]
                         action = await self.config.guild(guild).action()
                         try:
                             if action == "kick":
