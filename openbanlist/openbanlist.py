@@ -221,6 +221,9 @@ class OpenBanList(commands.Cog):
                 continue
             ban_info = ban_ids.get(member.id)
             if ban_info:
+                # Skip if appeal_verdict is accepted
+                if ban_info.get("appeal_verdict", "").lower() == "accepted":
+                    continue
                 try:
                     if action == "kick":
                         try:
@@ -338,7 +341,11 @@ class OpenBanList(commands.Cog):
             return
 
         for member in guild.members:
-            if any(member.id == int(ban_info["reported_id"]) for ban_info in banlist_data.values()):
+            # Only act if the member is in the banlist and their appeal_verdict is not accepted
+            ban_info = next((ban_info for ban_info in banlist_data.values() if member.id == int(ban_info["reported_id"])), None)
+            if ban_info:
+                if ban_info.get("appeal_verdict", "").lower() == "accepted":
+                    continue
                 try:
                     if action == "kick":
                         await member.kick(reason="Active ban detected on OpenBanlist")
@@ -359,9 +366,21 @@ class OpenBanList(commands.Cog):
                 log_channel_id = await self.config.guild(guild).log_channel()
                 log_channel = guild.get_channel(log_channel_id)
 
-                if any(member.id == int(ban_info["reported_id"]) for ban_info in banlist_data.values()):
+                # Find ban_info for this member, if any
+                ban_info = next((ban_info for ban_info in banlist_data.values() if member.id == int(ban_info["reported_id"])), None)
+                if ban_info:
+                    # Skip if appeal_verdict is accepted
+                    if ban_info.get("appeal_verdict", "").lower() == "accepted":
+                        if log_channel:
+                            embed = discord.Embed(
+                                title="User join screened",
+                                description=f"**{member.mention}** ({member.id}) joined the server, and their ban was previously appealed and accepted.",
+                                color=0x2bbd8e
+                            )
+                            embed.set_footer(text="Powered by OpenBanlist, a BeeHive service | openbanlist.cc")
+                            await log_channel.send(embed=embed)
+                        return
                     action = await self.config.guild(guild).action()
-                    ban_info = next(ban_info for ban_info in banlist_data.values() if member.id == int(ban_info["reported_id"]))
                     try:
                         if action == "kick":
                             try:
