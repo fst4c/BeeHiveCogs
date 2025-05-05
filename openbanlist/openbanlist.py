@@ -153,7 +153,7 @@ class OpenBanList(commands.Cog):
                 if not user_bans:
                     embed = discord.Embed(
                         title="OpenBanlist check",
-                        description=f"User ID {user_id} is not on the banlist.",
+                        description=f"That user has no active bans or historical punishments on OpenBanlist.",
                         color=0x2bbd8e
                     )
                     await ctx.send(embed=embed)
@@ -250,7 +250,7 @@ class OpenBanList(commands.Cog):
                             date_str = str(ban_date)
                     else:
                         date_str = "Unknown"
-                    prior_bans_lines.append(f"`#{idx}` for **{reason}** (Severity {severity_map.get(severity, 'Unknown')}) on **{date_str}**")
+                    prior_bans_lines.append(f"`#{idx}` for **{reason}** `({severity_map.get(severity, 'Unknown')})` on **{date_str}**")
                 if prior_bans_lines:
                     embed.add_field(
                         name="Prior bans",
