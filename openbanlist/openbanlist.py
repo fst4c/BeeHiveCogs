@@ -191,7 +191,7 @@ class OpenBanList(commands.Cog):
                 # If we get here, either there are no active bans, or the only ban(s) have an accepted appeal
                 embed = discord.Embed(
                     title="OpenBanlist check",
-                    description=f"<@{user_id}> is **not currently banned**, but has a history of bans on the **[OpenBanlist](https://openbanlist.cc)** that have been appealed and accepted.",
+                    description=f"<@{user_id}> is **not currently banned** but has a punishment history on **[OpenBanlist](https://openbanlist.cc)**",
                     color=discord.Color.orange()
                 )
                 # Add a single field for prior bans as per instructions
