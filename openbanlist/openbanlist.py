@@ -17,7 +17,12 @@ class OpenBanList(commands.Cog):
         self.config = Config.get_conf(self, identifier=1234567890)
         default_guild = {
             "enabled": False,
-            "action": "none",  # Default action is none
+            # Default actions for each severity: 1=high, 2=medium, 3=low
+            "actions": {
+                "1": "ban",
+                "2": "kick",
+                "3": "none"
+            },
             "log_channel": None  # Default log channel is None
         }
         self.config.register_guild(**default_guild)
@@ -63,10 +68,40 @@ class OpenBanList(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.admin_or_permissions(manage_guild=True)
-    @banlist.command()
-    async def action(self, ctx, action: str):
-        """Set the action to take against users on the banlist."""
+    @banlist.group(name="action", invoke_without_command=True)
+    async def action(self, ctx):
+        """Show the current actions for each ban severity."""
+        actions = await self.config.guild(ctx.guild).actions()
+        severity_map = {"1": "High", "2": "Medium", "3": "Low"}
         valid_actions = ["kick", "ban", "none"]
+        embed = discord.Embed(
+            title="OpenBanlist actions by severity",
+            color=0x2bbd8e
+        )
+        for sev in ("1", "2", "3"):
+            action = actions.get(sev, "none")
+            embed.add_field(name=f"Severity {sev} ({severity_map[sev]})", value=action, inline=False)
+        embed.set_footer(text="To set: banlist action set <severity> <action>")
+        await ctx.send(embed=embed)
+
+    @commands.admin_or_permissions(manage_guild=True)
+    @action.command(name="set")
+    async def action_set(self, ctx, severity: str, action: str):
+        """
+        Set the action to take for a given ban severity.
+        Severity: 1 (high), 2 (medium), 3 (low)
+        Action: kick, ban, or none
+        """
+        valid_severities = ["1", "2", "3"]
+        valid_actions = ["kick", "ban", "none"]
+        if severity not in valid_severities:
+            embed = discord.Embed(
+                title="Invalid severity",
+                description="Severity must be 1 (high), 2 (medium), or 3 (low).",
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+            return
         if action not in valid_actions:
             embed = discord.Embed(
                 title="Invalid action",
@@ -75,10 +110,13 @@ class OpenBanList(commands.Cog):
             )
             await ctx.send(embed=embed)
             return
-        await self.config.guild(ctx.guild).action.set(action)
+        actions = await self.config.guild(ctx.guild).actions()
+        actions[severity] = action
+        await self.config.guild(ctx.guild).actions.set(actions)
+        severity_map = {"1": "High", "2": "Medium", "3": "Low"}
         embed = discord.Embed(
             title="OpenBanlist action set",
-            description=f"Action for users on the banlist set to: {action}",
+            description=f"Action for severity {severity} ({severity_map[severity]}) set to: {action}",
             color=0x2bbd8e
         )
         await ctx.send(embed=embed)
@@ -127,6 +165,8 @@ class OpenBanList(commands.Cog):
                 # If there are active bans, show the first one
                 if active_bans:
                     active_ban = active_bans[0]
+                    severity = str(active_ban.get("severity", "3"))
+                    severity_map = {"1": "High", "2": "Medium", "3": "Low"}
                     embed = discord.Embed(
                         title="OpenBanlist check",
                         description=f"> Uh oh! <@{user_id}> is listed in the **[OpenBanlist](https://openbanlist.cc)**",
@@ -134,6 +174,7 @@ class OpenBanList(commands.Cog):
                     )
                     embed.add_field(name="Banned for", value=active_ban.get("ban_reason", "No reason provided yet, check back soon"), inline=True)
                     embed.add_field(name="Context", value=active_ban.get("context", "No context provided"), inline=False)
+                    embed.add_field(name="Severity", value=f"{severity} ({severity_map.get(severity, 'Unknown')})", inline=True)
                     # Process reporter name if available
                     reporter_id = active_ban.get('reporter_id', 'Unknown')
                     reporter_name = active_ban.get('reporter_name', None)
@@ -199,6 +240,8 @@ class OpenBanList(commands.Cog):
                 for idx, ban_info in user_bans:
                     reason = ban_info.get("ban_reason", "No reason provided")
                     ban_date = ban_info.get("ban_date", None)
+                    severity = str(ban_info.get("severity", "3"))
+                    severity_map = {"1": "High", "2": "Medium", "3": "Low"}
                     if ban_date and ban_date != "Unknown":
                         try:
                             # Discord dynamic timestamp
@@ -207,7 +250,7 @@ class OpenBanList(commands.Cog):
                             date_str = str(ban_date)
                     else:
                         date_str = "Unknown"
-                    prior_bans_lines.append(f"`#{idx}` for **{reason}** on **{date_str}**")
+                    prior_bans_lines.append(f"`#{idx}` for **{reason}** (Severity {severity_map.get(severity, 'Unknown')}) on **{date_str}**")
                 if prior_bans_lines:
                     embed.add_field(
                         name="Prior bans",
@@ -227,6 +270,10 @@ class OpenBanList(commands.Cog):
                 reason_counts = Counter(ban_reasons)
                 top_reasons = reason_counts.most_common(5)
 
+                # Count by severity
+                severity_counts = Counter(str(ban_info.get("severity", "3")) for ban_info in banlist_data.values())
+                severity_map = {"1": "High", "2": "Medium", "3": "Low"}
+
                 embed = discord.Embed(
                     title="OpenBanlist stats",
                     description=f"There are **{total_banned}** active global bans",
@@ -234,6 +281,12 @@ class OpenBanList(commands.Cog):
                 )
                 for reason, count in top_reasons:
                     embed.add_field(name=reason, value=f"**{count}** users", inline=False)
+                for sev in ("1", "2", "3"):
+                    embed.add_field(
+                        name=f"Severity {sev} ({severity_map[sev]})",
+                        value=f"**{severity_counts.get(sev, 0)}** bans",
+                        inline=True
+                    )
                 await ctx.send(embed=embed)
 
     @commands.admin_or_permissions(manage_guild=True)
@@ -253,11 +306,11 @@ class OpenBanList(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-        action = await self.config.guild(guild).action()
-        if action == "none":
+        actions = await self.config.guild(guild).actions()
+        if all(a == "none" for a in actions.values()):
             embed = discord.Embed(
                 title="No action configured",
-                description="Set an action (`kick` or `ban`) with `banlist action <action>` before scanning.",
+                description="Set actions for each severity (`banlist action set <severity> <action>`) before scanning.",
                 color=discord.Color.orange()
             )
             await ctx.send(embed=embed)
@@ -278,6 +331,7 @@ class OpenBanList(commands.Cog):
 
         found = []
         failed = []
+        severity_map = {"1": "High", "2": "Medium", "3": "Low"}
         for member in guild.members:
             if member.bot:
                 continue
@@ -287,6 +341,8 @@ class OpenBanList(commands.Cog):
                 appeal_info = ban_info.get("appeal_info", {})
                 if appeal_info.get("appeal_verdict", "").lower() == "accepted":
                     continue
+                severity = str(ban_info.get("severity", "3"))
+                action = actions.get(severity, "none")
                 try:
                     if action == "kick":
                         try:
@@ -299,7 +355,7 @@ class OpenBanList(commands.Cog):
                             await member.send(embed=embed_dm)
                         except discord.Forbidden:
                             pass
-                        await member.kick(reason="Active ban detected on OpenBanlist (manual scan)")
+                        await member.kick(reason=f"Active ban detected on OpenBanlist (manual scan, severity {severity})")
                         action_taken = "kicked"
                     elif action == "ban":
                         try:
@@ -312,7 +368,7 @@ class OpenBanList(commands.Cog):
                             await member.send(embed=embed_dm)
                         except discord.Forbidden:
                             pass
-                        await member.ban(reason="Active ban detected on OpenBanlist (manual scan)")
+                        await member.ban(reason=f"Active ban detected on OpenBanlist (manual scan, severity {severity})")
                         action_taken = "banned"
                     else:
                         action_taken = "none"
@@ -331,6 +387,7 @@ class OpenBanList(commands.Cog):
                     embed.add_field(name="Action taken", value=action_taken, inline=False)
                     embed.add_field(name="Ban reason", value=ban_info.get("ban_reason", "No reason provided"), inline=False)
                     embed.add_field(name="Context", value=ban_info.get("context", "No context provided"), inline=False)
+                    embed.add_field(name="Severity", value=f"{severity} ({severity_map.get(severity, 'Unknown')})", inline=True)
                     # Process reporter name if available
                     reporter_id = ban_info.get("reporter_id", "Unknown")
                     reporter_name = ban_info.get("reporter_name", None)
@@ -413,12 +470,13 @@ class OpenBanList(commands.Cog):
                         await self.enforce_banlist(guild, banlist_data)
 
     async def enforce_banlist(self, guild, banlist_data):
-        action = await self.config.guild(guild).action()
-        if action == "none":
+        actions = await self.config.guild(guild).actions()
+        if all(a == "none" for a in actions.values()):
             return
 
         # Build a dict by reported_id for fast lookup
         ban_ids = {int(ban_info.get("reported_id", 0)): ban_info for ban_info in banlist_data.values()}
+        severity_map = {"1": "High", "2": "Medium", "3": "Low"}
 
         for member in guild.members:
             ban_info = ban_ids.get(member.id)
@@ -426,11 +484,13 @@ class OpenBanList(commands.Cog):
                 appeal_info = ban_info.get("appeal_info", {})
                 if appeal_info.get("appeal_verdict", "").lower() == "accepted":
                     continue
+                severity = str(ban_info.get("severity", "3"))
+                action = actions.get(severity, "none")
                 try:
                     if action == "kick":
-                        await member.kick(reason="Active ban detected on OpenBanlist")
+                        await member.kick(reason=f"Active ban detected on OpenBanlist (severity {severity})")
                     elif action == "ban":
-                        await member.ban(reason="Active ban detected on OpenBanlist")
+                        await member.ban(reason=f"Active ban detected on OpenBanlist (severity {severity})")
                 except discord.Forbidden:
                     pass
 
@@ -455,13 +515,16 @@ class OpenBanList(commands.Cog):
                 # Only consider bans that are still active (appeal_verdict is not "accepted")
                 active_bans = [ban_info for idx, ban_info in user_bans if ban_info.get("appeal_info", {}).get("appeal_verdict", "").lower() != "accepted"]
 
+                severity_map = {"1": "High", "2": "Medium", "3": "Low"}
+                actions = await self.config.guild(guild).actions()
+
                 # If there are active bans, process as before
                 if user_bans:
-                    # If there are active bans, process as before
                     if active_bans:
                         # There is at least one active ban
                         active_ban = active_bans[0]
-                        action = await self.config.guild(guild).action()
+                        severity = str(active_ban.get("severity", "3"))
+                        action = actions.get(severity, "none")
                         try:
                             if action == "kick":
                                 try:
@@ -470,11 +533,12 @@ class OpenBanList(commands.Cog):
                                         description="You have been removed from the server due to an active ban on OpenBanlist.",
                                         color=0xff4545
                                     )
+                                    embed.add_field(name="Severity", value=f"{severity} ({severity_map.get(severity, 'Unknown')})", inline=True)
                                     embed.add_field(name="Appeal", value="To appeal, please visit [openbanlist.cc/appeal](https://openbanlist.cc/appeal).", inline=False)
                                     await member.send(embed=embed)
                                 except discord.Forbidden:
                                     pass
-                                await member.kick(reason="Active ban detected on OpenBanlist")
+                                await member.kick(reason=f"Active ban detected on OpenBanlist (severity {severity})")
                                 action_taken = "kicked"
                             elif action == "ban":
                                 try:
@@ -483,11 +547,12 @@ class OpenBanList(commands.Cog):
                                         description="You have been banned from the server due to an active ban on OpenBanlist.",
                                         color=0xff4545
                                     )
+                                    embed.add_field(name="Severity", value=f"{severity} ({severity_map.get(severity, 'Unknown')})", inline=True)
                                     embed.add_field(name="Appeal", value="To appeal, please visit [openbanlist.cc/appeal](https://openbanlist.cc/appeal).", inline=False)
                                     await member.send(embed=embed)
                                 except discord.Forbidden:
                                     pass
-                                await member.ban(reason="Active ban detected on OpenBanlist")
+                                await member.ban(reason=f"Active ban detected on OpenBanlist (severity {severity})")
                                 action_taken = "banned"
                             else:
                                 action_taken = "none"
@@ -503,6 +568,7 @@ class OpenBanList(commands.Cog):
                             embed.add_field(name="Action taken", value=action_taken, inline=False)
                             embed.add_field(name="Ban reason", value=active_ban.get("ban_reason", "No reason provided"), inline=False)
                             embed.add_field(name="Context", value=active_ban.get("context", "No context provided"), inline=False)
+                            embed.add_field(name="Severity", value=f"{severity} ({severity_map.get(severity, 'Unknown')})", inline=True)
                             # Process reporter name if available
                             reporter_id = active_ban.get("reporter_id", "Unknown")
                             reporter_name = active_ban.get("reporter_name", None)
@@ -566,6 +632,7 @@ class OpenBanList(commands.Cog):
                         for idx, ban_info in user_bans:
                             reason = ban_info.get("ban_reason", "No reason provided")
                             ban_date = ban_info.get("ban_date", None)
+                            severity = str(ban_info.get("severity", "3"))
                             if ban_date and ban_date != "Unknown":
                                 try:
                                     # ban_date is a unix timestamp, so use Discord dynamic timestamp
@@ -574,7 +641,7 @@ class OpenBanList(commands.Cog):
                                     date_str = str(ban_date)
                             else:
                                 date_str = "Unknown"
-                            prior_bans_lines.append(f"`#{idx}` for **{reason}** on **{date_str}**")
+                            prior_bans_lines.append(f"`#{idx}` for **{reason}** (Severity {severity_map.get(severity, 'Unknown')}) on **{date_str}**")
                         if prior_bans_lines:
                             embed.add_field(
                                 name="Prior bans",
