@@ -568,8 +568,8 @@ class OpenBanList(commands.Cog):
                             ban_date = ban_info.get("ban_date", None)
                             if ban_date and ban_date != "Unknown":
                                 try:
-                                    dt = datetime.utcfromtimestamp(int(ban_date))
-                                    date_str = dt.strftime("%B %-d, %Y %-I:%M %p").replace("AM", "AM").replace("PM", "PM")
+                                    # ban_date is a unix timestamp, so use Discord dynamic timestamp
+                                    date_str = f"<t:{int(ban_date)}:F>"
                                 except Exception:
                                     date_str = str(ban_date)
                             else:
