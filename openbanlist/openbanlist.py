@@ -117,7 +117,7 @@ class OpenBanList(commands.Cog):
                     return
 
                 # Only consider bans that are still active (appeal_verdict is not "accepted")
-                active_bans = [ban_info for ban_info in user_bans if ban_info.get("appeal_verdict", "").lower() != "accepted"]
+                active_bans = [ban_info for ban_info in user_bans if ban_info.get("appeal_info", {}).get("appeal_verdict", "").lower() != "accepted"]
 
                 # If there are active bans, show the first one
                 if active_bans:
@@ -148,7 +148,8 @@ class OpenBanList(commands.Cog):
                     appealable_status = ":white_check_mark: **Yes**" if active_ban.get("appealable", False) else ":x: **Not eligible**"
                     embed.add_field(name="Can be appealed?", value=appealable_status, inline=True)
                     if active_ban.get("appealed", False):
-                        appeal_verdict = active_ban.get("appeal_verdict", "")
+                        appeal_info = active_ban.get("appeal_info", {})
+                        appeal_verdict = appeal_info.get("appeal_verdict", "")
                         if not appeal_verdict:
                             appeal_status = "Pending"
                         elif appeal_verdict == "accepted":
@@ -161,8 +162,8 @@ class OpenBanList(commands.Cog):
                             appeal_status = "Unknown"
                         if active_bans:
                             embed.add_field(name="Appeal status", value=appeal_status, inline=True)
-                            embed.add_field(name="Appeal verdict", value=active_ban.get("appeal_verdict", "No verdict provided"), inline=False)
-                            appeal_reason = active_ban.get("appeal_reason", "")
+                            embed.add_field(name="Appeal verdict", value=appeal_verdict or "No verdict provided", inline=False)
+                            appeal_reason = appeal_info.get("appeal_reason", "")
                             if appeal_reason:
                                 embed.add_field(name="Appeal reason", value=appeal_reason, inline=False)
                     if active_bans:
@@ -205,8 +206,9 @@ class OpenBanList(commands.Cog):
                         approver_display = f"<@{approver_id}> (`{approver_id}`)"
                     report_date = ban_info.get("report_date", "Unknown")
                     ban_date = ban_info.get("ban_date", "Unknown")
-                    appeal_reason = ban_info.get("appeal_reason", "")
-                    appeal_verdict = ban_info.get("appeal_verdict", "")
+                    appeal_info = ban_info.get("appeal_info", {})
+                    appeal_reason = appeal_info.get("appeal_reason", "")
+                    appeal_verdict = appeal_info.get("appeal_verdict", "")
                     field_value = (
                         f"**Reason:** {reason}\n"
                         f"**Context:** {context}\n"
@@ -295,7 +297,8 @@ class OpenBanList(commands.Cog):
             ban_info = ban_ids.get(member.id)
             if ban_info:
                 # Skip if appeal_verdict is accepted
-                if ban_info.get("appeal_verdict", "").lower() == "accepted":
+                appeal_info = ban_info.get("appeal_info", {})
+                if appeal_info.get("appeal_verdict", "").lower() == "accepted":
                     continue
                 try:
                     if action == "kick":
@@ -358,7 +361,8 @@ class OpenBanList(commands.Cog):
                     embed.add_field(name="Approver", value=approver_display, inline=False)
                     embed.add_field(name="Appealable", value=str(ban_info.get("appealable", False)), inline=False)
                     if ban_info.get("appealed", False):
-                        appeal_verdict = ban_info.get("appeal_verdict", "")
+                        appeal_info = ban_info.get("appeal_info", {})
+                        appeal_verdict = appeal_info.get("appeal_verdict", "")
                         if not appeal_verdict:
                             appeal_status = "Pending"
                         elif appeal_verdict == "accepted":
@@ -368,8 +372,8 @@ class OpenBanList(commands.Cog):
                         else:
                             appeal_status = "Unknown"
                         embed.add_field(name="Appeal status", value=appeal_status, inline=True)
-                        embed.add_field(name="Appeal verdict", value=ban_info.get("appeal_verdict", "No verdict provided"), inline=False)
-                        appeal_reason = ban_info.get("appeal_reason", "")
+                        embed.add_field(name="Appeal verdict", value=appeal_verdict or "No verdict provided", inline=False)
+                        appeal_reason = appeal_info.get("appeal_reason", "")
                         if appeal_reason:
                             embed.add_field(name="Appeal reason", value=appeal_reason, inline=False)
                     evidence = ban_info.get("evidence", "")
@@ -432,7 +436,8 @@ class OpenBanList(commands.Cog):
         for member in guild.members:
             ban_info = ban_ids.get(member.id)
             if ban_info:
-                if ban_info.get("appeal_verdict", "").lower() == "accepted":
+                appeal_info = ban_info.get("appeal_info", {})
+                if appeal_info.get("appeal_verdict", "").lower() == "accepted":
                     continue
                 try:
                     if action == "kick":
@@ -457,7 +462,7 @@ class OpenBanList(commands.Cog):
                 # Find all bans for this member, if any, by reported_id
                 user_bans = [ban_info for ban_info in banlist_data.values() if int(ban_info.get("reported_id", 0)) == member.id]
                 # Only consider bans that are still active (appeal_verdict is not "accepted")
-                active_bans = [ban_info for ban_info in user_bans if ban_info.get("appeal_verdict", "").lower() != "accepted"]
+                active_bans = [ban_info for ban_info in user_bans if ban_info.get("appeal_info", {}).get("appeal_verdict", "").lower() != "accepted"]
 
                 # If there are active bans, process as before
                 if user_bans:
@@ -524,7 +529,8 @@ class OpenBanList(commands.Cog):
                             embed.add_field(name="Approver", value=approver_display, inline=False)
                             embed.add_field(name="Appealable", value=str(active_ban.get("appealable", False)), inline=False)
                             if active_ban.get("appealed", False):
-                                appeal_verdict = active_ban.get("appeal_verdict", "")
+                                appeal_info = active_ban.get("appeal_info", {})
+                                appeal_verdict = appeal_info.get("appeal_verdict", "")
                                 if not appeal_verdict:
                                     appeal_status = "Pending"
                                 elif appeal_verdict == "accepted":
@@ -537,8 +543,8 @@ class OpenBanList(commands.Cog):
                                     appeal_status = "Unknown"
                                 if active_bans:
                                     embed.add_field(name="Appeal status", value=appeal_status, inline=True)
-                                    embed.add_field(name="Appeal verdict", value=active_ban.get("appeal_verdict", "No verdict provided"), inline=False)
-                                    appeal_reason = active_ban.get("appeal_reason", "")
+                                    embed.add_field(name="Appeal verdict", value=appeal_verdict or "No verdict provided", inline=False)
+                                    appeal_reason = appeal_info.get("appeal_reason", "")
                                     if appeal_reason:
                                         embed.add_field(name="Appeal reason", value=appeal_reason, inline=False)
                             if active_bans:
@@ -581,8 +587,9 @@ class OpenBanList(commands.Cog):
                                 approver_display = f"<@{approver_id}> (`{approver_id}`)"
                             report_date = ban_info.get("report_date", "Unknown")
                             ban_date = ban_info.get("ban_date", "Unknown")
-                            appeal_reason = ban_info.get("appeal_reason", "")
-                            appeal_verdict = ban_info.get("appeal_verdict", "")
+                            appeal_info = ban_info.get("appeal_info", {})
+                            appeal_reason = appeal_info.get("appeal_reason", "")
+                            appeal_verdict = appeal_info.get("appeal_verdict", "")
                             field_value = (
                                 f"**Reason:** {reason}\n"
                                 f"**Context:** {context}\n"
