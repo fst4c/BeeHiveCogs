@@ -3,7 +3,9 @@ import discord
 import aiohttp
 import asyncio
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timedelta
+
+TIMEOUT_DURATION = 28 * 24 * 60 * 60  # 28 days in seconds (max Discord timeout)
 
 class OpenBanList(commands.Cog):
     """
@@ -29,9 +31,12 @@ class OpenBanList(commands.Cog):
         self.banlist_url = "https://openbanlist.cc/data/banlist.json"
         self.session = aiohttp.ClientSession()
         self.bot.loop.create_task(self.update_banlist_periodically())
+        self.timeout_task = self.bot.loop.create_task(self.timeout_enforcer())
 
     def cog_unload(self):
         self.bot.loop.create_task(self.session.close())
+        if hasattr(self, "timeout_task"):
+            self.timeout_task.cancel()
 
     @commands.guild_only()
     @commands.group(invoke_without_command=True)
@@ -73,7 +78,7 @@ class OpenBanList(commands.Cog):
         """Show the current actions for each ban severity."""
         actions = await self.config.guild(ctx.guild).actions()
         severity_map = {"1": "High", "2": "Medium", "3": "Low"}
-        valid_actions = ["kick", "ban", "none"]
+        valid_actions = ["kick", "ban", "timeout", "none"]
         embed = discord.Embed(
             title="OpenBanlist actions by severity",
             color=0x2bbd8e
@@ -90,10 +95,10 @@ class OpenBanList(commands.Cog):
         """
         Set the action to take for a given ban severity.
         Severity: 1 (high), 2 (medium), 3 (low)
-        Action: kick, ban, or none
+        Action: kick, ban, timeout, or none
         """
         valid_severities = ["1", "2", "3"]
-        valid_actions = ["kick", "ban", "none"]
+        valid_actions = ["kick", "ban", "timeout", "none"]
         if severity not in valid_severities:
             embed = discord.Embed(
                 title="Invalid severity",
@@ -370,6 +375,22 @@ class OpenBanList(commands.Cog):
                             pass
                         await member.ban(reason=f"Active ban detected on OpenBanlist (manual scan, severity {severity})")
                         action_taken = "banned"
+                    elif action == "timeout":
+                        try:
+                            embed_dm = discord.Embed(
+                                title="You have been timed out in this server",
+                                description="You have been timed out due to an active ban on OpenBanlist. You will not be able to interact in this server.",
+                                color=0xffa500
+                            )
+                            embed_dm.add_field(name="Appeal", value="To appeal, please visit [openbanlist.cc/appeal](https://openbanlist.cc/appeal).", inline=False)
+                            await member.send(embed=embed_dm)
+                        except discord.Forbidden:
+                            pass
+                        try:
+                            await member.timeout(until=discord.utils.utcnow() + timedelta(seconds=TIMEOUT_DURATION), reason=f"Active ban detected on OpenBanlist (manual scan, severity {severity})")
+                            action_taken = "timed out"
+                        except Exception:
+                            action_taken = "failed to timeout"
                     else:
                         action_taken = "none"
                     found.append((member, ban_info, action_taken))
@@ -491,8 +512,59 @@ class OpenBanList(commands.Cog):
                         await member.kick(reason=f"Active ban detected on OpenBanlist (severity {severity})")
                     elif action == "ban":
                         await member.ban(reason=f"Active ban detected on OpenBanlist (severity {severity})")
+                    elif action == "timeout":
+                        try:
+                            await member.timeout(until=discord.utils.utcnow() + timedelta(seconds=TIMEOUT_DURATION), reason=f"Active ban detected on OpenBanlist (severity {severity})")
+                        except Exception:
+                            pass
                 except discord.Forbidden:
                     pass
+
+    async def timeout_enforcer(self):
+        await self.bot.wait_until_ready()
+        while not self.bot.is_closed():
+            try:
+                for guild in self.bot.guilds:
+                    enabled = await self.config.guild(guild).enabled()
+                    if not enabled:
+                        continue
+                    actions = await self.config.guild(guild).actions()
+                    if all(a == "none" for a in actions.values()):
+                        continue
+                    log_channel_id = await self.config.guild(guild).log_channel()
+                    log_channel = guild.get_channel(log_channel_id) if log_channel_id else None
+
+                    async with self.session.get(self.banlist_url) as response:
+                        if response.status != 200:
+                            continue
+                        banlist_data = await response.json()
+                        ban_ids = {int(ban_info.get("reported_id", 0)): ban_info for ban_info in banlist_data.values()}
+                        severity_map = {"1": "High", "2": "Medium", "3": "Low"}
+                        for member in guild.members:
+                            if member.bot:
+                                continue
+                            ban_info = ban_ids.get(member.id)
+                            if not ban_info:
+                                continue
+                            appeal_info = ban_info.get("appeal_info", {})
+                            if appeal_info.get("appeal_verdict", "").lower() == "accepted":
+                                continue
+                            severity = str(ban_info.get("severity", "3"))
+                            action = actions.get(severity, "none")
+                            if action == "timeout":
+                                # Only re-timeout if not already timed out for the max duration
+                                try:
+                                    if hasattr(member, "timed_out_until") and member.timed_out_until:
+                                        # If timeout is expiring in less than 1 day, re-apply
+                                        if (member.timed_out_until - discord.utils.utcnow()).total_seconds() < 24 * 60 * 60:
+                                            await member.timeout(until=discord.utils.utcnow() + timedelta(seconds=TIMEOUT_DURATION), reason="OpenBanlist timeout enforcement")
+                                    else:
+                                        await member.timeout(until=discord.utils.utcnow() + timedelta(seconds=TIMEOUT_DURATION), reason="OpenBanlist timeout enforcement")
+                                except Exception:
+                                    pass
+            except Exception:
+                pass
+            await asyncio.sleep(60 * 60)  # Run every hour
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
@@ -554,6 +626,23 @@ class OpenBanList(commands.Cog):
                                     pass
                                 await member.ban(reason=f"Active ban detected on OpenBanlist (severity {severity})")
                                 action_taken = "banned"
+                            elif action == "timeout":
+                                try:
+                                    embed = discord.Embed(
+                                        title="You have been timed out in this server",
+                                        description="You have been timed out due to an active ban on OpenBanlist. You will not be able to interact in this server.",
+                                        color=0xffa500
+                                    )
+                                    embed.add_field(name="Severity", value=f"{severity} ({severity_map.get(severity, 'Unknown')})", inline=True)
+                                    embed.add_field(name="Appeal", value="To appeal, please visit [openbanlist.cc/appeal](https://openbanlist.cc/appeal).", inline=False)
+                                    await member.send(embed=embed)
+                                except discord.Forbidden:
+                                    pass
+                                try:
+                                    await member.timeout(until=discord.utils.utcnow() + timedelta(seconds=TIMEOUT_DURATION), reason=f"Active ban detected on OpenBanlist (severity {severity})")
+                                    action_taken = "timed out"
+                                except Exception:
+                                    action_taken = "failed to timeout"
                             else:
                                 action_taken = "none"
                         except discord.Forbidden:
