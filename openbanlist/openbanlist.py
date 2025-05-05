@@ -18,7 +18,7 @@ class OpenBanList(commands.Cog):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1234567890)
         default_guild = {
-            "enabled": False,
+            "enabled": True,
             # Default actions for each severity: 1=high, 2=medium, 3=low
             "actions": {
                 "1": "ban",
