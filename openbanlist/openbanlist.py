@@ -3,6 +3,7 @@ import discord
 import aiohttp
 import asyncio
 from collections import Counter
+from datetime import datetime
 
 class OpenBanList(commands.Cog):
     """
@@ -189,42 +190,25 @@ class OpenBanList(commands.Cog):
                     description=f"<@{user_id}> is **not currently banned**, but has a history of bans on the **[OpenBanlist](https://openbanlist.cc)** that have been appealed and accepted.",
                     color=discord.Color.orange()
                 )
-                for idx, ban_info in enumerate(user_bans, 1):
+                # Add a single field for prior bans as per instructions
+                prior_bans_lines = []
+                for ban_info in user_bans:
+                    ban_id = ban_info.get("reported_id", "Unknown")
                     reason = ban_info.get("ban_reason", "No reason provided")
-                    context = ban_info.get("context", "No context provided")
-                    reporter_id = ban_info.get("reporter_id", "Unknown")
-                    reporter_name = ban_info.get("reporter_name", None)
-                    if reporter_name:
-                        reporter_display = f"{reporter_name} (<@{reporter_id}>) (`{reporter_id}`)"
+                    ban_date = ban_info.get("ban_date", None)
+                    if ban_date and ban_date != "Unknown":
+                        try:
+                            # Discord dynamic timestamp
+                            date_str = f"<t:{int(ban_date)}:f>"
+                        except Exception:
+                            date_str = str(ban_date)
                     else:
-                        reporter_display = f"<@{reporter_id}> (`{reporter_id}`)"
-                    approver_id = ban_info.get("approver_id", "Unknown")
-                    approver_name = ban_info.get("approver_name", None)
-                    if approver_name:
-                        approver_display = f"{approver_name} (<@{approver_id}>) (`{approver_id}`)"
-                    else:
-                        approver_display = f"<@{approver_id}> (`{approver_id}`)"
-                    report_date = ban_info.get("report_date", "Unknown")
-                    ban_date = ban_info.get("ban_date", "Unknown")
-                    appeal_info = ban_info.get("appeal_info", {})
-                    appeal_reason = appeal_info.get("appeal_reason", "")
-                    appeal_verdict = appeal_info.get("appeal_verdict", "")
-                    field_value = (
-                        f"**Reason:** {reason}\n"
-                        f"**Context:** {context}\n"
-                        f"**Reporter:** {reporter_display}\n"
-                        f"**Approver:** {approver_display}\n"
-                        f"**Appeal verdict:** {appeal_verdict or 'Accepted'}\n"
-                    )
-                    if appeal_reason:
-                        field_value += f"**Appeal reason:** {appeal_reason}\n"
-                    if report_date != "Unknown":
-                        field_value += f"**Reported on:** <t:{report_date}:f>\n"
-                    if ban_date != "Unknown":
-                        field_value += f"**Added to database:** <t:{ban_date}:f>\n"
+                        date_str = "Unknown"
+                    prior_bans_lines.append(f"{ban_id} - **{reason}** - {date_str}")
+                if prior_bans_lines:
                     embed.add_field(
-                        name=f"Ban History #{idx}",
-                        value=field_value,
+                        name="Prior bans",
+                        value="\n".join(prior_bans_lines),
                         inline=False
                     )
                 await ctx.send(embed=embed)
@@ -570,42 +554,24 @@ class OpenBanList(commands.Cog):
                             description=f"**{member.mention}** ({member.id}) joined the server, and their ban was previously appealed and accepted.",
                             color=discord.Color.orange()
                         )
-                        for idx, ban_info in enumerate(user_bans, 1):
+                        # Add a single field for prior bans as per instructions
+                        prior_bans_lines = []
+                        for ban_info in user_bans:
+                            ban_id = ban_info.get("reported_id", "Unknown")
                             reason = ban_info.get("ban_reason", "No reason provided")
-                            context = ban_info.get("context", "No context provided")
-                            reporter_id = ban_info.get("reporter_id", "Unknown")
-                            reporter_name = ban_info.get("reporter_name", None)
-                            if reporter_name:
-                                reporter_display = f"{reporter_name} (<@{reporter_id}>) (`{reporter_id}`)"
+                            ban_date = ban_info.get("ban_date", None)
+                            if ban_date and ban_date != "Unknown":
+                                try:
+                                    date_str = f"<t:{int(ban_date)}:f>"
+                                except Exception:
+                                    date_str = str(ban_date)
                             else:
-                                reporter_display = f"<@{reporter_id}> (`{reporter_id}`)"
-                            approver_id = ban_info.get("approver_id", "Unknown")
-                            approver_name = ban_info.get("approver_name", None)
-                            if approver_name:
-                                approver_display = f"{approver_name} (<@{approver_id}>) (`{approver_id}`)"
-                            else:
-                                approver_display = f"<@{approver_id}> (`{approver_id}`)"
-                            report_date = ban_info.get("report_date", "Unknown")
-                            ban_date = ban_info.get("ban_date", "Unknown")
-                            appeal_info = ban_info.get("appeal_info", {})
-                            appeal_reason = appeal_info.get("appeal_reason", "")
-                            appeal_verdict = appeal_info.get("appeal_verdict", "")
-                            field_value = (
-                                f"**Reason:** {reason}\n"
-                                f"**Context:** {context}\n"
-                                f"**Reporter:** {reporter_display}\n"
-                                f"**Approver:** {approver_display}\n"
-                                f"**Appeal verdict:** {appeal_verdict or 'Accepted'}\n"
-                            )
-                            if appeal_reason:
-                                field_value += f"**Appeal reason:** {appeal_reason}\n"
-                            if report_date != "Unknown":
-                                field_value += f"**Reported on:** <t:{report_date}:f>\n"
-                            if ban_date != "Unknown":
-                                field_value += f"**Added to database:** <t:{ban_date}:f>\n"
+                                date_str = "Unknown"
+                            prior_bans_lines.append(f"{ban_id} - **{reason}** - {date_str}")
+                        if prior_bans_lines:
                             embed.add_field(
-                                name=f"Ban History #{idx}",
-                                value=field_value,
+                                name="Prior bans",
+                                value="\n".join(prior_bans_lines),
                                 inline=False
                             )
                         embed.set_footer(text="Powered by OpenBanlist, a BeeHive service | openbanlist.cc")
