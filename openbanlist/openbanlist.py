@@ -107,7 +107,11 @@ class OpenBanList(commands.Cog):
             if response.status == 200:
                 banlist_data = await response.json()
                 # Find all bans for this user by reported_id
-                user_bans = [ban_info for ban_info in banlist_data.values() if int(ban_info.get("reported_id", 0)) == user_id]
+                user_bans = []
+                banlist_items = list(banlist_data.items())
+                for idx, (ban_key, ban_info) in enumerate(banlist_items, 1):
+                    if int(ban_info.get("reported_id", 0)) == user_id:
+                        user_bans.append((idx, ban_info))
                 if not user_bans:
                     embed = discord.Embed(
                         title="OpenBanlist check",
@@ -118,7 +122,7 @@ class OpenBanList(commands.Cog):
                     return
 
                 # Only consider bans that are still active (appeal_verdict is not "accepted")
-                active_bans = [ban_info for ban_info in user_bans if ban_info.get("appeal_info", {}).get("appeal_verdict", "").lower() != "accepted"]
+                active_bans = [ban_info for idx, ban_info in user_bans if ban_info.get("appeal_info", {}).get("appeal_verdict", "").lower() != "accepted"]
 
                 # If there are active bans, show the first one
                 if active_bans:
@@ -192,8 +196,7 @@ class OpenBanList(commands.Cog):
                 )
                 # Add a single field for prior bans as per instructions
                 prior_bans_lines = []
-                for ban_info in user_bans:
-                    ban_id = ban_info.get("reported_id", "Unknown")
+                for idx, ban_info in user_bans:
                     reason = ban_info.get("ban_reason", "No reason provided")
                     ban_date = ban_info.get("ban_date", None)
                     if ban_date and ban_date != "Unknown":
@@ -204,7 +207,7 @@ class OpenBanList(commands.Cog):
                             date_str = str(ban_date)
                     else:
                         date_str = "Unknown"
-                    prior_bans_lines.append(f"{ban_id} - **{reason}** - {date_str}")
+                    prior_bans_lines.append(f"{idx} - **{reason}** - {date_str}")
                 if prior_bans_lines:
                     embed.add_field(
                         name="Prior bans",
@@ -444,9 +447,13 @@ class OpenBanList(commands.Cog):
                 log_channel = guild.get_channel(log_channel_id)
 
                 # Find all bans for this member, if any, by reported_id
-                user_bans = [ban_info for ban_info in banlist_data.values() if int(ban_info.get("reported_id", 0)) == member.id]
+                user_bans = []
+                banlist_items = list(banlist_data.items())
+                for idx, (ban_key, ban_info) in enumerate(banlist_items, 1):
+                    if int(ban_info.get("reported_id", 0)) == member.id:
+                        user_bans.append((idx, ban_info))
                 # Only consider bans that are still active (appeal_verdict is not "accepted")
-                active_bans = [ban_info for ban_info in user_bans if ban_info.get("appeal_info", {}).get("appeal_verdict", "").lower() != "accepted"]
+                active_bans = [ban_info for idx, ban_info in user_bans if ban_info.get("appeal_info", {}).get("appeal_verdict", "").lower() != "accepted"]
 
                 # If there are active bans, process as before
                 if user_bans:
@@ -556,18 +563,18 @@ class OpenBanList(commands.Cog):
                         )
                         # Add a single field for prior bans as per instructions
                         prior_bans_lines = []
-                        for ban_info in user_bans:
-                            ban_id = ban_info.get("reported_id", "Unknown")
+                        for idx, ban_info in user_bans:
                             reason = ban_info.get("ban_reason", "No reason provided")
                             ban_date = ban_info.get("ban_date", None)
                             if ban_date and ban_date != "Unknown":
                                 try:
-                                    date_str = f"<t:{int(ban_date)}:f>"
+                                    dt = datetime.utcfromtimestamp(int(ban_date))
+                                    date_str = dt.strftime("%B %-d, %Y %-I:%M %p").replace("AM", "AM").replace("PM", "PM")
                                 except Exception:
                                     date_str = str(ban_date)
                             else:
                                 date_str = "Unknown"
-                            prior_bans_lines.append(f"{ban_id} - **{reason}** - {date_str}")
+                            prior_bans_lines.append(f"{idx} - **{reason}** - {date_str}")
                         if prior_bans_lines:
                             embed.add_field(
                                 name="Prior bans",
