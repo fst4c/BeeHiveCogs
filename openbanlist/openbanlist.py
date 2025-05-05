@@ -207,7 +207,7 @@ class OpenBanList(commands.Cog):
                             date_str = str(ban_date)
                     else:
                         date_str = "Unknown"
-                    prior_bans_lines.append(f"`#{idx}` for **{reason}** on **{date_str}***")
+                    prior_bans_lines.append(f"`#{idx}` for **{reason}** on **{date_str}**")
                 if prior_bans_lines:
                     embed.add_field(
                         name="Prior bans",
