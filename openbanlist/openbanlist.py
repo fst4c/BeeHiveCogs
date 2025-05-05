@@ -105,22 +105,38 @@ class OpenBanList(commands.Cog):
         async with self.session.get(self.banlist_url) as response:
             if response.status == 200:
                 banlist_data = await response.json()
-                ban_info = next((ban_info for ban_info in banlist_data.values() if int(ban_info["reported_id"]) == user_id), None)
-                
-                if ban_info:
+                # Find all bans for this user
+                user_bans = [ban_info for ban_info in banlist_data.values() if int(ban_info["reported_id"]) == user_id]
+                if not user_bans:
+                    embed = discord.Embed(
+                        title="OpenBanlist check",
+                        description=f"User ID {user_id} is not on the banlist.",
+                        color=0x2bbd8e
+                    )
+                    await ctx.send(embed=embed)
+                    return
+
+                # Check for active ban (no accepted appeal)
+                active_ban = None
+                for ban_info in user_bans:
+                    if ban_info.get("appeal_verdict", "").lower() != "accepted":
+                        active_ban = ban_info
+                        break
+
+                if active_ban:
                     embed = discord.Embed(
                         title="OpenBanlist check",
                         description=f"> Uh oh! <@{user_id}> is listed in the **[OpenBanlist](https://openbanlist.cc)**",
                         color=0xff4545
                     )
-                    embed.add_field(name="Banned for", value=ban_info.get("ban_reason", "No reason provided yet, check back soon"), inline=True)
-                    embed.add_field(name="Context", value=ban_info.get("context", "No context provided"), inline=False)
-                    embed.add_field(name="Reported by", value=f"<@{ban_info.get('reporter_id', 'Unknown')}>\n`{ban_info.get('reporter_id', 'Unknown')}`", inline=True)
-                    embed.add_field(name="Approved by", value=f"<@{ban_info.get('approver_id', 'Unknown')}>\n`{ban_info.get('approver_id', 'Unknown')}`", inline=True)
-                    appealable_status = ":white_check_mark: **Yes**" if ban_info.get("appealable", False) else ":x: **Not eligible**"
+                    embed.add_field(name="Banned for", value=active_ban.get("ban_reason", "No reason provided yet, check back soon"), inline=True)
+                    embed.add_field(name="Context", value=active_ban.get("context", "No context provided"), inline=False)
+                    embed.add_field(name="Reported by", value=f"<@{active_ban.get('reporter_id', 'Unknown')}>\n`{active_ban.get('reporter_id', 'Unknown')}`", inline=True)
+                    embed.add_field(name="Approved by", value=f"<@{active_ban.get('approver_id', 'Unknown')}>\n`{active_ban.get('approver_id', 'Unknown')}`", inline=True)
+                    appealable_status = ":white_check_mark: **Yes**" if active_ban.get("appealable", False) else ":x: **Not eligible**"
                     embed.add_field(name="Can be appealed?", value=appealable_status, inline=True)
-                    if ban_info.get("appealed", False):
-                        appeal_verdict = ban_info.get("appeal_verdict", "")
+                    if active_ban.get("appealed", False):
+                        appeal_verdict = active_ban.get("appeal_verdict", "")
                         if not appeal_verdict:
                             appeal_status = "Pending"
                         elif appeal_verdict == "accepted":
@@ -130,15 +146,15 @@ class OpenBanList(commands.Cog):
                         else:
                             appeal_status = "Unknown"
                         embed.add_field(name="Appeal status", value=appeal_status, inline=True)
-                        embed.add_field(name="Appeal verdict", value=ban_info.get("appeal_verdict", "No verdict provided"), inline=False)
-                        appeal_reason = ban_info.get("appeal_reason", "")
+                        embed.add_field(name="Appeal verdict", value=active_ban.get("appeal_verdict", "No verdict provided"), inline=False)
+                        appeal_reason = active_ban.get("appeal_reason", "")
                         if appeal_reason:
                             embed.add_field(name="Appeal reason", value=appeal_reason, inline=False)
-                    evidence = ban_info.get("evidence", "")
+                    evidence = active_ban.get("evidence", "")
                     if evidence:
                         embed.set_image(url=evidence)
-                    report_date = ban_info.get("report_date", "Unknown")
-                    ban_date = ban_info.get("ban_date", "Unknown")
+                    report_date = active_ban.get("report_date", "Unknown")
+                    ban_date = active_ban.get("ban_date", "Unknown")
                     if report_date != "Unknown":
                         embed.add_field(name="Reported on", value=f"<t:{report_date}:f>", inline=True)
                     else:
@@ -147,13 +163,42 @@ class OpenBanList(commands.Cog):
                         embed.add_field(name="Added to database", value=f"<t:{ban_date}:f>", inline=True)
                     else:
                         embed.add_field(name="Ban date", value="Unknown", inline=True)
+                    await ctx.send(embed=embed)
                 else:
+                    # All bans have been appealed and accepted
                     embed = discord.Embed(
                         title="OpenBanlist check",
-                        description=f"User ID {user_id} is not on the banlist.",
-                        color=0x2bbd8e
+                        description=f"<@{user_id}> has a history of bans on the **[OpenBanlist](https://openbanlist.cc)**, but all have been appealed and accepted.",
+                        color=discord.Color.orange()
                     )
-                await ctx.send(embed=embed)
+                    for idx, ban_info in enumerate(user_bans, 1):
+                        reason = ban_info.get("ban_reason", "No reason provided")
+                        context = ban_info.get("context", "No context provided")
+                        reporter = ban_info.get("reporter_id", "Unknown")
+                        approver = ban_info.get("approver_id", "Unknown")
+                        report_date = ban_info.get("report_date", "Unknown")
+                        ban_date = ban_info.get("ban_date", "Unknown")
+                        appeal_reason = ban_info.get("appeal_reason", "")
+                        appeal_verdict = ban_info.get("appeal_verdict", "")
+                        field_value = (
+                            f"**Reason:** {reason}\n"
+                            f"**Context:** {context}\n"
+                            f"**Reporter:** <@{reporter}> (`{reporter}`)\n"
+                            f"**Approver:** <@{approver}> (`{approver}`)\n"
+                            f"**Appeal verdict:** {appeal_verdict or 'Accepted'}\n"
+                        )
+                        if appeal_reason:
+                            field_value += f"**Appeal reason:** {appeal_reason}\n"
+                        if report_date != "Unknown":
+                            field_value += f"**Reported on:** <t:{report_date}:f>\n"
+                        if ban_date != "Unknown":
+                            field_value += f"**Added to database:** <t:{ban_date}:f>\n"
+                        embed.add_field(
+                            name=f"Ban History #{idx}",
+                            value=field_value,
+                            inline=False
+                        )
+                    await ctx.send(embed=embed)
 
     @banlist.command()
     async def stats(self, ctx):
@@ -366,94 +411,128 @@ class OpenBanList(commands.Cog):
                 log_channel_id = await self.config.guild(guild).log_channel()
                 log_channel = guild.get_channel(log_channel_id)
 
-                # Find ban_info for this member, if any
-                ban_info = next((ban_info for ban_info in banlist_data.values() if member.id == int(ban_info["reported_id"])), None)
-                if ban_info:
-                    # Skip if appeal_verdict is accepted
-                    if ban_info.get("appeal_verdict", "").lower() == "accepted":
+                # Find all bans for this member, if any
+                user_bans = [ban_info for ban_info in banlist_data.values() if member.id == int(ban_info["reported_id"])]
+                if user_bans:
+                    # Check for active ban (no accepted appeal)
+                    active_ban = None
+                    for ban_info in user_bans:
+                        if ban_info.get("appeal_verdict", "").lower() != "accepted":
+                            active_ban = ban_info
+                            break
+
+                    if active_ban:
+                        action = await self.config.guild(guild).action()
+                        try:
+                            if action == "kick":
+                                try:
+                                    embed = discord.Embed(
+                                        title="You're unable to join this server",
+                                        description="You have been removed from the server due to an active ban on OpenBanlist.",
+                                        color=0xff4545
+                                    )
+                                    embed.add_field(name="Appeal", value="To appeal, please visit [openbanlist.cc/appeal](https://openbanlist.cc/appeal).", inline=False)
+                                    await member.send(embed=embed)
+                                except discord.Forbidden:
+                                    pass
+                                await member.kick(reason="Active ban detected on OpenBanlist")
+                                action_taken = "kicked"
+                            elif action == "ban":
+                                try:
+                                    embed = discord.Embed(
+                                        title="You're unable to join this server",
+                                        description="You have been banned from the server due to an active ban on OpenBanlist.",
+                                        color=0xff4545
+                                    )
+                                    embed.add_field(name="Appeal", value="To appeal, please visit [openbanlist.cc/appeal](https://openbanlist.cc/appeal).", inline=False)
+                                    await member.send(embed=embed)
+                                except discord.Forbidden:
+                                    pass
+                                await member.ban(reason="Active ban detected on OpenBanlist")
+                                action_taken = "banned"
+                            else:
+                                action_taken = "none"
+                        except discord.Forbidden:
+                            action_taken = "failed due to permissions"
+
+                        if log_channel:
+                            embed = discord.Embed(
+                                title="Banlist match found",
+                                description=f"{member.mention} ({member.id}) joined and is actively listed on OpenBanlist.",
+                                color=0xff4545
+                            )
+                            embed.add_field(name="Action taken", value=action_taken, inline=False)
+                            embed.add_field(name="Ban reason", value=active_ban.get("ban_reason", "No reason provided"), inline=False)
+                            embed.add_field(name="Context", value=active_ban.get("context", "No context provided"), inline=False)
+                            embed.add_field(name="Reporter ID", value=active_ban.get("reporter_id", "Unknown"), inline=False)
+                            embed.add_field(name="Approver ID", value=active_ban.get("approver_id", "Unknown"), inline=False)
+                            embed.add_field(name="Appealable", value=str(active_ban.get("appealable", False)), inline=False)
+                            if active_ban.get("appealed", False):
+                                appeal_verdict = active_ban.get("appeal_verdict", "")
+                                if not appeal_verdict:
+                                    appeal_status = "Pending"
+                                elif appeal_verdict == "accepted":
+                                    appeal_status = "Accepted"
+                                elif appeal_verdict == "denied":
+                                    appeal_status = "Denied"
+                                else:
+                                    appeal_status = "Unknown"
+                                embed.add_field(name="Appeal status", value=appeal_status, inline=True)
+                                embed.add_field(name="Appeal verdict", value=active_ban.get("appeal_verdict", "No verdict provided"), inline=False)
+                                appeal_reason = active_ban.get("appeal_reason", "")
+                                if appeal_reason:
+                                    embed.add_field(name="Appeal reason", value=appeal_reason, inline=False)
+                            evidence = active_ban.get("evidence", "")
+                            if evidence:
+                                embed.set_image(url=evidence)
+                            report_date = active_ban.get("report_date", "Unknown")
+                            ban_date = active_ban.get("ban_date", "Unknown")
+                            if report_date != "Unknown":
+                                embed.add_field(name="Report date", value=f"<t:{report_date}:F>", inline=False)
+                            else:
+                                embed.add_field(name="Report date", value="Unknown", inline=False)
+                            if ban_date != "Unknown":
+                                embed.add_field(name="Ban date", value=f"<t:{ban_date}:F>", inline=False)
+                            else:
+                                embed.add_field(name="Ban date", value="Unknown", inline=False)
+                            await log_channel.send(embed=embed)
+                    else:
+                        # All bans have been appealed and accepted
                         if log_channel:
                             embed = discord.Embed(
                                 title="User join screened",
                                 description=f"**{member.mention}** ({member.id}) joined the server, and their ban was previously appealed and accepted.",
-                                color=0x2bbd8e
+                                color=discord.Color.orange()
                             )
+                            for idx, ban_info in enumerate(user_bans, 1):
+                                reason = ban_info.get("ban_reason", "No reason provided")
+                                context = ban_info.get("context", "No context provided")
+                                reporter = ban_info.get("reporter_id", "Unknown")
+                                approver = ban_info.get("approver_id", "Unknown")
+                                report_date = ban_info.get("report_date", "Unknown")
+                                ban_date = ban_info.get("ban_date", "Unknown")
+                                appeal_reason = ban_info.get("appeal_reason", "")
+                                appeal_verdict = ban_info.get("appeal_verdict", "")
+                                field_value = (
+                                    f"**Reason:** {reason}\n"
+                                    f"**Context:** {context}\n"
+                                    f"**Reporter:** <@{reporter}> (`{reporter}`)\n"
+                                    f"**Approver:** <@{approver}> (`{approver}`)\n"
+                                    f"**Appeal verdict:** {appeal_verdict or 'Accepted'}\n"
+                                )
+                                if appeal_reason:
+                                    field_value += f"**Appeal reason:** {appeal_reason}\n"
+                                if report_date != "Unknown":
+                                    field_value += f"**Reported on:** <t:{report_date}:f>\n"
+                                if ban_date != "Unknown":
+                                    field_value += f"**Added to database:** <t:{ban_date}:f>\n"
+                                embed.add_field(
+                                    name=f"Ban History #{idx}",
+                                    value=field_value,
+                                    inline=False
+                                )
                             embed.set_footer(text="Powered by OpenBanlist, a BeeHive service | openbanlist.cc")
                             await log_channel.send(embed=embed)
-                        return
-                    action = await self.config.guild(guild).action()
-                    try:
-                        if action == "kick":
-                            try:
-                                embed = discord.Embed(
-                                    title="You're unable to join this server",
-                                    description="You have been removed from the server due to an active ban on OpenBanlist.",
-                                    color=0xff4545
-                                )
-                                embed.add_field(name="Appeal", value="To appeal, please visit [openbanlist.cc/appeal](https://openbanlist.cc/appeal).", inline=False)
-                                await member.send(embed=embed)
-                            except discord.Forbidden:
-                                pass
-                            await member.kick(reason="Active ban detected on OpenBanlist")
-                            action_taken = "kicked"
-                        elif action == "ban":
-                            try:
-                                embed = discord.Embed(
-                                    title="You're unable to join this server",
-                                    description="You have been banned from the server due to an active ban on OpenBanlist.",
-                                    color=0xff4545
-                                )
-                                embed.add_field(name="Appeal", value="To appeal, please visit [openbanlist.cc/appeal](https://openbanlist.cc/appeal).", inline=False)
-                                await member.send(embed=embed)
-                            except discord.Forbidden:
-                                pass
-                            await member.ban(reason="Active ban detected on OpenBanlist")
-                            action_taken = "banned"
-                        else:
-                            action_taken = "none"
-                    except discord.Forbidden:
-                        action_taken = "failed due to permissions"
-
-                    if log_channel:
-                        embed = discord.Embed(
-                            title="Banlist match found",
-                            description=f"{member.mention} ({member.id}) joined and is actively listed on OpenBanlist.",
-                            color=0xff4545
-                        )
-                        embed.add_field(name="Action taken", value=action_taken, inline=False)
-                        embed.add_field(name="Ban reason", value=ban_info.get("ban_reason", "No reason provided"), inline=False)
-                        embed.add_field(name="Context", value=ban_info.get("context", "No context provided"), inline=False)
-                        embed.add_field(name="Reporter ID", value=ban_info.get("reporter_id", "Unknown"), inline=False)
-                        embed.add_field(name="Approver ID", value=ban_info.get("approver_id", "Unknown"), inline=False)
-                        embed.add_field(name="Appealable", value=str(ban_info.get("appealable", False)), inline=False)
-                        if ban_info.get("appealed", False):
-                            appeal_verdict = ban_info.get("appeal_verdict", "")
-                            if not appeal_verdict:
-                                appeal_status = "Pending"
-                            elif appeal_verdict == "accepted":
-                                appeal_status = "Accepted"
-                            elif appeal_verdict == "denied":
-                                appeal_status = "Denied"
-                            else:
-                                appeal_status = "Unknown"
-                            embed.add_field(name="Appeal status", value=appeal_status, inline=True)
-                            embed.add_field(name="Appeal verdict", value=ban_info.get("appeal_verdict", "No verdict provided"), inline=False)
-                            appeal_reason = ban_info.get("appeal_reason", "")
-                            if appeal_reason:
-                                embed.add_field(name="Appeal reason", value=appeal_reason, inline=False)
-                        evidence = ban_info.get("evidence", "")
-                        if evidence:
-                            embed.set_image(url=evidence)
-                        report_date = ban_info.get("report_date", "Unknown")
-                        ban_date = ban_info.get("ban_date", "Unknown")
-                        if report_date != "Unknown":
-                            embed.add_field(name="Report date", value=f"<t:{report_date}:F>", inline=False)
-                        else:
-                            embed.add_field(name="Report date", value="Unknown", inline=False)
-                        if ban_date != "Unknown":
-                            embed.add_field(name="Ban date", value=f"<t:{ban_date}:F>", inline=False)
-                        else:
-                            embed.add_field(name="Ban date", value="Unknown", inline=False)
-                        await log_channel.send(embed=embed)
                 else:
                     if log_channel:
                         embed = discord.Embed(
