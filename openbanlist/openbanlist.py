@@ -558,7 +558,7 @@ class OpenBanList(commands.Cog):
                     if log_channel:
                         embed = discord.Embed(
                             title="User join screened",
-                            description=f"**{member.mention}** ({member.id}) joined the server, and their ban was previously appealed and accepted.",
+                            description=f"**{member.mention}** ({member.id}) joined the server and has a punishment history on OpenBanlist",
                             color=discord.Color.orange()
                         )
                         # Add a single field for prior bans as per instructions
@@ -574,7 +574,7 @@ class OpenBanList(commands.Cog):
                                     date_str = str(ban_date)
                             else:
                                 date_str = "Unknown"
-                            prior_bans_lines.append(f"`#{idx}` for **{reason}** on {date_str}")
+                            prior_bans_lines.append(f"`#{idx}` for **{reason}** on **{date_str}**")
                         if prior_bans_lines:
                             embed.add_field(
                                 name="Prior bans",
@@ -587,7 +587,7 @@ class OpenBanList(commands.Cog):
                     if log_channel:
                         embed = discord.Embed(
                             title="User join screened",
-                            description=f"**{member.mention}** ({member.id}) joined the server, and no active ban was found on the OpenBanlist.",
+                            description=f"**{member.mention}** ({member.id}) joined the server and passed all banlist checks",
                             color=0x2bbd8e
                         )
                         embed.set_footer(text="Powered by OpenBanlist, a BeeHive service | openbanlist.cc")
