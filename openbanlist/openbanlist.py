@@ -119,8 +119,8 @@ class OpenBanList(commands.Cog):
                 # Only consider bans that are still active (appeal_verdict is not "accepted")
                 active_bans = [ban_info for ban_info in user_bans if ban_info.get("appeal_verdict", "").lower() != "accepted"]
 
+                # If there are active bans, show the first one
                 if active_bans:
-                    # Show the first active ban (for display)
                     active_ban = active_bans[0]
                     embed = discord.Embed(
                         title="OpenBanlist check",
@@ -152,75 +152,80 @@ class OpenBanList(commands.Cog):
                         if not appeal_verdict:
                             appeal_status = "Pending"
                         elif appeal_verdict == "accepted":
-                            appeal_status = "Accepted"
+                            # If the appeal is accepted, this ban should not be considered active, so skip showing as active
+                            # Instead, fall through to the else block below
+                            active_bans = []
                         elif appeal_verdict == "denied":
                             appeal_status = "Denied"
                         else:
                             appeal_status = "Unknown"
-                        embed.add_field(name="Appeal status", value=appeal_status, inline=True)
-                        embed.add_field(name="Appeal verdict", value=active_ban.get("appeal_verdict", "No verdict provided"), inline=False)
-                        appeal_reason = active_ban.get("appeal_reason", "")
-                        if appeal_reason:
-                            embed.add_field(name="Appeal reason", value=appeal_reason, inline=False)
-                    evidence = active_ban.get("evidence", "")
-                    if evidence:
-                        embed.set_image(url=evidence)
-                    report_date = active_ban.get("report_date", "Unknown")
-                    ban_date = active_ban.get("ban_date", "Unknown")
-                    if report_date != "Unknown":
-                        embed.add_field(name="Reported on", value=f"<t:{report_date}:f>", inline=True)
-                    else:
-                        embed.add_field(name="Report date", value="Unknown", inline=True)
-                    if ban_date != "Unknown":
-                        embed.add_field(name="Added to database", value=f"<t:{ban_date}:f>", inline=True)
-                    else:
-                        embed.add_field(name="Ban date", value="Unknown", inline=True)
-                    await ctx.send(embed=embed)
-                else:
-                    # All bans have been appealed and accepted
-                    embed = discord.Embed(
-                        title="OpenBanlist check",
-                        description=f"<@{user_id}> has a history of bans on the **[OpenBanlist](https://openbanlist.cc)**, but all have been appealed and accepted.",
-                        color=discord.Color.orange()
-                    )
-                    for idx, ban_info in enumerate(user_bans, 1):
-                        reason = ban_info.get("ban_reason", "No reason provided")
-                        context = ban_info.get("context", "No context provided")
-                        reporter_id = ban_info.get("reporter_id", "Unknown")
-                        reporter_name = ban_info.get("reporter_name", None)
-                        if reporter_name:
-                            reporter_display = f"{reporter_name} (<@{reporter_id}>) (`{reporter_id}`)"
-                        else:
-                            reporter_display = f"<@{reporter_id}> (`{reporter_id}`)"
-                        approver_id = ban_info.get("approver_id", "Unknown")
-                        approver_name = ban_info.get("approver_name", None)
-                        if approver_name:
-                            approver_display = f"{approver_name} (<@{approver_id}>) (`{approver_id}`)"
-                        else:
-                            approver_display = f"<@{approver_id}> (`{approver_id}`)"
-                        report_date = ban_info.get("report_date", "Unknown")
-                        ban_date = ban_info.get("ban_date", "Unknown")
-                        appeal_reason = ban_info.get("appeal_reason", "")
-                        appeal_verdict = ban_info.get("appeal_verdict", "")
-                        field_value = (
-                            f"**Reason:** {reason}\n"
-                            f"**Context:** {context}\n"
-                            f"**Reporter:** {reporter_display}\n"
-                            f"**Approver:** {approver_display}\n"
-                            f"**Appeal verdict:** {appeal_verdict or 'Accepted'}\n"
-                        )
-                        if appeal_reason:
-                            field_value += f"**Appeal reason:** {appeal_reason}\n"
+                        if active_bans:
+                            embed.add_field(name="Appeal status", value=appeal_status, inline=True)
+                            embed.add_field(name="Appeal verdict", value=active_ban.get("appeal_verdict", "No verdict provided"), inline=False)
+                            appeal_reason = active_ban.get("appeal_reason", "")
+                            if appeal_reason:
+                                embed.add_field(name="Appeal reason", value=appeal_reason, inline=False)
+                    if active_bans:
+                        evidence = active_ban.get("evidence", "")
+                        if evidence:
+                            embed.set_image(url=evidence)
+                        report_date = active_ban.get("report_date", "Unknown")
+                        ban_date = active_ban.get("ban_date", "Unknown")
                         if report_date != "Unknown":
-                            field_value += f"**Reported on:** <t:{report_date}:f>\n"
+                            embed.add_field(name="Reported on", value=f"<t:{report_date}:f>", inline=True)
+                        else:
+                            embed.add_field(name="Report date", value="Unknown", inline=True)
                         if ban_date != "Unknown":
-                            field_value += f"**Added to database:** <t:{ban_date}:f>\n"
-                        embed.add_field(
-                            name=f"Ban History #{idx}",
-                            value=field_value,
-                            inline=False
-                        )
-                    await ctx.send(embed=embed)
+                            embed.add_field(name="Added to database", value=f"<t:{ban_date}:f>", inline=True)
+                        else:
+                            embed.add_field(name="Ban date", value="Unknown", inline=True)
+                        await ctx.send(embed=embed)
+                        return  # Only send the active ban embed if still valid
+
+                # If we get here, either there are no active bans, or the only ban(s) have an accepted appeal
+                embed = discord.Embed(
+                    title="OpenBanlist check",
+                    description=f"<@{user_id}> is **not currently banned**, but has a history of bans on the **[OpenBanlist](https://openbanlist.cc)** that have been appealed and accepted.",
+                    color=discord.Color.orange()
+                )
+                for idx, ban_info in enumerate(user_bans, 1):
+                    reason = ban_info.get("ban_reason", "No reason provided")
+                    context = ban_info.get("context", "No context provided")
+                    reporter_id = ban_info.get("reporter_id", "Unknown")
+                    reporter_name = ban_info.get("reporter_name", None)
+                    if reporter_name:
+                        reporter_display = f"{reporter_name} (<@{reporter_id}>) (`{reporter_id}`)"
+                    else:
+                        reporter_display = f"<@{reporter_id}> (`{reporter_id}`)"
+                    approver_id = ban_info.get("approver_id", "Unknown")
+                    approver_name = ban_info.get("approver_name", None)
+                    if approver_name:
+                        approver_display = f"{approver_name} (<@{approver_id}>) (`{approver_id}`)"
+                    else:
+                        approver_display = f"<@{approver_id}> (`{approver_id}`)"
+                    report_date = ban_info.get("report_date", "Unknown")
+                    ban_date = ban_info.get("ban_date", "Unknown")
+                    appeal_reason = ban_info.get("appeal_reason", "")
+                    appeal_verdict = ban_info.get("appeal_verdict", "")
+                    field_value = (
+                        f"**Reason:** {reason}\n"
+                        f"**Context:** {context}\n"
+                        f"**Reporter:** {reporter_display}\n"
+                        f"**Approver:** {approver_display}\n"
+                        f"**Appeal verdict:** {appeal_verdict or 'Accepted'}\n"
+                    )
+                    if appeal_reason:
+                        field_value += f"**Appeal reason:** {appeal_reason}\n"
+                    if report_date != "Unknown":
+                        field_value += f"**Reported on:** <t:{report_date}:f>\n"
+                    if ban_date != "Unknown":
+                        field_value += f"**Added to database:** <t:{ban_date}:f>\n"
+                    embed.add_field(
+                        name=f"Ban History #{idx}",
+                        value=field_value,
+                        inline=False
+                    )
+                await ctx.send(embed=embed)
 
     @banlist.command()
     async def stats(self, ctx):
@@ -454,7 +459,9 @@ class OpenBanList(commands.Cog):
                 # Only consider bans that are still active (appeal_verdict is not "accepted")
                 active_bans = [ban_info for ban_info in user_bans if ban_info.get("appeal_verdict", "").lower() != "accepted"]
 
+                # If there are active bans, process as before
                 if user_bans:
+                    # If there are active bans, process as before
                     if active_bans:
                         # There is at least one active ban
                         active_ban = active_bans[0]
@@ -521,77 +528,81 @@ class OpenBanList(commands.Cog):
                                 if not appeal_verdict:
                                     appeal_status = "Pending"
                                 elif appeal_verdict == "accepted":
-                                    appeal_status = "Accepted"
+                                    # If the appeal is accepted, this ban should not be considered active, so skip showing as active
+                                    # Instead, fall through to the else block below
+                                    active_bans = []
                                 elif appeal_verdict == "denied":
                                     appeal_status = "Denied"
                                 else:
                                     appeal_status = "Unknown"
-                                embed.add_field(name="Appeal status", value=appeal_status, inline=True)
-                                embed.add_field(name="Appeal verdict", value=active_ban.get("appeal_verdict", "No verdict provided"), inline=False)
-                                appeal_reason = active_ban.get("appeal_reason", "")
-                                if appeal_reason:
-                                    embed.add_field(name="Appeal reason", value=appeal_reason, inline=False)
-                            evidence = active_ban.get("evidence", "")
-                            if evidence:
-                                embed.set_image(url=evidence)
-                            report_date = active_ban.get("report_date", "Unknown")
-                            ban_date = active_ban.get("ban_date", "Unknown")
-                            if report_date != "Unknown":
-                                embed.add_field(name="Report date", value=f"<t:{report_date}:F>", inline=False)
-                            else:
-                                embed.add_field(name="Report date", value="Unknown", inline=False)
-                            if ban_date != "Unknown":
-                                embed.add_field(name="Ban date", value=f"<t:{ban_date}:F>", inline=False)
-                            else:
-                                embed.add_field(name="Ban date", value="Unknown", inline=False)
-                            await log_channel.send(embed=embed)
-                    else:
-                        # All bans have been appealed and accepted
-                        if log_channel:
-                            embed = discord.Embed(
-                                title="User join screened",
-                                description=f"**{member.mention}** ({member.id}) joined the server, and their ban was previously appealed and accepted.",
-                                color=discord.Color.orange()
-                            )
-                            for idx, ban_info in enumerate(user_bans, 1):
-                                reason = ban_info.get("ban_reason", "No reason provided")
-                                context = ban_info.get("context", "No context provided")
-                                reporter_id = ban_info.get("reporter_id", "Unknown")
-                                reporter_name = ban_info.get("reporter_name", None)
-                                if reporter_name:
-                                    reporter_display = f"{reporter_name} (<@{reporter_id}>) (`{reporter_id}`)"
-                                else:
-                                    reporter_display = f"<@{reporter_id}> (`{reporter_id}`)"
-                                approver_id = ban_info.get("approver_id", "Unknown")
-                                approver_name = ban_info.get("approver_name", None)
-                                if approver_name:
-                                    approver_display = f"{approver_name} (<@{approver_id}>) (`{approver_id}`)"
-                                else:
-                                    approver_display = f"<@{approver_id}> (`{approver_id}`)"
-                                report_date = ban_info.get("report_date", "Unknown")
-                                ban_date = ban_info.get("ban_date", "Unknown")
-                                appeal_reason = ban_info.get("appeal_reason", "")
-                                appeal_verdict = ban_info.get("appeal_verdict", "")
-                                field_value = (
-                                    f"**Reason:** {reason}\n"
-                                    f"**Context:** {context}\n"
-                                    f"**Reporter:** {reporter_display}\n"
-                                    f"**Approver:** {approver_display}\n"
-                                    f"**Appeal verdict:** {appeal_verdict or 'Accepted'}\n"
-                                )
-                                if appeal_reason:
-                                    field_value += f"**Appeal reason:** {appeal_reason}\n"
+                                if active_bans:
+                                    embed.add_field(name="Appeal status", value=appeal_status, inline=True)
+                                    embed.add_field(name="Appeal verdict", value=active_ban.get("appeal_verdict", "No verdict provided"), inline=False)
+                                    appeal_reason = active_ban.get("appeal_reason", "")
+                                    if appeal_reason:
+                                        embed.add_field(name="Appeal reason", value=appeal_reason, inline=False)
+                            if active_bans:
+                                evidence = active_ban.get("evidence", "")
+                                if evidence:
+                                    embed.set_image(url=evidence)
+                                report_date = active_ban.get("report_date", "Unknown")
+                                ban_date = active_ban.get("ban_date", "Unknown")
                                 if report_date != "Unknown":
-                                    field_value += f"**Reported on:** <t:{report_date}:f>\n"
+                                    embed.add_field(name="Report date", value=f"<t:{report_date}:F>", inline=False)
+                                else:
+                                    embed.add_field(name="Report date", value="Unknown", inline=False)
                                 if ban_date != "Unknown":
-                                    field_value += f"**Added to database:** <t:{ban_date}:f>\n"
-                                embed.add_field(
-                                    name=f"Ban History #{idx}",
-                                    value=field_value,
-                                    inline=False
-                                )
-                            embed.set_footer(text="Powered by OpenBanlist, a BeeHive service | openbanlist.cc")
-                            await log_channel.send(embed=embed)
+                                    embed.add_field(name="Ban date", value=f"<t:{ban_date}:F>", inline=False)
+                                else:
+                                    embed.add_field(name="Ban date", value="Unknown", inline=False)
+                                await log_channel.send(embed=embed)
+                                return  # Only send the active ban embed if still valid
+                    # If we get here, either there are no active bans, or the only ban(s) have an accepted appeal
+                    if log_channel:
+                        embed = discord.Embed(
+                            title="User join screened",
+                            description=f"**{member.mention}** ({member.id}) joined the server, and their ban was previously appealed and accepted.",
+                            color=discord.Color.orange()
+                        )
+                        for idx, ban_info in enumerate(user_bans, 1):
+                            reason = ban_info.get("ban_reason", "No reason provided")
+                            context = ban_info.get("context", "No context provided")
+                            reporter_id = ban_info.get("reporter_id", "Unknown")
+                            reporter_name = ban_info.get("reporter_name", None)
+                            if reporter_name:
+                                reporter_display = f"{reporter_name} (<@{reporter_id}>) (`{reporter_id}`)"
+                            else:
+                                reporter_display = f"<@{reporter_id}> (`{reporter_id}`)"
+                            approver_id = ban_info.get("approver_id", "Unknown")
+                            approver_name = ban_info.get("approver_name", None)
+                            if approver_name:
+                                approver_display = f"{approver_name} (<@{approver_id}>) (`{approver_id}`)"
+                            else:
+                                approver_display = f"<@{approver_id}> (`{approver_id}`)"
+                            report_date = ban_info.get("report_date", "Unknown")
+                            ban_date = ban_info.get("ban_date", "Unknown")
+                            appeal_reason = ban_info.get("appeal_reason", "")
+                            appeal_verdict = ban_info.get("appeal_verdict", "")
+                            field_value = (
+                                f"**Reason:** {reason}\n"
+                                f"**Context:** {context}\n"
+                                f"**Reporter:** {reporter_display}\n"
+                                f"**Approver:** {approver_display}\n"
+                                f"**Appeal verdict:** {appeal_verdict or 'Accepted'}\n"
+                            )
+                            if appeal_reason:
+                                field_value += f"**Appeal reason:** {appeal_reason}\n"
+                            if report_date != "Unknown":
+                                field_value += f"**Reported on:** <t:{report_date}:f>\n"
+                            if ban_date != "Unknown":
+                                field_value += f"**Added to database:** <t:{ban_date}:f>\n"
+                            embed.add_field(
+                                name=f"Ban History #{idx}",
+                                value=field_value,
+                                inline=False
+                            )
+                        embed.set_footer(text="Powered by OpenBanlist, a BeeHive service | openbanlist.cc")
+                        await log_channel.send(embed=embed)
                 else:
                     if log_channel:
                         embed = discord.Embed(
