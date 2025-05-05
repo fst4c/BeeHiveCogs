@@ -23,7 +23,7 @@ class OpenBanList(commands.Cog):
             "actions": {
                 "1": "ban",
                 "2": "kick",
-                "3": "none"
+                "3": "timeout"
             },
             "log_channel": None  # Default log channel is None
         }
