@@ -1,4 +1,4 @@
-from redbot.core import commands, Config # type: ignore
+from redbot.core import commands, Config  # type: ignore
 import discord
 import aiohttp
 import asyncio
@@ -7,7 +7,7 @@ from collections import Counter
 class OpenBanList(commands.Cog):
     """
     OpenBanlist is a project aimed at cataloging malicious Discord users and working to keep them out of servers in a united fashion.
-    
+
     For more information or to report a user, please visit [openbanlist.cc](<https://openbanlist.cc>)
     """
 
@@ -32,7 +32,7 @@ class OpenBanList(commands.Cog):
     async def banlist(self, ctx):
         """
         OpenBanlist is a project aimed at cataloging malicious Discord users and working to keep them out of servers in a united fashion.
-    
+
         For more information or to report a user, please visit [openbanlist.cc](<https://openbanlist.cc>)
         """
         await ctx.send_help(ctx.command)
@@ -105,8 +105,8 @@ class OpenBanList(commands.Cog):
         async with self.session.get(self.banlist_url) as response:
             if response.status == 200:
                 banlist_data = await response.json()
-                # Find all bans for this user
-                user_bans = [ban_info for ban_info in banlist_data.values() if int(ban_info["reported_id"]) == user_id]
+                # Find all bans for this user by reported_id
+                user_bans = [ban_info for ban_info in banlist_data.values() if int(ban_info.get("reported_id", 0)) == user_id]
                 if not user_bans:
                     embed = discord.Embed(
                         title="OpenBanlist check",
@@ -129,8 +129,22 @@ class OpenBanList(commands.Cog):
                     )
                     embed.add_field(name="Banned for", value=active_ban.get("ban_reason", "No reason provided yet, check back soon"), inline=True)
                     embed.add_field(name="Context", value=active_ban.get("context", "No context provided"), inline=False)
-                    embed.add_field(name="Reported by", value=f"<@{active_ban.get('reporter_id', 'Unknown')}>\n`{active_ban.get('reporter_id', 'Unknown')}`", inline=True)
-                    embed.add_field(name="Approved by", value=f"<@{active_ban.get('approver_id', 'Unknown')}>\n`{active_ban.get('approver_id', 'Unknown')}`", inline=True)
+                    # Process reporter name if available
+                    reporter_id = active_ban.get('reporter_id', 'Unknown')
+                    reporter_name = active_ban.get('reporter_name', None)
+                    if reporter_name:
+                        reporter_display = f"{reporter_name} (<@{reporter_id}>)\n`{reporter_id}`"
+                    else:
+                        reporter_display = f"<@{reporter_id}>\n`{reporter_id}`"
+                    embed.add_field(name="Reported by", value=reporter_display, inline=True)
+                    # Process approver name if available
+                    approver_id = active_ban.get('approver_id', 'Unknown')
+                    approver_name = active_ban.get('approver_name', None)
+                    if approver_name:
+                        approver_display = f"{approver_name} (<@{approver_id}>)\n`{approver_id}`"
+                    else:
+                        approver_display = f"<@{approver_id}>\n`{approver_id}`"
+                    embed.add_field(name="Approved by", value=approver_display, inline=True)
                     appealable_status = ":white_check_mark: **Yes**" if active_ban.get("appealable", False) else ":x: **Not eligible**"
                     embed.add_field(name="Can be appealed?", value=appealable_status, inline=True)
                     if active_ban.get("appealed", False):
@@ -172,8 +186,18 @@ class OpenBanList(commands.Cog):
                     for idx, ban_info in enumerate(user_bans, 1):
                         reason = ban_info.get("ban_reason", "No reason provided")
                         context = ban_info.get("context", "No context provided")
-                        reporter = ban_info.get("reporter_id", "Unknown")
-                        approver = ban_info.get("approver_id", "Unknown")
+                        reporter_id = ban_info.get("reporter_id", "Unknown")
+                        reporter_name = ban_info.get("reporter_name", None)
+                        if reporter_name:
+                            reporter_display = f"{reporter_name} (<@{reporter_id}>) (`{reporter_id}`)"
+                        else:
+                            reporter_display = f"<@{reporter_id}> (`{reporter_id}`)"
+                        approver_id = ban_info.get("approver_id", "Unknown")
+                        approver_name = ban_info.get("approver_name", None)
+                        if approver_name:
+                            approver_display = f"{approver_name} (<@{approver_id}>) (`{approver_id}`)"
+                        else:
+                            approver_display = f"<@{approver_id}> (`{approver_id}`)"
                         report_date = ban_info.get("report_date", "Unknown")
                         ban_date = ban_info.get("ban_date", "Unknown")
                         appeal_reason = ban_info.get("appeal_reason", "")
@@ -181,8 +205,8 @@ class OpenBanList(commands.Cog):
                         field_value = (
                             f"**Reason:** {reason}\n"
                             f"**Context:** {context}\n"
-                            f"**Reporter:** <@{reporter}> (`{reporter}`)\n"
-                            f"**Approver:** <@{approver}> (`{approver}`)\n"
+                            f"**Reporter:** {reporter_display}\n"
+                            f"**Approver:** {approver_display}\n"
                             f"**Appeal verdict:** {appeal_verdict or 'Accepted'}\n"
                         )
                         if appeal_reason:
@@ -255,7 +279,8 @@ class OpenBanList(commands.Cog):
                 await ctx.send("Failed to fetch the banlist. Please try again later.")
                 return
             banlist_data = await response.json()
-            ban_ids = {int(ban_info["reported_id"]): ban_info for ban_info in banlist_data.values()}
+            # Build a dict by reported_id for fast lookup
+            ban_ids = {int(ban_info.get("reported_id", 0)): ban_info for ban_info in banlist_data.values()}
 
         found = []
         failed = []
@@ -311,8 +336,21 @@ class OpenBanList(commands.Cog):
                     embed.add_field(name="Action taken", value=action_taken, inline=False)
                     embed.add_field(name="Ban reason", value=ban_info.get("ban_reason", "No reason provided"), inline=False)
                     embed.add_field(name="Context", value=ban_info.get("context", "No context provided"), inline=False)
-                    embed.add_field(name="Reporter ID", value=ban_info.get("reporter_id", "Unknown"), inline=False)
-                    embed.add_field(name="Approver ID", value=ban_info.get("approver_id", "Unknown"), inline=False)
+                    # Process reporter name if available
+                    reporter_id = ban_info.get("reporter_id", "Unknown")
+                    reporter_name = ban_info.get("reporter_name", None)
+                    if reporter_name:
+                        reporter_display = f"{reporter_name} (<@{reporter_id}>)"
+                    else:
+                        reporter_display = f"<@{reporter_id}>"
+                    embed.add_field(name="Reporter", value=reporter_display, inline=False)
+                    approver_id = ban_info.get("approver_id", "Unknown")
+                    approver_name = ban_info.get("approver_name", None)
+                    if approver_name:
+                        approver_display = f"{approver_name} (<@{approver_id}>)"
+                    else:
+                        approver_display = f"<@{approver_id}>"
+                    embed.add_field(name="Approver", value=approver_display, inline=False)
                     embed.add_field(name="Appealable", value=str(ban_info.get("appealable", False)), inline=False)
                     if ban_info.get("appealed", False):
                         appeal_verdict = ban_info.get("appeal_verdict", "")
@@ -383,9 +421,11 @@ class OpenBanList(commands.Cog):
         if action == "none":
             return
 
+        # Build a dict by reported_id for fast lookup
+        ban_ids = {int(ban_info.get("reported_id", 0)): ban_info for ban_info in banlist_data.values()}
+
         for member in guild.members:
-            # Only act if the member is in the banlist and their appeal_verdict is not accepted
-            ban_info = next((ban_info for ban_info in banlist_data.values() if member.id == int(ban_info["reported_id"])), None)
+            ban_info = ban_ids.get(member.id)
             if ban_info:
                 if ban_info.get("appeal_verdict", "").lower() == "accepted":
                     continue
@@ -409,8 +449,8 @@ class OpenBanList(commands.Cog):
                 log_channel_id = await self.config.guild(guild).log_channel()
                 log_channel = guild.get_channel(log_channel_id)
 
-                # Find all bans for this member, if any
-                user_bans = [ban_info for ban_info in banlist_data.values() if member.id == int(ban_info["reported_id"])]
+                # Find all bans for this member, if any, by reported_id
+                user_bans = [ban_info for ban_info in banlist_data.values() if int(ban_info.get("reported_id", 0)) == member.id]
                 # Only consider bans that are still active (appeal_verdict is not "accepted")
                 active_bans = [ban_info for ban_info in user_bans if ban_info.get("appeal_verdict", "").lower() != "accepted"]
 
@@ -460,8 +500,21 @@ class OpenBanList(commands.Cog):
                             embed.add_field(name="Action taken", value=action_taken, inline=False)
                             embed.add_field(name="Ban reason", value=active_ban.get("ban_reason", "No reason provided"), inline=False)
                             embed.add_field(name="Context", value=active_ban.get("context", "No context provided"), inline=False)
-                            embed.add_field(name="Reporter ID", value=active_ban.get("reporter_id", "Unknown"), inline=False)
-                            embed.add_field(name="Approver ID", value=active_ban.get("approver_id", "Unknown"), inline=False)
+                            # Process reporter name if available
+                            reporter_id = active_ban.get("reporter_id", "Unknown")
+                            reporter_name = active_ban.get("reporter_name", None)
+                            if reporter_name:
+                                reporter_display = f"{reporter_name} (<@{reporter_id}>)"
+                            else:
+                                reporter_display = f"<@{reporter_id}>"
+                            embed.add_field(name="Reporter", value=reporter_display, inline=False)
+                            approver_id = active_ban.get("approver_id", "Unknown")
+                            approver_name = active_ban.get("approver_name", None)
+                            if approver_name:
+                                approver_display = f"{approver_name} (<@{approver_id}>)"
+                            else:
+                                approver_display = f"<@{approver_id}>"
+                            embed.add_field(name="Approver", value=approver_display, inline=False)
                             embed.add_field(name="Appealable", value=str(active_ban.get("appealable", False)), inline=False)
                             if active_ban.get("appealed", False):
                                 appeal_verdict = active_ban.get("appeal_verdict", "")
@@ -503,8 +556,18 @@ class OpenBanList(commands.Cog):
                             for idx, ban_info in enumerate(user_bans, 1):
                                 reason = ban_info.get("ban_reason", "No reason provided")
                                 context = ban_info.get("context", "No context provided")
-                                reporter = ban_info.get("reporter_id", "Unknown")
-                                approver = ban_info.get("approver_id", "Unknown")
+                                reporter_id = ban_info.get("reporter_id", "Unknown")
+                                reporter_name = ban_info.get("reporter_name", None)
+                                if reporter_name:
+                                    reporter_display = f"{reporter_name} (<@{reporter_id}>) (`{reporter_id}`)"
+                                else:
+                                    reporter_display = f"<@{reporter_id}> (`{reporter_id}`)"
+                                approver_id = ban_info.get("approver_id", "Unknown")
+                                approver_name = ban_info.get("approver_name", None)
+                                if approver_name:
+                                    approver_display = f"{approver_name} (<@{approver_id}>) (`{approver_id}`)"
+                                else:
+                                    approver_display = f"<@{approver_id}> (`{approver_id}`)"
                                 report_date = ban_info.get("report_date", "Unknown")
                                 ban_date = ban_info.get("ban_date", "Unknown")
                                 appeal_reason = ban_info.get("appeal_reason", "")
@@ -512,8 +575,8 @@ class OpenBanList(commands.Cog):
                                 field_value = (
                                     f"**Reason:** {reason}\n"
                                     f"**Context:** {context}\n"
-                                    f"**Reporter:** <@{reporter}> (`{reporter}`)\n"
-                                    f"**Approver:** <@{approver}> (`{approver}`)\n"
+                                    f"**Reporter:** {reporter_display}\n"
+                                    f"**Approver:** {approver_display}\n"
                                     f"**Appeal verdict:** {appeal_verdict or 'Accepted'}\n"
                                 )
                                 if appeal_reason:
