@@ -23,6 +23,10 @@ def _strip_zero_width(s: str) -> str:
         s = s.replace(char, "")
     return s
 
+def _strip_trailing_slash_and_whitespace(s: str) -> str:
+    # Remove trailing slashes and whitespace
+    return s.rstrip("/ \t\r\n")
+
 class AntiPhishing(commands.Cog):
     """
     Guard users from malicious links and phishing attempts with customizable protection options.
@@ -104,6 +108,8 @@ class AntiPhishing(commands.Cog):
             # Remove trailing punctuation that is not part of the URL
             url = url.rstrip('.,;:!?)"]}\'')
             url = url.lstrip('([{"\'')
+            # Remove trailing whitespace and slashes for blocklist matching
+            url = url.rstrip(" \t\r\n/")
             # If no scheme, add http:// for parsing
             if not re.match(r'^(?:https?|ftp)://', url, re.I):
                 url_for_parse = "http://" + url
@@ -695,6 +701,9 @@ class AntiPhishing(commands.Cog):
 
             # Remove zero-width/invisible chars from url
             url_clean = _strip_zero_width(url)
+            url_clean = url_clean.strip()
+            # Remove trailing slashes and whitespace for blocklist matching
+            url_clean = url_clean.rstrip("/ \t\r\n")
 
             # Try to parse the URL, adding scheme if missing
             if not re.match(r'^(?:https?|ftp)://', url_clean, re.I):
@@ -720,9 +729,11 @@ class AntiPhishing(commands.Cog):
             found = False
             for candidate in domain_candidates:
                 candidate_lc = candidate.lower()
-                if candidate_lc in self.domains:
+                # Also check candidate with trailing slash removed (for cases like "serai.pro/")
+                candidate_lc_stripped = candidate_lc.rstrip("/")
+                if candidate_lc in self.domains or candidate_lc_stripped in self.domains:
                     log.debug(f"Blocklist match found: {candidate_lc} (from {hostname})")
-                    await self.handle_phishing(message, candidate_lc)
+                    await self.handle_phishing(message, candidate_lc if candidate_lc in self.domains else candidate_lc_stripped)
                     found = True
                     break
             if found:
