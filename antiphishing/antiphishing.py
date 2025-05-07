@@ -625,11 +625,11 @@ class AntiPhishing(commands.Cog):
     async def on_message_edit(self, before: discord.Message, after: discord.Message):
         """
         Handles the logic for checking URLs when a message is edited.
-        Ignores messages older than 5 minutes to avoid unnecessary checks.
+        Ignores messages older than 15 minutes to avoid unnecessary checks.
         """
         if not after.guild or after.author.bot:
             return
-        if before.content == after.content or (discord.utils.utcnow() - after.created_at).total_seconds() > 300:
+        if before.content == after.content or (discord.utils.utcnow() - after.created_at).total_seconds() > 900:
             return
         if await self.bot.cog_disabled_in_guild(self, after.guild):
             return
