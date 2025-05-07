@@ -76,19 +76,24 @@ class AntiPhishing(commands.Cog):
         # Remove zero-width and invisible chars
         message = _strip_zero_width(message)
 
-        # Regex for URLs with scheme (http/https/ftp)
+        # Improved regex for URLs, including those without scheme and with unicode domains
+        # This regex will match:
+        # - URLs with or without scheme
+        # - Punycode and unicode domains
+        # - URLs with ports, paths, queries, fragments
+        # - URLs surrounded by punctuation (e.g. in parentheses, at end of sentence)
         url_pattern = re.compile(
             r'(?:(?:https?|ftp):\/\/)?'  # optional scheme
             r'(?:\S+(?::\S*)?@)?'       # optional user:pass@
             r'('
-                r'(?:(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})'  # domain
+                r'(?:[a-zA-Z0-9\-._~%]+(?:\.[a-zA-Z0-9\-._~%]+)+)'  # domain (including unicode/punycode)
                 r'|'
                 r'(?:\d{1,3}\.){3}\d{1,3}'               # or IPv4
                 r'|'
                 r'\[[0-9a-fA-F:]+\]'                     # or IPv6
             r')'
             r'(?::\d{2,5})?'                             # optional port
-            r'(?:[/?#][^\s]*)?',                         # optional path/query/fragment
+            r'(?:[/?#][^\s<>\]\[\(\)\{\}"\'`.,;:]*)?',   # optional path/query/fragment, avoid trailing punctuation
             re.UNICODE
         )
 
@@ -97,6 +102,9 @@ class AntiPhishing(commands.Cog):
         urls = set()
         for match in matches:
             url = match.group(0)
+            # Remove trailing punctuation that is not part of the URL
+            url = url.rstrip('.,;:!?)"]}\'')
+            url = url.lstrip('([{"\'')
             # If no scheme, add http:// for parsing
             if not re.match(r'^(?:https?|ftp)://', url, re.I):
                 url_for_parse = "http://" + url
@@ -107,7 +115,6 @@ class AntiPhishing(commands.Cog):
                 # Only consider if we have a netloc (domain)
                 if result.netloc:
                     # Reconstruct the URL as it appeared in the message
-                    # (If original had no scheme, keep as in message)
                     urls.add(url)
             except Exception as e:
                 log.debug(f"Error parsing potential URL '{url}': {e}")
@@ -118,7 +125,9 @@ class AntiPhishing(commands.Cog):
         Get unique links from the message content.
         """
         links = self.extract_urls(message)
-        return list(set(links)) if links else None
+        # Remove duplicates and filter out empty/None
+        links = [l for l in set(links) if l]
+        return links if links else None
 
     @commands.group()
     @commands.guild_only()
@@ -791,7 +800,9 @@ class AntiPhishing(commands.Cog):
 
             try:
                 parsed = urlsplit(url_for_parse)
-                hostname = parsed.hostname.lower() if parsed.hostname else None
+                hostname = parsed.hostname
+                if hostname:
+                    hostname = hostname.rstrip('.').lower()
             except Exception as e:
                 log.warning(f"Could not parse URL for hostname: {url_clean} ({e})")
                 continue
