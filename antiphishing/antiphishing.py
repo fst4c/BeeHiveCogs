@@ -95,7 +95,6 @@ class AntiPhishing(commands.Cog):
                 description="The provided server ID is invalid or the bot is not in that server.",
                 colour=0xff4545,
             )
-            embed.set_thumbnail(url="https://www.beehive.systems/hubfs/Icon%20Packs/Red/close-circle.png")
             await ctx.send(embed=embed)
             return
 
@@ -105,7 +104,6 @@ class AntiPhishing(commands.Cog):
             description=f"Phishing alerts will be sent to the server **{server.name}**.",
             colour=0x2bbd8e,
         )
-        embed.set_thumbnail(url="https://www.beehive.systems/hubfs/Icon%20Packs/Green/check-circle.png")
         await ctx.send(embed=embed)
 
     @commands.admin_or_permissions()    
@@ -163,7 +161,6 @@ class AntiPhishing(commands.Cog):
                 ),
                 colour=16729413,
             )
-            embed.set_thumbnail(url="https://www.beehive.systems/hubfs/Icon%20Packs/Red/close-circle.png")
             await ctx.send(embed=embed)
             return
 
@@ -185,21 +182,10 @@ class AntiPhishing(commands.Cog):
             "timeout": 0xffd966  # Yellow
         }
 
-        thumbnail_urls = {
-            "ignore": "https://www.beehive.systems/hubfs/Icon%20Packs/Yellow/close.png",
-            "notify": "https://www.beehive.systems/hubfs/Icon%20Packs/Yellow/notifications.png",
-            "delete": "https://www.beehive.systems/hubfs/Icon%20Packs/Red/trash.png",
-            "kick": "https://www.beehive.systems/hubfs/Icon%20Packs/Red/footsteps.png",
-            "ban": "https://www.beehive.systems/hubfs/Icon%20Packs/Red/ban.png",
-            "timeout": "https://www.beehive.systems/hubfs/Icon%20Packs/Yellow/clock.png"
-        }
-
         description = descriptions[action]
         colour = colours[action]
-        thumbnail_url = thumbnail_urls[action]
 
         embed = discord.Embed(title='Settings changed', description=description, colour=colour)
-        embed.set_thumbnail(url=thumbnail_url)
         await ctx.send(embed=embed)
 
     @antiphishing.command()
@@ -281,9 +267,9 @@ class AntiPhishing(commands.Cog):
 
     @commands.admin_or_permissions()
     @antiphishing.command()
-    async def logchannel(self, ctx: Context, channel: discord.TextChannel):
+    async def logs(self, ctx: Context, channel: discord.TextChannel):
         """
-        Set the logging channel where link detections will be sent.
+        Set a logging channel
         """
         await self.config.guild(ctx.guild).log_channel.set(channel.id)
         embed = discord.Embed(
@@ -291,7 +277,6 @@ class AntiPhishing(commands.Cog):
             description=f"The logging channel has been set to {channel.mention}.",
             colour=0x2bbd8e,
         )
-        embed.set_thumbnail(url="https://www.beehive.systems/hubfs/Icon%20Packs/Green/check-circle.png")
         await ctx.send(embed=embed)
 
     @tasks.loop(minutes=2)
