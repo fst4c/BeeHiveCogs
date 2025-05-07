@@ -1,8 +1,8 @@
 import asyncio
 import datetime
 import re
-from typing import List, Optional, Dict, Any
-from urllib.parse import urlsplit, urlunsplit
+from typing import List, Optional
+from urllib.parse import urlsplit
 import aiohttp  # type: ignore
 import discord  # type: ignore
 from discord.ext import tasks  # type: ignore
@@ -37,7 +37,6 @@ class AntiPhishing(commands.Cog):
         self.config = Config.get_conf(self, identifier=73836)
         self.session = aiohttp.ClientSession()
         self.domains = set()  # Stores lowercase registered domains
-        self.domains_v2 = {}  # Stores lowercase registered domains -> additional info
         self._initialize_config()
         self.bot.loop.create_task(self.get_phishing_domains())
 
@@ -249,7 +248,7 @@ class AntiPhishing(commands.Cog):
             guild_data.get('bans', 0),
             guild_data.get('timeouts', 0)
         )
-        total_domains = len(self.domains | set(self.domains_v2.keys()))
+        total_domains = len(self.domains)
 
         embed = discord.Embed(
             title='Link safety statistics',
@@ -320,51 +319,11 @@ class AntiPhishing(commands.Cog):
                                f"The timeout duration is now set to **{minutes}** minutes.",
                                0xffd966)
 
-    @commands.admin_or_permissions()
-    @antiphishing.command()
-    async def lookup(self, ctx: Context, domain: str):
-        """
-        Lookup a domain in the blocklistv2 and show its details if it exists.
-        Show all fields for the domain as individual fields in the embed.
-        """
-        domain = domain.lower()
-        if domain in self.domains_v2:
-            additional_info = self.domains_v2[domain]
-
-            embed = discord.Embed(
-                title=f"Domain Lookup: {domain}",
-                color=0x2bbd8e  # Green
-            )
-            for key, value in additional_info.items():
-                # Format the key for display
-                field_name = key.replace('_', ' ').title()
-                # Format the value for display
-                if isinstance(value, list):
-                    if value:
-                        value_str = ", ".join(str(v) for v in value)
-                    else:
-                        value_str = "None"
-                elif value is None or value == "":
-                    value_str = "None"
-                else:
-                    value_str = str(value)
-                embed.add_field(name=field_name, value=value_str, inline=False)
-
-            await ctx.send(embed=embed)
-        else:
-            await self._send_embed(
-                ctx,
-                'Domain Not Found',
-                f"The domain `{domain}` is not in the blocklistv2.",
-                0xffd966  # Yellow
-            )
-
     @tasks.loop(minutes=15)
     async def get_phishing_domains(self) -> None:
-        """Fetches and updates the phishing domain lists."""
-        log.info("Attempting to update phishing domain lists...")
+        """Fetches and updates the phishing domain list."""
+        log.info("Attempting to update phishing domain list...")
         new_domains = set()
-        new_domains_v2 = {}
         updated = False
 
         headers = {
@@ -374,19 +333,16 @@ class AntiPhishing(commands.Cog):
 
         # Fetch V1 list
         fetched_v1 = await self._fetch_domains("https://www.beehive.systems/hubfs/blocklist/blocklist.json", headers, new_domains)
-        # Fetch V2 list
-        fetched_v2 = await self._fetch_domains_v2("https://www.beehive.systems/hubfs/blocklist/blocklistv2.json", headers, new_domains_v2)
 
-        if fetched_v1 or fetched_v2:
-            if new_domains != self.domains or new_domains_v2 != self.domains_v2:
+        if fetched_v1:
+            if new_domains != self.domains:
                 self.domains = new_domains
-                self.domains_v2 = new_domains_v2
                 updated = True
-                log.info(f"Phishing domain lists updated. V1: {len(self.domains)} entries, V2: {len(self.domains_v2)} entries.")
+                log.info(f"Phishing domain list updated. V1: {len(self.domains)} entries.")
             else:
-                log.info("Phishing domain lists checked, no changes detected.")
+                log.info("Phishing domain list checked, no changes detected.")
         else:
-            log.warning("Failed to fetch updates for both V1 and V2 blocklists.")
+            log.warning("Failed to fetch updates for V1 blocklist.")
             return
 
         if updated:
@@ -399,7 +355,7 @@ class AntiPhishing(commands.Cog):
                             embed = discord.Embed(
                                 title="Definitions updated",
                                 description=f"The phishing domains list has been updated.\n"
-                                            f"Now tracking **{len(self.domains) + len(self.domains_v2):,}** domains.",
+                                            f"Now tracking **{len(self.domains):,}** domains.",
                                 color=0x2bbd8e # Green
                             )
                             await log_channel.send(embed=embed)
@@ -431,35 +387,6 @@ class AntiPhishing(commands.Cog):
             return False
         except Exception as e:
             log.exception(f"An unexpected error occurred fetching V1 blocklist from {url}: {e}")
-            return False
-
-    async def _fetch_domains_v2(self, url: str, headers: dict, domains_v2: Dict[str, Any]) -> bool:
-        """Fetches V2 domain list, stores lowercase keys, returns True on success."""
-        try:
-            async with self.session.get(url, headers=headers, timeout=10) as request:
-                request.raise_for_status()
-                data = await request.json()
-                if isinstance(data, dict) and "blocklist" in data:
-                    for entry in data["blocklist"]:
-                        domain = entry.get("domain", "").lower()
-                        if domain:
-                            domains_v2[domain] = {
-                                "category": entry.get("category", ""),
-                                "severity": entry.get("severity", ""),
-                                "description": entry.get("description", ""),
-                                "targeted_orgs": entry.get("targeted_orgs", ""),
-                                "detected_date": entry.get("detected_date", "")
-                            }
-                    log.debug(f"Successfully fetched and parsed V2 blocklist from {url}. {len(data['blocklist'])} entries raw.")
-                    return True
-                else:
-                    log.warning(f"Unexpected data format received from V2 blocklist {url}. Expected dict with 'blocklist', got {type(data)}.")
-                    return False
-        except (aiohttp.ClientResponseError, aiohttp.ClientError) as e:
-            log.warning(f"Error fetching V2 blocklist from {url}: {e}")
-            return False
-        except Exception as e:
-            log.exception(f"An unexpected error occurred fetching V2 blocklist from {url}: {e}")
             return False
 
     async def handle_phishing(self, message: discord.Message, matched_domain: str) -> None:
@@ -499,16 +426,6 @@ class AntiPhishing(commands.Cog):
         log_embed.add_field(name="Full Message Content", value=f"```\n{message.content[:1000]}\n```" if message.content else "*(No text content)*", inline=False)
         log_embed.add_field(name="Action Taken", value=f"`{await self.config.guild(message.guild).action()}`", inline=True)
         log_embed.add_field(name="Message Link", value=f"[Jump to Message]({message.jump_url})", inline=True)
-
-        additional_info = self.domains_v2.get(matched_domain)
-        if additional_info and isinstance(additional_info, dict):
-            try:
-                formatted_info = "\n".join(f"**{key.replace('_', ' ').title()}**: {value}" for key, value in additional_info.items())
-                if len(formatted_info) > 1000:
-                    formatted_info = formatted_info[:1000] + "\n... (truncated)"
-                log_embed.add_field(name="Additional Info (V2)", value=formatted_info, inline=False)
-            except Exception as e:
-                log.error(f"Error formatting V2 additional info for log: {e}")
 
         log_embed.set_footer(text=f"User total detections: {await self.config.member(message.author).caught()}")
 
@@ -587,24 +504,11 @@ class AntiPhishing(commands.Cog):
             embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
             embed.set_footer(text="Please alert staff if you believe this is an error.")
 
-            additional_info = self.domains_v2.get(domain)
-            if additional_info and isinstance(additional_info, dict):
-                description = (
-                    f"{message.author.mention} sent a link (`{domain}`) identified as potentially malicious. "
-                    "This website might contain malware, spyware, phishing attempts, or other harmful content. "
-                    "**Avoid clicking this link.**\n\n"
-                    f"**Category**: {additional_info.get('category', 'N/A')}\n"
-                    f"**Description**: {additional_info.get('description', 'N/A')}\n"
-                    f"**Targeted Organizations**: {additional_info.get('targeted_orgs', 'N/A')}\n"
-                    f"**Detected Date**: {additional_info.get('detected_date', 'N/A')}"
-                )
-                embed.add_field(name="Threat Details", value=description, inline=False)
-            else:
-                embed.description = (
-                    f"{message.author.mention} sent a link (`{domain}`) identified as potentially malicious. "
-                    "This website might contain malware, spyware, phishing attempts, or other harmful content. "
-                    "**Avoid clicking this link.**"
-                )
+            embed.description = (
+                f"{message.author.mention} sent a link (`{domain}`) identified as potentially malicious. "
+                "This website might contain malware, spyware, phishing attempts, or other harmful content. "
+                "**Avoid clicking this link.**"
+            )
 
             reply_target = message.to_reference(fail_if_not_exists=False)
             if reply_target:
@@ -816,7 +720,7 @@ class AntiPhishing(commands.Cog):
             found = False
             for candidate in domain_candidates:
                 candidate_lc = candidate.lower()
-                if candidate_lc in self.domains or candidate_lc in self.domains_v2:
+                if candidate_lc in self.domains:
                     log.debug(f"Blocklist match found: {candidate_lc} (from {hostname})")
                     await self.handle_phishing(message, candidate_lc)
                     found = True
