@@ -19,8 +19,8 @@ class AntiPhishing(commands.Cog):
     Guard users from malicious links and phishing attempts with customizable protection options.
     """
 
-    __version__ = "1.6.0.1"
-    __last_updated__ = "October 2nd, 2024"
+    __version__ = "1.7.0"
+    __last_updated__ = "May 7th, 2025"
     __quick_notes__ = "We've added a new `timeout` punishment to automatically time a user out for a predetermined amount of time if they share a known dangerous link."
 
     def __init__(self, bot: Red):
