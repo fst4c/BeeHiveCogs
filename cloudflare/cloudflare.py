@@ -650,11 +650,30 @@ class Cloudflare(commands.Cog):
                                 try:
                                     log_embed = discord.Embed(
                                         title="Cloudflare detected a threat",
-                                        description=f"A message containing a malicious URL was detected and deleted in {message.channel.mention}.\n\n**User:** {message.author.mention} (`{message.author.id}`)\n**URL:** {url}\n**Scan ID:** `{scan_id}`",
-                                        color=0xff4545,
+                                        description=f"A message containing a malicious URL was detected and deleted in {message.channel.mention}.",
+                                        color=0xF38020,
                                         timestamp=datetime.utcnow()
                                     )
-                                    log_embed.add_field(name="Message Content", value=message.content[:1024], inline=False)
+                                    log_embed.add_field(
+                                        name="User",
+                                        value=f"{message.author.mention} (`{message.author.id}`)",
+                                        inline=False
+                                    )
+                                    log_embed.add_field(
+                                        name="URL",
+                                        value=url,
+                                        inline=False
+                                    )
+                                    log_embed.add_field(
+                                        name="Scan ID",
+                                        value=f"`{scan_id}`",
+                                        inline=False
+                                    )
+                                    log_embed.add_field(
+                                        name="Content",
+                                        value=message.content[:1024],
+                                        inline=False
+                                    )
                                     log_embed.set_footer(text=f"User ID: {message.author.id}")
                                     await log_channel.send(embed=log_embed)
                                 except Exception:
