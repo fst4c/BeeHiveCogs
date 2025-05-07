@@ -56,7 +56,7 @@ class URLScan(commands.Cog):
     @commands.has_permissions(manage_guild=True)
     @urlscan.command(name="logs", description="Set the logging channel")
     async def set_log_channel(self, ctx, channel: discord.TextChannel):
-        """Set the logging channel for URL scan results"""
+        """Set the logging channel for URL scan results and autoscan detections"""
         await self.config.guild(ctx.guild).log_channel.set(channel.id)
         await ctx.send(f"Log channel set to {channel.mention}")
 
@@ -138,7 +138,9 @@ class URLScan(commands.Cog):
         if message.guild is None:
             return
 
-        if not hasattr(self.bot, 'autoscan_enabled_guilds') or not self.bot.autoscan_enabled_guilds.get(message.guild.id, False):
+        # Check if autoscan is enabled for this guild
+        autoscan_enabled = await self.config.guild(message.guild).autoscan_enabled()
+        if not autoscan_enabled:
             return
 
         if message.author.bot:
@@ -148,9 +150,15 @@ class URLScan(commands.Cog):
         if not urls_to_scan:
             return
 
-        ctx = await self.bot.get_context(message)
+        # Get log channel for this guild, if set
         log_channel_id = await self.config.guild(message.guild).log_channel()
-        log_channel = self.bot.get_channel(log_channel_id) if log_channel_id else None
+        log_channel = message.guild.get_channel(log_channel_id) if log_channel_id else None
+        if log_channel is None and log_channel_id:
+            # Try to fetch if not cached
+            try:
+                log_channel = await message.guild.fetch_channel(log_channel_id)
+            except Exception:
+                log_channel = None
 
         for url in urls_to_scan:
             urlscan_key = await self.bot.get_shared_api_tokens("urlscan")
@@ -184,7 +192,35 @@ class URLScan(commands.Cog):
                                         color=0xe25946
                                     )
                                     await message.channel.send(embed=embed)
-                                    if log_channel:
+                                    # Send alert to log channel if set and different from the message channel
+                                    if log_channel and log_channel.id != message.channel.id:
+                                        try:
+                                            log_embed = discord.Embed(
+                                                title="URLScan detected a threat",
+                                                description=f"A message containing a suspicious URL was detected and deleted in {message.channel.mention}.",
+                                                color=0xe25946
+                                            )
+                                            log_embed.add_field(
+                                                name="User",
+                                                value=f"{message.author.mention} (`{message.author.id}`)",
+                                                inline=False
+                                            )
+                                            log_embed.add_field(
+                                                name="URL",
+                                                value=url,
+                                                inline=False
+                                            )
+                                            log_embed.add_field(
+                                                name="Content",
+                                                value=message.content[:1024],
+                                                inline=False
+                                            )
+                                            log_embed.set_footer(text=f"User ID: {message.author.id}")
+                                            await log_channel.send(embed=log_embed)
+                                        except Exception:
+                                            pass
+                                    elif log_channel:
+                                        # If log channel is same as message channel, just send the embed
                                         await log_channel.send(embed=embed)
                                 except discord.NotFound:
                                     # Message was already deleted, possibly by another link filtering module
