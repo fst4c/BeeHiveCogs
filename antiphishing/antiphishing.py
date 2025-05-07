@@ -360,7 +360,7 @@ class AntiPhishing(commands.Cog):
                 request.raise_for_status()
                 data = await request.json()
                 if isinstance(data, list):
-                    domains.update(d.lower() for d in data if isinstance(d, str))
+                    domains.update(d.lower().rstrip('.') for d in data if isinstance(d, str))
                     log.debug(f"Successfully fetched and parsed V1 blocklist from {url}. {len(data)} entries raw.")
                     return True
                 else:
