@@ -73,56 +73,28 @@ class AntiPhishing(commands.Cog):
 
     def extract_urls(self, message: str) -> List[str]:
         """
-        Extract URLs from a message using regex.
-        This function is designed to catch as many valid hyperlinks as possible, including those without schemes.
+        Extract URLs from a message using a basic regex pattern.
+        This function is designed to catch a wide range of hyperlinks.
         """
         # Remove zero-width and invisible chars
         message = _strip_zero_width(message)
 
-        # Improved regex for URLs, including those without scheme and with unicode domains
-        # This regex will match:
-        # - URLs with or without scheme
-        # - Punycode and unicode domains
-        # - URLs with ports, paths, queries, fragments
-        # - URLs surrounded by punctuation (e.g. in parentheses, at end of sentence)
+        # Basic regex for URLs
         url_pattern = re.compile(
-            r'(?:(?:https?|ftp):\/\/)?'  # optional scheme
-            r'(?:\S+(?::\S*)?@)?'       # optional user:pass@
-            r'('
-                r'(?:[a-zA-Z0-9\-._~%]+(?:\.[a-zA-Z0-9\-._~%]+)+)'  # domain (including unicode/punycode)
-                r'|'
-                r'(?:\d{1,3}\.){3}\d{1,3}'               # or IPv4
-                r'|'
-                r'\[[0-9a-fA-F:]+\]'                     # or IPv6
-            r')'
-            r'(?::\d{2,5})?'                             # optional port
-            r'(?:[/?#][^\s<>\]\[\(\)\{\}"\'`.,;:]*)?',   # optional path/query/fragment, avoid trailing punctuation
-            re.UNICODE
+            r'(https?://[^\s]+)',
+            re.IGNORECASE
         )
 
-        # Find all matches, including those without scheme
-        matches = url_pattern.finditer(message)
+        # Find all matches
+        matches = url_pattern.findall(message)
         urls = set()
-        for match in matches:
-            url = match.group(0)
+        for url in matches:
             # Remove trailing punctuation that is not part of the URL
             url = url.rstrip('.,;:!?)"]}\'')
             url = url.lstrip('([{"\'')
             # Remove trailing whitespace and slashes for blocklist matching
             url = url.rstrip(" \t\r\n/")
-            # If no scheme, add http:// for parsing
-            if not re.match(r'^(?:https?|ftp)://', url, re.I):
-                url_for_parse = "http://" + url
-            else:
-                url_for_parse = url
-            try:
-                result = urlsplit(url_for_parse)
-                # Only consider if we have a netloc (domain)
-                if result.netloc:
-                    # Reconstruct the URL as it appeared in the message
-                    urls.add(url)
-            except Exception as e:
-                log.debug(f"Error parsing potential URL '{url}': {e}")
+            urls.add(url)
         return list(urls)
 
     def get_links(self, message: str) -> Optional[List[str]]:
