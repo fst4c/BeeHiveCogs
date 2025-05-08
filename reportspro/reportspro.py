@@ -188,8 +188,9 @@ class ReportsPro(commands.Cog):
         ]
 
         class ReportDropdown(discord.ui.Select):
-            def __init__(self, config, interaction, member, reports_channel, capture_chat_history, message):
+            def __init__(self, config, cog, interaction, member, reports_channel, capture_chat_history, message):
                 self.config = config
+                self.cog = cog
                 self.interaction = interaction
                 self.member = member
                 self.reports_channel = reports_channel
@@ -239,6 +240,7 @@ class ReportsPro(commands.Cog):
                                 modal_interaction,
                                 parent_dropdown,
                                 parent_dropdown.config,
+                                parent_dropdown.cog,
                                 parent_dropdown.interaction,
                                 parent_dropdown.member,
                                 parent_dropdown.reports_channel,
@@ -263,6 +265,7 @@ class ReportsPro(commands.Cog):
                     interaction,
                     self,
                     self.config,
+                    self.cog,
                     self.interaction,
                     self.member,
                     self.reports_channel,
@@ -275,7 +278,7 @@ class ReportsPro(commands.Cog):
 
             @staticmethod
             async def finish_report_static(
-                interaction, self_ref, config, orig_interaction, member, reports_channel,
+                interaction, self_ref, config, cog, orig_interaction, member, reports_channel,
                 capture_chat_history, message, selected_reason, selected_description, extra_details
             ):
                 # Defer the interaction if possible, to ensure it always completes
@@ -486,7 +489,7 @@ class ReportsPro(commands.Cog):
                             content=mention_text,
                             embed=report_message,
                             allowed_mentions=discord.AllowedMentions(roles=True),
-                            view=ReportActionView(self_ref.config.cog, member.id, report_id, message.jump_url)
+                            view=ReportActionView(cog, member.id, report_id, message.jump_url)
                         )
                         if chat_history:
                             await reports_channel.send(file=discord.File(chat_history, filename=f"{member.id}_chat_history.txt"))
@@ -576,12 +579,12 @@ class ReportsPro(commands.Cog):
 
         # Create a view and add the dropdown
         class ReportView(discord.ui.View):
-            def __init__(self, config, interaction, member, reports_channel, capture_chat_history, message):
+            def __init__(self, config, cog, interaction, member, reports_channel, capture_chat_history, message):
                 super().__init__(timeout=180)
-                dropdown = ReportDropdown(config, interaction, member, reports_channel, capture_chat_history, message)
+                dropdown = ReportDropdown(config, cog, interaction, member, reports_channel, capture_chat_history, message)
                 self.add_item(dropdown)
 
-        view = ReportView(self.config, interaction, member, reports_channel, self.capture_chat_history, message)
+        view = ReportView(self.config, self, interaction, member, reports_channel, self.capture_chat_history, message)
 
         try:
             sent_msg = await interaction.response.send_message(embed=report_embed, view=view, ephemeral=True)
