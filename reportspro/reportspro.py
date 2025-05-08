@@ -69,7 +69,7 @@ class ReportsPro(commands.Cog):
         if role is None:
             await self.config.guild(ctx.guild).mention_role.set(None)
             embed = discord.Embed(
-                title="Mention Role Cleared",
+                title="Role cleaeed",
                 description="The mention role for new reports has been cleared.",
                 color=discord.Color.green()
             )
