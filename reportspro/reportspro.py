@@ -401,8 +401,93 @@ class ReportsPro(commands.Cog):
                     mention_role = interaction.guild.get_role(mention_role_id) if mention_role_id else None
                     mention_text = mention_role.mention if mention_role else ""
 
+                    # --- BUTTONS FOR STAFF ACTIONS ---
+                    class ReportActionView(discord.ui.View):
+                        def __init__(self, cog, reported_user_id, report_id, message_link):
+                            super().__init__(timeout=None)
+                            self.cog = cog
+                            self.reported_user_id = reported_user_id
+                            self.report_id = report_id
+                            self.message_link = message_link
+
+                        async def interaction_check(self, interaction: discord.Interaction) -> bool:
+                            # Only allow users with ban_members or manage_guild to use the buttons
+                            perms = interaction.user.guild_permissions
+                            if perms.ban_members or perms.kick_members or perms.moderate_members or perms.manage_guild:
+                                return True
+                            await interaction.response.send_message("You do not have permission to use these actions.", ephemeral=True)
+                            return False
+
+                        @discord.ui.button(label="Ban", style=discord.ButtonStyle.danger, emoji="🔨")
+                        async def ban_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                            guild = interaction.guild
+                            user = guild.get_member(int(self.reported_user_id))
+                            if not user:
+                                await interaction.response.send_message("User not found in this server.", ephemeral=True)
+                                return
+                            try:
+                                await user.ban(reason=f"Staff action via report {self.report_id}")
+                                await interaction.response.send_message(f"{user.mention} has been **banned**.", ephemeral=True)
+                            except discord.Forbidden:
+                                await interaction.response.send_message("I do not have permission to ban this user.", ephemeral=True)
+                            except Exception as e:
+                                await interaction.response.send_message(f"Error banning user: {e}", ephemeral=True)
+
+                        @discord.ui.button(label="Kick", style=discord.ButtonStyle.danger, emoji="👢")
+                        async def kick_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                            guild = interaction.guild
+                            user = guild.get_member(int(self.reported_user_id))
+                            if not user:
+                                await interaction.response.send_message("User not found in this server.", ephemeral=True)
+                                return
+                            try:
+                                await user.kick(reason=f"Staff action via report {self.report_id}")
+                                await interaction.response.send_message(f"{user.mention} has been **kicked**.", ephemeral=True)
+                            except discord.Forbidden:
+                                await interaction.response.send_message("I do not have permission to kick this user.", ephemeral=True)
+                            except Exception as e:
+                                await interaction.response.send_message(f"Error kicking user: {e}", ephemeral=True)
+
+                        @discord.ui.button(label="Timeout 24h", style=discord.ButtonStyle.primary, emoji="⏲️")
+                        async def timeout_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                            guild = interaction.guild
+                            user = guild.get_member(int(self.reported_user_id))
+                            if not user:
+                                await interaction.response.send_message("User not found in this server.", ephemeral=True)
+                                return
+                            try:
+                                # discord.py 2.x: timeout(duration=seconds)
+                                if hasattr(user, "timeout"):
+                                    await user.timeout(duration=86400)
+                                elif hasattr(user, "edit"):
+                                    await user.edit(timeout_until=datetime.now(timezone.utc) + timedelta(seconds=86400))
+                                else:
+                                    raise Exception("Timeout not supported on this bot version.")
+                                await interaction.response.send_message(f"{user.mention} has been **timed out for 24 hours**.", ephemeral=True)
+                            except discord.Forbidden:
+                                await interaction.response.send_message("I do not have permission to timeout this user.", ephemeral=True)
+                            except Exception as e:
+                                await interaction.response.send_message(f"Error timing out user: {e}", ephemeral=True)
+
+                        @discord.ui.button(label="Dismiss", style=discord.ButtonStyle.secondary, emoji="❌")
+                        async def dismiss_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                            # Mark the report as closed in config
+                            reports = await self.cog.config.guild(interaction.guild).reports()
+                            if self.report_id in reports:
+                                reports[self.report_id]["status"] = "Closed"
+                                reports[self.report_id]["action_taken"] = "Dismissed"
+                                reports[self.report_id]["handled_by"] = str(interaction.user.id)
+                                reports[self.report_id]["handled_at"] = datetime.now(timezone.utc).isoformat()
+                                await self.cog.config.guild(interaction.guild).reports.set(reports)
+                            await interaction.response.send_message("Report dismissed and marked as closed.", ephemeral=True)
+
                     try:
-                        await reports_channel.send(content=mention_text, embed=report_message, allowed_mentions=discord.AllowedMentions(roles=True))
+                        await reports_channel.send(
+                            content=mention_text,
+                            embed=report_message,
+                            allowed_mentions=discord.AllowedMentions(roles=True),
+                            view=ReportActionView(self_ref.config.cog, member.id, report_id, message.jump_url)
+                        )
                         if chat_history:
                             await reports_channel.send(file=discord.File(chat_history, filename=f"{member.id}_chat_history.txt"))
                             os.remove(chat_history)  # Clean up the file after sending
@@ -647,11 +732,90 @@ class ReportsPro(commands.Cog):
             embeds.append(embed)
 
         # Function to handle pagination
-        async def send_paginated_embeds(ctx, embeds):
+        async def send_paginated_embeds(ctx, embeds, report_ids, reported_user_ids, message_links):
             current_page = 0
-            message = await ctx.send(embed=embeds[current_page])
+            # Add staff action buttons to each report view
+            class ReportActionView(discord.ui.View):
+                def __init__(self, cog, reported_user_id, report_id, message_link):
+                    super().__init__(timeout=None)
+                    self.cog = cog
+                    self.reported_user_id = reported_user_id
+                    self.report_id = report_id
+                    self.message_link = message_link
 
-            # Add reaction controls
+                async def interaction_check(self, interaction: discord.Interaction) -> bool:
+                    perms = interaction.user.guild_permissions
+                    if perms.ban_members or perms.kick_members or perms.moderate_members or perms.manage_guild:
+                        return True
+                    await interaction.response.send_message("You do not have permission to use these actions.", ephemeral=True)
+                    return False
+
+                @discord.ui.button(label="Ban", style=discord.ButtonStyle.danger, emoji="🔨")
+                async def ban_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                    guild = interaction.guild
+                    user = guild.get_member(int(self.reported_user_id))
+                    if not user:
+                        await interaction.response.send_message("User not found in this server.", ephemeral=True)
+                        return
+                    try:
+                        await user.ban(reason=f"Staff action via report {self.report_id}")
+                        await interaction.response.send_message(f"{user.mention} has been **banned**.", ephemeral=True)
+                    except discord.Forbidden:
+                        await interaction.response.send_message("I do not have permission to ban this user.", ephemeral=True)
+                    except Exception as e:
+                        await interaction.response.send_message(f"Error banning user: {e}", ephemeral=True)
+
+                @discord.ui.button(label="Kick", style=discord.ButtonStyle.danger, emoji="👢")
+                async def kick_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                    guild = interaction.guild
+                    user = guild.get_member(int(self.reported_user_id))
+                    if not user:
+                        await interaction.response.send_message("User not found in this server.", ephemeral=True)
+                        return
+                    try:
+                        await user.kick(reason=f"Staff action via report {self.report_id}")
+                        await interaction.response.send_message(f"{user.mention} has been **kicked**.", ephemeral=True)
+                    except discord.Forbidden:
+                        await interaction.response.send_message("I do not have permission to kick this user.", ephemeral=True)
+                    except Exception as e:
+                        await interaction.response.send_message(f"Error kicking user: {e}", ephemeral=True)
+
+                @discord.ui.button(label="Timeout 24h", style=discord.ButtonStyle.primary, emoji="⏲️")
+                async def timeout_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                    guild = interaction.guild
+                    user = guild.get_member(int(self.reported_user_id))
+                    if not user:
+                        await interaction.response.send_message("User not found in this server.", ephemeral=True)
+                        return
+                    try:
+                        if hasattr(user, "timeout"):
+                            await user.timeout(duration=86400)
+                        elif hasattr(user, "edit"):
+                            await user.edit(timeout_until=datetime.now(timezone.utc) + timedelta(seconds=86400))
+                        else:
+                            raise Exception("Timeout not supported on this bot version.")
+                        await interaction.response.send_message(f"{user.mention} has been **timed out for 24 hours**.", ephemeral=True)
+                    except discord.Forbidden:
+                        await interaction.response.send_message("I do not have permission to timeout this user.", ephemeral=True)
+                    except Exception as e:
+                        await interaction.response.send_message(f"Error timing out user: {e}", ephemeral=True)
+
+                @discord.ui.button(label="Dismiss", style=discord.ButtonStyle.secondary, emoji="❌")
+                async def dismiss_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                    reports = await self.cog.config.guild(interaction.guild).reports()
+                    if self.report_id in reports:
+                        reports[self.report_id]["status"] = "Closed"
+                        reports[self.report_id]["action_taken"] = "Dismissed"
+                        reports[self.report_id]["handled_by"] = str(interaction.user.id)
+                        reports[self.report_id]["handled_at"] = datetime.now(timezone.utc).isoformat()
+                        await self.cog.config.guild(interaction.guild).reports.set(reports)
+                    await interaction.response.send_message("Report dismissed and marked as closed.", ephemeral=True)
+
+            # Send the first embed with buttons
+            view = ReportActionView(ctx.cog, reported_user_ids[current_page], report_ids[current_page], message_links[current_page])
+            message = await ctx.send(embed=embeds[current_page], view=view)
+
+            # Add reaction controls for pagination
             if len(embeds) > 1:
                 await message.add_reaction("⬅️")
                 await message.add_reaction("➡️")
@@ -662,14 +826,16 @@ class ReportsPro(commands.Cog):
 
             while True:
                 try:
-                    reaction, user = await self.bot.wait_for('reaction_add', timeout=120.0, check=check)
+                    reaction, user = await ctx.bot.wait_for('reaction_add', timeout=120.0, check=check)
 
                     if str(reaction.emoji) == "➡️" and current_page < len(embeds) - 1:
                         current_page += 1
-                        await message.edit(embed=embeds[current_page])
+                        new_view = ReportActionView(ctx.cog, reported_user_ids[current_page], report_ids[current_page], message_links[current_page])
+                        await message.edit(embed=embeds[current_page], view=new_view)
                     elif str(reaction.emoji) == "⬅️" and current_page > 0:
                         current_page -= 1
-                        await message.edit(embed=embeds[current_page])
+                        new_view = ReportActionView(ctx.cog, reported_user_ids[current_page], report_ids[current_page], message_links[current_page])
+                        await message.edit(embed=embeds[current_page], view=new_view)
                     elif str(reaction.emoji) == "❌":
                         await message.delete()
                         break
@@ -685,7 +851,16 @@ class ReportsPro(commands.Cog):
                         pass
                     break
 
-        await send_paginated_embeds(ctx, embeds)
+        # Prepare lists for report_ids, reported_user_ids, and message_links for pagination
+        report_ids = []
+        reported_user_ids = []
+        message_links = []
+        for report_id, report_info in filtered_reports:
+            report_ids.append(report_id)
+            reported_user_ids.append(report_info.get('reported_user'))
+            message_links.append(report_info.get('reported_message_link'))
+
+        await send_paginated_embeds(ctx, embeds, report_ids, reported_user_ids, message_links)
 
     @reports.command(name="clear")
     @checks.admin_or_permissions(manage_guild=True)
@@ -767,270 +942,4 @@ class ReportsPro(commands.Cog):
         except Exception:
             return False
 
-    @reports.command(name="handle")
-    @checks.admin_or_permissions(manage_guild=True)
-    async def handle_report(self, ctx, report_id: str):
-        """Handle a report by its ID."""
-        reports = await self.config.guild(ctx.guild).reports()
-        report = reports.get(report_id)
-
-        if not report:
-            embed = discord.Embed(
-                title="Report Not Found",
-                description="We couldn't find a report with that ID.",
-                color=discord.Color.red()
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Defensive: handle missing or malformed IDs
-        try:
-            reported_user = ctx.guild.get_member(int(report['reported_user'])) if report.get('reported_user') else None
-        except Exception:
-            reported_user = None
-        try:
-            reporter = ctx.guild.get_member(int(report['reporter'])) if report.get('reporter') else None
-        except Exception:
-            reporter = None
-
-        # Create a view for handling the report
-        class HandleReportView(discord.ui.View):
-            def __init__(self, ctx, report_id, reporter, reported_user):
-                super().__init__()
-                self.ctx = ctx
-                self.report_id = report_id
-                self.reporter = reporter
-                self.reported_user = reported_user
-                self.answers = []
-
-            async def ask_question(self, ctx, question, emoji_meanings):
-                embed = discord.Embed(
-                    title="Report Handling",
-                    description=question,
-                    color=discord.Color.blue()
-                )
-                emoji_list = "\n".join([f"{emoji}: {meaning}" for emoji, meaning in emoji_meanings.items()])
-                embed.add_field(name="Options", value=emoji_list, inline=False)
-                message = await ctx.send(embed=embed)
-                for emoji in emoji_meanings.keys():
-                    try:
-                        await message.add_reaction(emoji)
-                    except Exception:
-                        pass
-                return message
-
-            async def handle_reaction(self, message, emoji_meanings):
-                def check(reaction, user):
-                    return user == self.ctx.author and str(reaction.emoji) in emoji_meanings and reaction.message.id == message.id
-
-                try:
-                    reaction, _ = await self.ctx.bot.wait_for('reaction_add', timeout=60.0, check=check)
-                    return str(reaction.emoji)
-                except asyncio.TimeoutError:
-                    embed = discord.Embed(
-                        title="Timeout",
-                        description="You took too long to respond. Please try again.",
-                        color=discord.Color.red()
-                    )
-                    await self.ctx.send(embed=embed)
-                    return None
-
-            async def handle_report(self):
-                # Initial question to confirm investigation
-                question = "Have you reviewed and investigated all facts of the matter?"
-                emoji_meanings = {"✅": "Yes", "❌": "No"}
-                message = await self.ask_question(self.ctx, question, emoji_meanings)
-                emoji = await self.handle_reaction(message, emoji_meanings)
-                if emoji is None or emoji_meanings[emoji] == "No":
-                    embed = discord.Embed(
-                        title="Investigation Required",
-                        description="Please make sure to review all facts before proceeding.",
-                        color=discord.Color.orange()
-                    )
-                    await self.ctx.send(embed=embed)
-                    return
-                self.answers.append(emoji_meanings[emoji])
-
-                # Question to determine validity of the report
-                question = "Do you believe the report, including its evidence and reason, is valid?"
-                emoji_meanings = {"✅": "Valid", "❌": "Invalid"}
-                message = await self.ask_question(self.ctx, question, emoji_meanings)
-                emoji = await self.handle_reaction(message, emoji_meanings)
-                if emoji is None or emoji_meanings[emoji] == "Invalid":
-                    embed = discord.Embed(
-                        title="Report Marked as Invalid",
-                        description="This report has been reviewed and determined to be invalid. No further action will be taken at this time.",
-                        color=discord.Color.orange()
-                    )
-                    await self.ctx.send(embed=embed)
-                    self.answers.append("Invalid")
-                    await self.finalize()
-                    return
-                self.answers.append(emoji_meanings[emoji])
-
-                # Final question to decide action
-                question = "What action should be taken against the reported user?"
-                emoji_meanings = {"⚠️": "Warning", "⏲️": "Timeout", "🔨": "Ban", "❌": "No Action"}
-                message = await self.ask_question(self.ctx, question, emoji_meanings)
-                emoji = await self.handle_reaction(message, emoji_meanings)
-                if emoji is None:
-                    return
-                self.answers.append(emoji_meanings[emoji])
-
-                await self.finalize()
-
-            async def finalize(self):
-                action = self.answers[2] if len(self.answers) > 2 else "No action"
-                # Update report status in config
-                reports = await self.ctx.cog.config.guild(self.ctx.guild).reports()
-                if self.report_id in reports:
-                    reports[self.report_id]["status"] = "Closed"
-                    reports[self.report_id]["action_taken"] = action
-                    reports[self.report_id]["handled_by"] = str(self.ctx.author.id)
-                    reports[self.report_id]["handled_at"] = datetime.now(timezone.utc).isoformat()
-                    await self.ctx.cog.config.guild(self.ctx.guild).reports.set(reports)
-
-                # Improved user communication for actions
-                if action == "Warning" and self.reported_user:
-                    try:
-                        await self.reported_user.send(
-                            "Hello, this is a notice from the moderation team. "
-                            "You have received a warning following a review of a report submitted against you. "
-                            "Please review the server rules and ensure your future conduct aligns with our guidelines. "
-                            "If you have questions, you may contact the moderation team."
-                        )
-                    except discord.Forbidden:
-                        embed = discord.Embed(
-                            title="Warning Error",
-                            description="I couldn't send a warning to the reported user.",
-                            color=discord.Color.red()
-                        )
-                        await self.ctx.send(embed=embed)
-                elif action == "Timeout" and self.reported_user:
-                    try:
-                        # discord.Member.timeout expects a timedelta or int (seconds) in discord.py 2.x
-                        # But in Redbot, it may be .timeout_for or .edit(timeout=...)
-                        # We'll use .timeout if available, else fallback
-                        if hasattr(self.reported_user, "timeout"):
-                            await self.reported_user.timeout(duration=86400)  # 24 hours
-                        elif hasattr(self.reported_user, "edit"):
-                            await self.reported_user.edit(timeout_until=datetime.now(timezone.utc) + timedelta(seconds=86400))
-                        else:
-                            raise Exception("Timeout not supported on this bot version.")
-                        embed = discord.Embed(
-                            title="User Timed Out",
-                            description=f"{self.reported_user.mention} has been timed out for 24 hours.",
-                            color=discord.Color.green()
-                        )
-                        await self.ctx.send(embed=embed)
-                        try:
-                            await self.reported_user.send(
-                                "You have been temporarily restricted from participating in the server for 24 hours following a review of a report. "
-                                "Please use this time to review the server rules. If you have questions, you may contact the moderation team."
-                            )
-                        except Exception:
-                            pass
-                    except discord.Forbidden:
-                        embed = discord.Embed(
-                            title="Timeout Error",
-                            description="I couldn't timeout the reported user.",
-                            color=discord.Color.red()
-                        )
-                        await self.ctx.send(embed=embed)
-                    except Exception as e:
-                        embed = discord.Embed(
-                            title="Timeout Error",
-                            description=f"An error occurred while timing out the user: {e}",
-                            color=discord.Color.red()
-                        )
-                        await self.ctx.send(embed=embed)
-                elif action == "Ban" and self.reported_user:
-                    try:
-                        await self.reported_user.ban(reason="Report handled and deemed valid.")
-                        embed = discord.Embed(
-                            title="User Banned",
-                            description=f"{self.reported_user.mention} has been permanently removed from the server following a review of a report. This action was taken in accordance with our community guidelines.",
-                            color=discord.Color.green()
-                        )
-                        await self.ctx.send(embed=embed)
-                        try:
-                            await self.reported_user.send(
-                                "You have been permanently removed (banned) from the server following a review of a report. "
-                                "This action was taken in accordance with our community guidelines."
-                            )
-                        except Exception:
-                            pass
-                    except discord.Forbidden:
-                        embed = discord.Embed(
-                            title="Ban Error",
-                            description="I couldn't ban the reported user.",
-                            color=discord.Color.red()
-                        )
-                        await self.ctx.send(embed=embed)
-                    except Exception as e:
-                        embed = discord.Embed(
-                            title="Ban Error",
-                            description=f"An error occurred while banning the user: {e}",
-                            color=discord.Color.red()
-                        )
-                        await self.ctx.send(embed=embed)
-                elif action == "No Action":
-                    embed = discord.Embed(
-                        title="No action taken",
-                        description="No action was taken against the reported user.",
-                        color=discord.Color.orange()
-                    )
-                    await self.ctx.send(embed=embed)
-
-                # Improved language for reporter notification
-                if self.reporter:
-                    try:
-                        if self.answers[1] == "Invalid":
-                            result_text = (
-                                f"Thank you for submitting your report (ID: `{self.report_id}`). "
-                                "After a thorough review, the moderation team has determined that the report does not violate our rules or guidelines, "
-                                "and no action will be taken. If you have further concerns, please feel free to reach out to the moderation team."
-                            )
-                        else:
-                            action_text = {
-                                "Warning": "The reported user has received a formal warning.",
-                                "Timeout": "The reported user has been temporarily restricted from the server for 24 hours.",
-                                "Ban": "The reported user has been permanently removed (banned) from the server.",
-                                "No Action": "No action was taken against the reported user."
-                            }.get(action, f"Action taken: {action}.")
-                            result_text = (
-                                f"Thank you for submitting your report (ID: `{self.report_id}`). "
-                                "Our moderation team has reviewed your report and determined it to be valid. "
-                                f"{action_text} If you have any questions or further concerns, please contact the moderation team."
-                            )
-                        embed = discord.Embed(
-                            title="Update on Your Report",
-                            description=result_text,
-                            color=discord.Color.from_rgb(255, 255, 254)
-                        )
-                        await self.reporter.send(embed=embed)
-                    except discord.Forbidden:
-                        embed = discord.Embed(
-                            title="Couldn't send report update",
-                            description="I couldn't send a DM to the reporter to update them on this report. You may need to reach out manually to the user if you're inclined.",
-                            color=discord.Color.red()
-                        )
-                        await self.ctx.send(embed=embed)
-                    except Exception as e:
-                        embed = discord.Embed(
-                            title="Couldn't send report update",
-                            description=f"An error occurred while DMing the reporter: {e}",
-                            color=discord.Color.red()
-                        )
-                        await self.ctx.send(embed=embed)
-
-                embed = discord.Embed(
-                    title="Report Processed",
-                    description=f"Report `{self.report_id}` has been reviewed and closed. Action taken: {action}.",
-                    color=0x2bbd8e
-                )
-                await self.ctx.send(embed=embed)
-                self.stop()
-
-        view = HandleReportView(ctx, report_id, reporter, reported_user)
-        await view.handle_report()
+    # The handle_report command and interactive handling system are removed in favor of staff action buttons on each report.
