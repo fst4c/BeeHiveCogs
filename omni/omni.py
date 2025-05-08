@@ -139,9 +139,9 @@ class Omni(commands.Cog):
         try:
             command_prefix = (await self.bot.get_valid_prefixes())[0]
             embed = discord.Embed(
-                title="Omni is monitoring the conversation",
+                title="This conversation is subject to automatic moderation",
                 description=(
-                    "An agentic (AI) moderator is analyzing this conversation in **real-time**, watching for harmful content and behaviors. Your messages are subject to moderation, logging, transmission, analysis, and archival **at any time**.\n- Omni will hand out punishments without waiting for human intervention.\n- **All** violations are automatically documented for staff review\n- Extreme or consistent abuse may result in your Discord account being globally banned."
+                    "An agentic (AI) moderator is analyzing this conversation in **real-time**, watching for potentially harmful content and behaviors.\n\nYour messages and message content are subject to moderation, logging, transmission, analysis, and archival **at any time**.\n- Human review is not required for Omni to take action\n- **All** violations are automatically documented for staff review\n- Extreme or consistent abuse may result in your Discord account being globally banned."
                 ),
                 color=0xfffffe
             )
@@ -255,8 +255,15 @@ class Omni(commands.Cog):
                 self.memory_category_counter[guild_id][category] += 1
 
     async def analyze_content(self, input_data, api_key, message):
-        try:
-            while True:
+        """
+        Analyze content using the OpenAI moderation endpoint.
+        Automatically retries on 4XX and 5XX errors, with exponential backoff up to a max number of attempts.
+        """
+        max_attempts = 5
+        base_delay = 2  # seconds
+        attempt = 0
+        while attempt < max_attempts:
+            try:
                 async with self.session.post(
                     "https://api.openai.com/v1/moderations",
                     headers={
@@ -271,13 +278,25 @@ class Omni(commands.Cog):
                     if response.status == 200:
                         data = await response.json()
                         return data.get("results", [{}])[0].get("category_scores", {})
-                    elif response.status == 500:
-                        await asyncio.sleep(5)
+                    elif 400 <= response.status < 600:
+                        # Retry on any 4XX or 5XX error
+                        attempt += 1
+                        if attempt >= max_attempts:
+                            await self.log_message(message, {}, error_code=response.status)
+                            return {}
+                        await asyncio.sleep(base_delay * attempt)
                     else:
+                        # Unexpected status, log and return empty
                         await self.log_message(message, {}, error_code=response.status)
                         return {}
-        except Exception as e:
-            raise RuntimeError(f"Failed to analyze content: {e}")
+            except Exception as e:
+                attempt += 1
+                if attempt >= max_attempts:
+                    raise RuntimeError(f"Failed to analyze content after {max_attempts} attempts: {e}")
+                await asyncio.sleep(base_delay * attempt)
+        # If all attempts fail, return empty
+        await self.log_message(message, {}, error_code="max_retries")
+        return {}
 
     async def handle_moderation(self, message, category_scores):
         try:
