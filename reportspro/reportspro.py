@@ -110,47 +110,51 @@ class ReportsPro(commands.Cog):
             )
             await ctx.send(embed=embed)
 
-    # --- Reporting Command ---
+    # --- Reporting Context Menu Command ---
 
     @commands.guild_only()
-    @commands.command(name="report")
-    async def report_user(self, ctx, member: discord.Member):
-        """Report a user for inappropriate behavior."""
-        if member == ctx.author:
+    @commands.message_command(name="Report sender")
+    async def report_sender_context(self, interaction: discord.Interaction, message: discord.Message):
+        """Context menu: Report sender of a message."""
+        ctx = await commands.Context.from_interaction(interaction)
+        member = message.author
+
+        if member == interaction.user:
             embed = discord.Embed(
                 title="Error",
                 description="You cannot report yourself.",
                 color=discord.Color.red()
             )
-            await ctx.send(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
-        reports_channel_id = await self.config.guild(ctx.guild).reports_channel()
+        reports_channel_id = await self.config.guild(interaction.guild).reports_channel()
         if not reports_channel_id:
             embed = discord.Embed(
                 title="Error",
                 description="The reports channel hasn't been set up yet. Please contact an admin.",
                 color=discord.Color.red()
             )
-            await ctx.send(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
-        reports_channel = ctx.guild.get_channel(reports_channel_id)
+        reports_channel = interaction.guild.get_channel(reports_channel_id)
         if not reports_channel:
             embed = discord.Embed(
                 title="Error",
                 description="I can't access the reports channel. Please contact an admin.",
                 color=discord.Color.red()
             )
-            await ctx.send(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         # Create an embed with report types
         report_embed = discord.Embed(
-            title=f"Report a User to the Moderators of {ctx.guild.name}",
+            title=f"Report a User to the Moderators of {interaction.guild.name}",
             color=discord.Color.from_rgb(255, 69, 69),
             description=f"**You're reporting {member.mention} ({member.id})**\n\n"
-                        f"Please choose a reason for the report from the dropdown below."
+                        f"Please choose a reason for the report from the dropdown below.\n\n"
+                        f"**Message:**\n{message.content[:4000]}"
         )
 
         # Define report reasons with descriptions and emojis
@@ -168,13 +172,14 @@ class ReportsPro(commands.Cog):
 
         # Create a dropdown menu for report reasons
         class ReportDropdown(discord.ui.Select):
-            def __init__(self, config, ctx, member, reports_channel, capture_chat_history):
+            def __init__(self, config, interaction, member, reports_channel, capture_chat_history, message):
                 self.config = config
-                self.ctx = ctx
+                self.interaction = interaction
                 self.member = member
                 self.reports_channel = reports_channel
                 self.capture_chat_history = capture_chat_history
-                self.allowed_user_id = ctx.author.id  # Only allow the command invoker
+                self.allowed_user_id = interaction.user.id  # Only allow the command invoker
+                self.message = message
                 options = [
                     discord.SelectOption(label=reason, description=description)
                     for reason, description in report_reasons
@@ -202,7 +207,7 @@ class ReportsPro(commands.Cog):
                     modal.add_item(discord.ui.InputText(label="Please describe the reason for your report:", style=discord.InputTextStyle.long, required=True))
                     try:
                         await interaction.response.send_modal(modal)
-                        modal_interaction = await self.ctx.bot.wait_for(
+                        modal_interaction = await self.interaction.client.wait_for(
                             "modal_submit",
                             check=lambda i: i.user.id == self.allowed_user_id and i.message.id == interaction.message.id,
                             timeout=120
@@ -213,7 +218,7 @@ class ReportsPro(commands.Cog):
                         selected_description += "\n\n(No extra details provided.)"
 
                 # Generate a unique report ID
-                reports = await self.config.guild(self.ctx.guild).reports()
+                reports = await self.config.guild(self.interaction.guild).reports()
                 report_id = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
                 attempts = 0
                 while report_id in reports and attempts < 10000:
@@ -238,14 +243,17 @@ class ReportsPro(commands.Cog):
                 try:
                     reports[report_id] = {
                         "reported_user": str(self.member.id),
-                        "reporter": str(self.ctx.author.id),
+                        "reporter": str(self.interaction.user.id),
                         "reason": selected_reason,
                         "description": selected_description,
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                         "status": "Open",
                         "details": extra_details,
+                        "reported_message_id": str(self.message.id),
+                        "reported_message_content": self.message.content[:4000],
+                        "reported_message_link": self.message.jump_url,
                     }
-                    await self.config.guild(self.ctx.guild).reports.set(reports)
+                    await self.config.guild(self.interaction.guild).reports.set(reports)
                 except Exception as e:
                     embed = discord.Embed(
                         title="Error",
@@ -263,7 +271,7 @@ class ReportsPro(commands.Cog):
 
                 # Capture chat history
                 try:
-                    chat_history = await self.capture_chat_history(self.ctx.guild, self.member)
+                    chat_history = await self.capture_chat_history(self.interaction.guild, self.member)
                 except Exception as e:
                     embed = discord.Embed(
                         title="Error",
@@ -292,18 +300,21 @@ class ReportsPro(commands.Cog):
                     report_message.add_field(name="Offender", value=f"{self.member.mention}", inline=True)
                     report_message.add_field(name="Offender ID", value=f"`{self.member.id}`", inline=True)
                     report_message.add_field(name="Date", value=f"<t:{int(datetime.now(timezone.utc).timestamp())}:D>", inline=True)
-                    report_message.add_field(name="Reporter", value=self.ctx.author.mention, inline=True)
-                    report_message.add_field(name="Reporter ID", value=f"`{self.ctx.author.id}`", inline=True)
+                    report_message.add_field(name="Reporter", value=self.interaction.user.mention, inline=True)
+                    report_message.add_field(name="Reporter ID", value=f"`{self.interaction.user.id}`", inline=True)
                     report_message.add_field(name="Time", value=f"<t:{int(datetime.now(timezone.utc).timestamp())}:R>", inline=True)
                     report_message.add_field(name="Reason", value=f"**{selected_reason}**\n*{selected_description}*", inline=False)
+                    report_message.add_field(name="Reported Message", value=f"[Jump to message]({self.message.jump_url})", inline=False)
+                    if self.message.content:
+                        report_message.add_field(name="Message Content", value=self.message.content[:1024], inline=False)
 
                     # Add a summary of existing report counts by reason
                     if reason_counts:
                         summary = "\n".join(f"**{reason}** x**{count}**" for reason, count in reason_counts.items())
                         report_message.add_field(name="Previous reports", value=summary, inline=False)
 
-                    mention_role_id = await self.config.guild(self.ctx.guild).mention_role()
-                    mention_role = self.ctx.guild.get_role(mention_role_id) if mention_role_id else None
+                    mention_role_id = await self.config.guild(self.interaction.guild).mention_role()
+                    mention_role = self.interaction.guild.get_role(mention_role_id) if mention_role_id else None
                     mention_text = mention_role.mention if mention_role else ""
 
                     try:
@@ -387,28 +398,28 @@ class ReportsPro(commands.Cog):
 
         # Create a view and add the dropdown
         class ReportView(discord.ui.View):
-            def __init__(self, config, ctx, member, reports_channel, capture_chat_history):
+            def __init__(self, config, interaction, member, reports_channel, capture_chat_history, message):
                 super().__init__(timeout=180)
-                self.add_item(ReportDropdown(config, ctx, member, reports_channel, capture_chat_history))
+                self.add_item(ReportDropdown(config, interaction, member, reports_channel, capture_chat_history, message))
 
-        view = ReportView(self.config, ctx, member, reports_channel, self.capture_chat_history)
+        view = ReportView(self.config, interaction, member, reports_channel, self.capture_chat_history, message)
 
         try:
-            await ctx.send(embed=report_embed, view=view, ephemeral=True)
+            await interaction.response.send_message(embed=report_embed, view=view, ephemeral=True)
         except discord.Forbidden:
             embed = discord.Embed(
                 title="Permission Error",
                 description="I can't send messages in this channel. Please check my permissions.",
                 color=discord.Color.red()
             )
-            await ctx.send(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
         except Exception as e:
             embed = discord.Embed(
                 title="Error",
                 description=f"Something went wrong while sending the report embed: {e}",
                 color=discord.Color.red()
             )
-            await ctx.send(embed=embed, ephemeral=True)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def capture_chat_history(self, guild, member, limit_per_channel=200):
         """Capture the chat history of a member across all channels."""
@@ -524,6 +535,18 @@ class ReportsPro(commands.Cog):
                 embed.add_field(
                     name="Extra Details",
                     value=report_info["details"],
+                    inline=False
+                )
+            if report_info.get("reported_message_link"):
+                embed.add_field(
+                    name="Reported Message",
+                    value=f"[Jump to message]({report_info['reported_message_link']})",
+                    inline=False
+                )
+            if report_info.get("reported_message_content"):
+                embed.add_field(
+                    name="Message Content",
+                    value=report_info["reported_message_content"][:1024],
                     inline=False
                 )
             embeds.append(embed)
