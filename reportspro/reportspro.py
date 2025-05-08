@@ -196,6 +196,7 @@ class ReportsPro(commands.Cog):
                 self.capture_chat_history = capture_chat_history
                 self.allowed_user_id = interaction.user.id  # Only allow the command invoker
                 self.message = message
+                self.report_interaction_message = None  # Will be set after view is sent
                 options = [
                     discord.SelectOption(label=reason, description=description)
                     for reason, description in report_reasons
@@ -468,6 +469,14 @@ class ReportsPro(commands.Cog):
                     except Exception:
                         pass
 
+                # Delete the original "report user to the moderators of" embed after thank you message
+                try:
+                    # interaction.message is the ephemeral message with the embed and dropdown
+                    if hasattr(interaction, "message") and interaction.message:
+                        await interaction.message.delete()
+                except Exception:
+                    pass
+
                 # Disable the dropdown after use to prevent "This interaction failed"
                 if hasattr(self_ref, "disabled"):
                     self_ref.disabled = True
@@ -484,12 +493,14 @@ class ReportsPro(commands.Cog):
         class ReportView(discord.ui.View):
             def __init__(self, config, interaction, member, reports_channel, capture_chat_history, message):
                 super().__init__(timeout=180)
-                self.add_item(ReportDropdown(config, interaction, member, reports_channel, capture_chat_history, message))
+                dropdown = ReportDropdown(config, interaction, member, reports_channel, capture_chat_history, message)
+                self.add_item(dropdown)
 
         view = ReportView(self.config, interaction, member, reports_channel, self.capture_chat_history, message)
 
         try:
-            await interaction.response.send_message(embed=report_embed, view=view, ephemeral=True)
+            sent_msg = await interaction.response.send_message(embed=report_embed, view=view, ephemeral=True)
+            # There is no direct way to get the ephemeral message object, but interaction.message will be set in the callback
         except discord.Forbidden:
             embed = discord.Embed(
                 title="Permission Error",
