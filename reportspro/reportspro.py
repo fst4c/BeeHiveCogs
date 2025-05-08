@@ -4,12 +4,12 @@ from datetime import datetime, timezone, timedelta
 import os
 import tempfile
 import asyncio
-from collections import Counter
+from collections import Counter, defaultdict
 import random
 import string
 
 class ReportsPro(commands.Cog):
-    """Cog to handle global user reports"""
+    """Cog to handle global user reports with improved functionality"""
 
     def __init__(self, bot):
         self.bot = bot
@@ -17,9 +17,13 @@ class ReportsPro(commands.Cog):
         default_guild = {
             "reports_channel": None,
             "reports": {},
-            "mention_role": None
+            "mention_role": None,
+            "auto_cleanup_days": 30,
+            "auto_cleanup_enabled": False,
         }
         self.config.register_guild(**default_guild)
+
+    # --- Settings Commands ---
 
     @commands.guild_only()
     @commands.group(name="reportset", invoke_without_command=True)
@@ -62,6 +66,21 @@ class ReportsPro(commands.Cog):
             )
             await ctx.send(embed=embed)
 
+    @reportset.command(name="autocleanup")
+    async def set_auto_cleanup(self, ctx, days: int = 30, enabled: bool = True):
+        """
+        Set automatic cleanup of old reports.
+        Usage: [p]reportset autocleanup <days> <enabled>
+        """
+        await self.config.guild(ctx.guild).auto_cleanup_days.set(days)
+        await self.config.guild(ctx.guild).auto_cleanup_enabled.set(enabled)
+        embed = discord.Embed(
+            title="Auto Cleanup Settings",
+            description=f"Auto cleanup is now {'enabled' if enabled else 'disabled'} for reports older than {days} days.",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
+
     @reportset.command(name="view")
     async def view_settings(self, ctx):
         """View the current settings for the guild."""
@@ -72,11 +91,15 @@ class ReportsPro(commands.Cog):
         mention_role_id = await self.config.guild(ctx.guild).mention_role()
         mention_role = ctx.guild.get_role(mention_role_id) if mention_role_id else None
         role_mention = mention_role.mention if mention_role else "Not Set"
-        
+
+        auto_cleanup_days = await self.config.guild(ctx.guild).auto_cleanup_days()
+        auto_cleanup_enabled = await self.config.guild(ctx.guild).auto_cleanup_enabled()
+
         embed = discord.Embed(title="Current Reporting Settings", color=discord.Color.from_rgb(255, 255, 254))
         embed.add_field(name="Log Channel", value=channel_mention, inline=False)
         embed.add_field(name="Mention Role", value=role_mention, inline=False)
-        
+        embed.add_field(name="Auto Cleanup", value=f"{'Enabled' if auto_cleanup_enabled else 'Disabled'} ({auto_cleanup_days} days)", inline=False)
+
         try:
             await ctx.send(embed=embed)
         except discord.Forbidden:
@@ -87,10 +110,21 @@ class ReportsPro(commands.Cog):
             )
             await ctx.send(embed=embed)
 
+    # --- Reporting Command ---
+
     @commands.guild_only()
     @commands.command(name="report")
     async def report_user(self, ctx, member: discord.Member):
         """Report a user for inappropriate behavior."""
+        if member == ctx.author:
+            embed = discord.Embed(
+                title="Error",
+                description="You cannot report yourself.",
+                color=discord.Color.red()
+            )
+            await ctx.send(embed=embed, ephemeral=True)
+            return
+
         reports_channel_id = await self.config.guild(ctx.guild).reports_channel()
         if not reports_channel_id:
             embed = discord.Embed(
@@ -160,13 +194,30 @@ class ReportsPro(commands.Cog):
 
                 selected_reason = self.values[0]
                 selected_description = next(description for reason, description in report_reasons if reason == selected_reason)
-                
+
+                # Ask for additional details if "Other" is selected
+                extra_details = ""
+                if selected_reason == "Other":
+                    modal = discord.ui.Modal(title="Additional Details")
+                    modal.add_item(discord.ui.InputText(label="Please describe the reason for your report:", style=discord.InputTextStyle.long, required=True))
+                    try:
+                        await interaction.response.send_modal(modal)
+                        modal_interaction = await self.ctx.bot.wait_for(
+                            "modal_submit",
+                            check=lambda i: i.user.id == self.allowed_user_id and i.message.id == interaction.message.id,
+                            timeout=120
+                        )
+                        extra_details = modal_interaction.data["components"][0]["components"][0]["value"]
+                        selected_description += f"\n\nUser details: {extra_details}"
+                    except Exception:
+                        selected_description += "\n\n(No extra details provided.)"
+
                 # Generate a unique report ID
                 reports = await self.config.guild(self.ctx.guild).reports()
-                report_id = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
+                report_id = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
                 attempts = 0
                 while report_id in reports and attempts < 10000:
-                    report_id = ''.join(random.choices(string.ascii_letters + string.digits, k=4))
+                    report_id = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
                     attempts += 1
                 if report_id in reports:
                     embed = discord.Embed(
@@ -190,7 +241,9 @@ class ReportsPro(commands.Cog):
                         "reporter": str(self.ctx.author.id),
                         "reason": selected_reason,
                         "description": selected_description,
-                        "timestamp": datetime.now(timezone.utc).isoformat()
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "status": "Open",
+                        "details": extra_details,
                     }
                     await self.config.guild(self.ctx.guild).reports.set(reports)
                 except Exception as e:
@@ -243,7 +296,7 @@ class ReportsPro(commands.Cog):
                     report_message.add_field(name="Reporter ID", value=f"`{self.ctx.author.id}`", inline=True)
                     report_message.add_field(name="Time", value=f"<t:{int(datetime.now(timezone.utc).timestamp())}:R>", inline=True)
                     report_message.add_field(name="Reason", value=f"**{selected_reason}**\n*{selected_description}*", inline=False)
-                    
+
                     # Add a summary of existing report counts by reason
                     if reason_counts:
                         summary = "\n".join(f"**{reason}** x**{count}**" for reason, count in reason_counts.items())
@@ -303,22 +356,17 @@ class ReportsPro(commands.Cog):
 
                 # Update the original ephemeral message with the thank you message and remove the view
                 thank_you_embed = discord.Embed(
-                    description="Report submitted, thank you for helping keep the server safer",
+                    description="Your report has been submitted. Thank you for helping to keep this community safe. Our moderators will review your report as soon as possible.",
                     color=0x2bbd8e
                 )
-                # --- Begin fix for ephemeral message update ---
-                # The following block is rewritten to always respond to the interaction
                 try:
-                    # Always respond to the interaction, and always remove the view
                     await interaction.response.edit_message(embed=thank_you_embed, view=None)
                 except discord.InteractionResponded:
-                    # If already responded, use followup
                     try:
                         await interaction.followup.send(embed=thank_you_embed, ephemeral=True)
                     except Exception:
                         pass
                 except Exception:
-                    # As a last resort, try to edit the original response (discord.py 2.x+)
                     try:
                         await interaction.edit_original_response(embed=thank_you_embed, view=None)
                     except Exception:
@@ -326,7 +374,6 @@ class ReportsPro(commands.Cog):
                             await interaction.followup.send(embed=thank_you_embed, ephemeral=True)
                         except Exception:
                             pass
-                # --- End fix ---
 
                 # Disable the dropdown after use to prevent "This interaction failed"
                 self.disabled = True
@@ -363,14 +410,17 @@ class ReportsPro(commands.Cog):
             )
             await ctx.send(embed=embed, ephemeral=True)
 
-    async def capture_chat_history(self, guild, member):
+    async def capture_chat_history(self, guild, member, limit_per_channel=200):
         """Capture the chat history of a member across all channels."""
         chat_history = []
         for channel in guild.text_channels:
             try:
-                async for message in channel.history(limit=100, oldest_first=False):
+                async for message in channel.history(limit=limit_per_channel, oldest_first=False):
                     if message.author.id == member.id:
-                        chat_history.append(f"[{message.created_at}] {message.author}: {message.content}")
+                        content = message.content
+                        if message.attachments:
+                            content += " [Attachments: " + ", ".join(a.url for a in message.attachments) + "]"
+                        chat_history.append(f"[{message.created_at}] #{channel.name} {message.author}: {content}")
             except discord.Forbidden:
                 continue
             except Exception as e:
@@ -386,6 +436,8 @@ class ReportsPro(commands.Cog):
                 return None
         return None
 
+    # --- Reports Management Commands ---
+
     @commands.guild_only()
     @commands.group(name="reports", invoke_without_command=True)
     @checks.admin_or_permissions()
@@ -394,8 +446,11 @@ class ReportsPro(commands.Cog):
         await ctx.send_help(ctx.command)
 
     @reports.command(name="view")
-    async def view_reports(self, ctx, member: discord.Member = None):
-        """View all reports in the guild or reports for a specific user."""
+    async def view_reports(self, ctx, member: discord.Member = None, status: str = None):
+        """
+        View all reports in the guild, reports for a specific user, or by status.
+        Usage: [p]reports view [member] [status]
+        """
         reports = await self.config.guild(ctx.guild).reports()
         if not reports:
             embed = discord.Embed(
@@ -409,17 +464,21 @@ class ReportsPro(commands.Cog):
         # Filter reports for a specific member if provided
         filtered_reports = [
             (report_id, report_info) for report_id, report_info in reports.items()
-            if not member or (str(report_info['reported_user']) == str(member.id))
+            if (not member or (str(report_info['reported_user']) == str(member.id)))
+            and (not status or report_info.get("status", "Open").lower() == status.lower())
         ]
 
         if not filtered_reports:
             embed = discord.Embed(
                 title="No Reports",
-                description="There are no reports for the specified user.",
+                description="There are no reports for the specified user or status.",
                 color=discord.Color.orange()
             )
             await ctx.send(embed=embed)
             return
+
+        # Sort by timestamp descending
+        filtered_reports.sort(key=lambda x: x[1].get("timestamp", ""), reverse=True)
 
         # Create a list of embeds, one for each report
         embeds = []
@@ -456,6 +515,17 @@ class ReportsPro(commands.Cog):
                 value=time_str,
                 inline=False
             )
+            embed.add_field(
+                name="Status",
+                value=report_info.get("status", "Open"),
+                inline=False
+            )
+            if report_info.get("details"):
+                embed.add_field(
+                    name="Extra Details",
+                    value=report_info["details"],
+                    inline=False
+                )
             embeds.append(embed)
 
         # Function to handle pagination
@@ -474,7 +544,7 @@ class ReportsPro(commands.Cog):
 
             while True:
                 try:
-                    reaction, user = await self.bot.wait_for('reaction_add', timeout=60.0, check=check)
+                    reaction, user = await self.bot.wait_for('reaction_add', timeout=120.0, check=check)
 
                     if str(reaction.emoji) == "➡️" and current_page < len(embeds) - 1:
                         current_page += 1
@@ -524,11 +594,12 @@ class ReportsPro(commands.Cog):
     async def cleanup_reports(self, ctx):
         """Manually clean up old reports."""
         reports = await self.config.guild(ctx.guild).reports()
-        updated_reports = {k: v for k, v in reports.items() if self.is_recent(v.get('timestamp'))}
+        days = await self.config.guild(ctx.guild).auto_cleanup_days()
+        updated_reports = {k: v for k, v in reports.items() if self.is_recent(v.get('timestamp'), days)}
         await self.config.guild(ctx.guild).reports.set(updated_reports)
         embed = discord.Embed(
             title="Reports Cleaned",
-            description="Old reports have been cleaned up.",
+            description=f"Reports older than {days} days have been cleaned up.",
             color=discord.Color.green()
         )
         await ctx.send(embed=embed)
@@ -550,6 +621,8 @@ class ReportsPro(commands.Cog):
         total_reports = len(reports)
         reason_counts = Counter(report.get('reason', 'Unknown') for report in reports.values())
         most_common_reason = reason_counts.most_common(1)[0] if reason_counts else ("None", 0)
+        status_counts = Counter(report.get('status', 'Open') for report in reports.values())
+        user_report_counts = Counter(report.get('reported_user', 'Unknown') for report in reports.values())
 
         embed = discord.Embed(
             title="Report Statistics",
@@ -558,11 +631,13 @@ class ReportsPro(commands.Cog):
         embed.add_field(name="Total Reports", value=total_reports, inline=False)
         embed.add_field(name="Most Common Reason", value=f"{most_common_reason[0]} ({most_common_reason[1]} times)", inline=False)
         embed.add_field(name="Reason Breakdown", value="\n".join(f"{reason}: {count}" for reason, count in reason_counts.items()), inline=False)
+        embed.add_field(name="Status Breakdown", value="\n".join(f"{status}: {count}" for status, count in status_counts.items()), inline=False)
+        embed.add_field(name="Top Reported Users", value="\n".join(f"<@{user}>: {count}" for user, count in user_report_counts.most_common(5)), inline=False)
 
         await ctx.send(embed=embed)
 
-    def is_recent(self, timestamp):
-        """Check if a report is recent (within 30 days)."""
+    def is_recent(self, timestamp, days=30):
+        """Check if a report is recent (within N days)."""
         if not timestamp:
             return False
         try:
@@ -570,7 +645,7 @@ class ReportsPro(commands.Cog):
             # If timestamp is naive, assume UTC
             if report_time.tzinfo is None:
                 report_time = report_time.replace(tzinfo=timezone.utc)
-            return (datetime.now(timezone.utc) - report_time).days < 30
+            return (datetime.now(timezone.utc) - report_time).days < days
         except Exception:
             return False
 
@@ -665,8 +740,8 @@ class ReportsPro(commands.Cog):
                 emoji = await self.handle_reaction(message, emoji_meanings)
                 if emoji is None or emoji_meanings[emoji] == "Invalid":
                     embed = discord.Embed(
-                        title="Report Invalid",
-                        description="The report has been marked as invalid. No further action will be taken.",
+                        title="Report Marked as Invalid",
+                        description="This report has been reviewed and determined to be invalid. No further action will be taken at this time.",
                         color=discord.Color.orange()
                     )
                     await self.ctx.send(embed=embed)
@@ -677,7 +752,7 @@ class ReportsPro(commands.Cog):
 
                 # Final question to decide action
                 question = "What action should be taken against the reported user?"
-                emoji_meanings = {"⚠️": "Warning", "⏲️": "Timeout", "🔨": "Ban"}
+                emoji_meanings = {"⚠️": "Warning", "⏲️": "Timeout", "🔨": "Ban", "❌": "No Action"}
                 message = await self.ask_question(self.ctx, question, emoji_meanings)
                 emoji = await self.handle_reaction(message, emoji_meanings)
                 if emoji is None:
@@ -688,9 +763,24 @@ class ReportsPro(commands.Cog):
 
             async def finalize(self):
                 action = self.answers[2] if len(self.answers) > 2 else "No action"
+                # Update report status in config
+                reports = await self.ctx.cog.config.guild(self.ctx.guild).reports()
+                if self.report_id in reports:
+                    reports[self.report_id]["status"] = "Closed"
+                    reports[self.report_id]["action_taken"] = action
+                    reports[self.report_id]["handled_by"] = str(self.ctx.author.id)
+                    reports[self.report_id]["handled_at"] = datetime.now(timezone.utc).isoformat()
+                    await self.ctx.cog.config.guild(self.ctx.guild).reports.set(reports)
+
+                # Improved user communication for actions
                 if action == "Warning" and self.reported_user:
                     try:
-                        await self.reported_user.send("You have received a warning due to a report against you.")
+                        await self.reported_user.send(
+                            "Hello, this is a notice from the moderation team. "
+                            "You have received a warning following a review of a report submitted against you. "
+                            "Please review the server rules and ensure your future conduct aligns with our guidelines. "
+                            "If you have questions, you may contact the moderation team."
+                        )
                     except discord.Forbidden:
                         embed = discord.Embed(
                             title="Warning Error",
@@ -715,6 +805,13 @@ class ReportsPro(commands.Cog):
                             color=discord.Color.green()
                         )
                         await self.ctx.send(embed=embed)
+                        try:
+                            await self.reported_user.send(
+                                "You have been temporarily restricted from participating in the server for 24 hours following a review of a report. "
+                                "Please use this time to review the server rules. If you have questions, you may contact the moderation team."
+                            )
+                        except Exception:
+                            pass
                     except discord.Forbidden:
                         embed = discord.Embed(
                             title="Timeout Error",
@@ -734,10 +831,17 @@ class ReportsPro(commands.Cog):
                         await self.reported_user.ban(reason="Report handled and deemed valid.")
                         embed = discord.Embed(
                             title="User Banned",
-                            description=f"{self.reported_user.mention} has been banned.",
+                            description=f"{self.reported_user.mention} has been permanently removed from the server following a review of a report. This action was taken in accordance with our community guidelines.",
                             color=discord.Color.green()
                         )
                         await self.ctx.send(embed=embed)
+                        try:
+                            await self.reported_user.send(
+                                "You have been permanently removed (banned) from the server following a review of a report. "
+                                "This action was taken in accordance with our community guidelines."
+                            )
+                        except Exception:
+                            pass
                     except discord.Forbidden:
                         embed = discord.Embed(
                             title="Ban Error",
@@ -752,24 +856,45 @@ class ReportsPro(commands.Cog):
                             color=discord.Color.red()
                         )
                         await self.ctx.send(embed=embed)
+                elif action == "No Action":
+                    embed = discord.Embed(
+                        title="No action taken",
+                        description="No action was taken against the reported user.",
+                        color=discord.Color.orange()
+                    )
+                    await self.ctx.send(embed=embed)
 
+                # Improved language for reporter notification
                 if self.reporter:
                     try:
+                        if self.answers[1] == "Invalid":
+                            result_text = (
+                                f"Thank you for submitting your report (ID: `{self.report_id}`). "
+                                "After a thorough review, the moderation team has determined that the report does not violate our rules or guidelines, "
+                                "and no action will be taken. If you have further concerns, please feel free to reach out to the moderation team."
+                            )
+                        else:
+                            action_text = {
+                                "Warning": "The reported user has received a formal warning.",
+                                "Timeout": "The reported user has been temporarily restricted from the server for 24 hours.",
+                                "Ban": "The reported user has been permanently removed (banned) from the server.",
+                                "No Action": "No action was taken against the reported user."
+                            }.get(action, f"Action taken: {action}.")
+                            result_text = (
+                                f"Thank you for submitting your report (ID: `{self.report_id}`). "
+                                "Our moderation team has reviewed your report and determined it to be valid. "
+                                f"{action_text} If you have any questions or further concerns, please contact the moderation team."
+                            )
                         embed = discord.Embed(
                             title="Update on Your Report",
-                            description=(
-                                f"The report you submitted with ID `{self.report_id}` "
-                                f"has been reviewed by a staff member. After careful consideration, "
-                                f"the report was deemed {self.answers[1]}. As a result, the following "
-                                f"action has been taken against the reported user: {action}."
-                            ),
+                            description=result_text,
                             color=discord.Color.from_rgb(255, 255, 254)
                         )
                         await self.reporter.send(embed=embed)
                     except discord.Forbidden:
                         embed = discord.Embed(
                             title="Couldn't send report update",
-                            description="I couldn't send a DM to the reporter to update them on this report, you may need to reach out manually to the user if you're inclined.",
+                            description="I couldn't send a DM to the reporter to update them on this report. You may need to reach out manually to the user if you're inclined.",
                             color=discord.Color.red()
                         )
                         await self.ctx.send(embed=embed)
@@ -782,8 +907,8 @@ class ReportsPro(commands.Cog):
                         await self.ctx.send(embed=embed)
 
                 embed = discord.Embed(
-                    title="Report handled",
-                    description=f"Report {self.report_id} has been handled.\nAction: {action}.",
+                    title="Report Processed",
+                    description=f"Report `{self.report_id}` has been reviewed and closed. Action taken: {action}.",
                     color=0x2bbd8e
                 )
                 await self.ctx.send(embed=embed)
