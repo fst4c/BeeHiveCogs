@@ -339,6 +339,9 @@ class ReportsPro(commands.Cog):
                         "reported_message_id": str(message.id),
                         "reported_message_link": message.jump_url,
                         "reported_message_content": message.content,
+                        "action_taken": None,
+                        "handled_by": None,
+                        "handled_at": None,
                     }
                     await config.guild(interaction.guild).reports.set(reports)
                 except Exception as e:
@@ -430,6 +433,26 @@ class ReportsPro(commands.Cog):
                                 return
                             try:
                                 await user.ban(reason=f"Staff action via report {self.report_id}")
+                                # Update report status in config
+                                reports = await self.cog.config.guild(interaction.guild).reports()
+                                if self.report_id in reports:
+                                    reports[self.report_id]["status"] = "Closed"
+                                    reports[self.report_id]["action_taken"] = "Banned"
+                                    reports[self.report_id]["handled_by"] = str(interaction.user.id)
+                                    reports[self.report_id]["handled_at"] = datetime.now(timezone.utc).isoformat()
+                                    await self.cog.config.guild(interaction.guild).reports.set(reports)
+                                # Log embed
+                                log_embed = discord.Embed(
+                                    title="Report Closed: User Banned",
+                                    color=discord.Color.red(),
+                                    description=f"Report `{self.report_id}` has been closed. {user.mention} was **banned** by {interaction.user.mention}."
+                                )
+                                log_embed.add_field(name="Report ID", value=f"`{self.report_id}`", inline=True)
+                                log_embed.add_field(name="Action", value="Banned", inline=True)
+                                log_embed.add_field(name="Handled By", value=interaction.user.mention, inline=True)
+                                log_embed.add_field(name="Handled At", value=f"<t:{int(datetime.now(timezone.utc).timestamp())}:F>", inline=True)
+                                log_embed.add_field(name="Reported Message", value=f"[Jump to message]({self.message_link})", inline=False)
+                                await interaction.channel.send(embed=log_embed)
                                 await interaction.response.send_message(f"{user.mention} has been **banned**.", ephemeral=True)
                             except discord.Forbidden:
                                 await interaction.response.send_message("I do not have permission to ban this user.", ephemeral=True)
@@ -445,32 +468,101 @@ class ReportsPro(commands.Cog):
                                 return
                             try:
                                 await user.kick(reason=f"Staff action via report {self.report_id}")
+                                # Update report status in config
+                                reports = await self.cog.config.guild(interaction.guild).reports()
+                                if self.report_id in reports:
+                                    reports[self.report_id]["status"] = "Closed"
+                                    reports[self.report_id]["action_taken"] = "Kicked"
+                                    reports[self.report_id]["handled_by"] = str(interaction.user.id)
+                                    reports[self.report_id]["handled_at"] = datetime.now(timezone.utc).isoformat()
+                                    await self.cog.config.guild(interaction.guild).reports.set(reports)
+                                # Log embed
+                                log_embed = discord.Embed(
+                                    title="Report Closed: User Kicked",
+                                    color=discord.Color.orange(),
+                                    description=f"Report `{self.report_id}` has been closed. {user.mention} was **kicked** by {interaction.user.mention}."
+                                )
+                                log_embed.add_field(name="Report ID", value=f"`{self.report_id}`", inline=True)
+                                log_embed.add_field(name="Action", value="Kicked", inline=True)
+                                log_embed.add_field(name="Handled By", value=interaction.user.mention, inline=True)
+                                log_embed.add_field(name="Handled At", value=f"<t:{int(datetime.now(timezone.utc).timestamp())}:F>", inline=True)
+                                log_embed.add_field(name="Reported Message", value=f"[Jump to message]({self.message_link})", inline=False)
+                                await interaction.channel.send(embed=log_embed)
                                 await interaction.response.send_message(f"{user.mention} has been **kicked**.", ephemeral=True)
                             except discord.Forbidden:
                                 await interaction.response.send_message("I do not have permission to kick this user.", ephemeral=True)
                             except Exception as e:
                                 await interaction.response.send_message(f"Error kicking user: {e}", ephemeral=True)
 
-                        @discord.ui.button(label="Timeout 24h", style=discord.ButtonStyle.primary, emoji="⏲️")
+                        @discord.ui.button(label="Timeout", style=discord.ButtonStyle.primary, emoji="⏲️")
                         async def timeout_button(self, interaction: discord.Interaction, button: discord.ui.Button):
                             guild = interaction.guild
                             user = guild.get_member(int(self.reported_user_id))
                             if not user:
                                 await interaction.response.send_message("User not found in this server.", ephemeral=True)
                                 return
-                            try:
-                                # discord.py 2.x: timeout(duration=seconds)
-                                if hasattr(user, "timeout"):
-                                    await user.timeout(duration=86400)
-                                elif hasattr(user, "edit"):
-                                    await user.edit(timeout_until=datetime.now(timezone.utc) + timedelta(seconds=86400))
-                                else:
-                                    raise Exception("Timeout not supported on this bot version.")
-                                await interaction.response.send_message(f"{user.mention} has been **timed out for 24 hours**.", ephemeral=True)
-                            except discord.Forbidden:
-                                await interaction.response.send_message("I do not have permission to timeout this user.", ephemeral=True)
-                            except Exception as e:
-                                await interaction.response.send_message(f"Error timing out user: {e}", ephemeral=True)
+
+                            class TimeoutModal(discord.ui.Modal, title="Timeout User"):
+                                hours = discord.ui.TextInput(
+                                    label="Timeout duration (hours, up to 672):",
+                                    style=discord.TextStyle.short,
+                                    required=True,
+                                    max_length=4,
+                                    placeholder="e.g. 24"
+                                )
+
+                                def __init__(self):
+                                    super().__init__()
+
+                                async def on_submit(self, modal_interaction: discord.Interaction):
+                                    try:
+                                        hours_val = int(self.hours.value)
+                                        if hours_val < 1 or hours_val > 672:
+                                            await modal_interaction.response.send_message("Please enter a value between 1 and 672 hours (28 days).", ephemeral=True)
+                                            return
+                                    except Exception:
+                                        await modal_interaction.response.send_message("Invalid number of hours.", ephemeral=True)
+                                        return
+                                    try:
+                                        seconds = hours_val * 3600
+                                        if hasattr(user, "timeout"):
+                                            await user.timeout(duration=seconds)
+                                        elif hasattr(user, "edit"):
+                                            await user.edit(timeout_until=datetime.now(timezone.utc) + timedelta(seconds=seconds))
+                                        else:
+                                            raise Exception("Timeout not supported on this bot version.")
+                                        # Update report status in config
+                                        reports = await self.cog.config.guild(modal_interaction.guild).reports()
+                                        if self.report_id in reports:
+                                            reports[self.report_id]["status"] = "Closed"
+                                            reports[self.report_id]["action_taken"] = f"Timed out ({hours_val}h)"
+                                            reports[self.report_id]["handled_by"] = str(modal_interaction.user.id)
+                                            reports[self.report_id]["handled_at"] = datetime.now(timezone.utc).isoformat()
+                                            await self.cog.config.guild(modal_interaction.guild).reports.set(reports)
+                                        # Log embed
+                                        log_embed = discord.Embed(
+                                            title="Report Closed: User Timed Out",
+                                            color=discord.Color.blue(),
+                                            description=f"Report `{self.report_id}` has been closed. {user.mention} was **timed out for {hours_val} hours** by {modal_interaction.user.mention}."
+                                        )
+                                        log_embed.add_field(name="Report ID", value=f"`{self.report_id}`", inline=True)
+                                        log_embed.add_field(name="Action", value=f"Timed out ({hours_val}h)", inline=True)
+                                        log_embed.add_field(name="Handled By", value=modal_interaction.user.mention, inline=True)
+                                        log_embed.add_field(name="Handled At", value=f"<t:{int(datetime.now(timezone.utc).timestamp())}:F>", inline=True)
+                                        log_embed.add_field(name="Reported Message", value=f"[Jump to message]({self.message_link})", inline=False)
+                                        await modal_interaction.channel.send(embed=log_embed)
+                                        await modal_interaction.response.send_message(f"{user.mention} has been **timed out for {hours_val} hours**.", ephemeral=True)
+                                    except discord.Forbidden:
+                                        await modal_interaction.response.send_message("I do not have permission to timeout this user.", ephemeral=True)
+                                    except Exception as e:
+                                        await modal_interaction.response.send_message(f"Error timing out user: {e}", ephemeral=True)
+
+                            # Attach report_id/message_link to modal instance
+                            modal = TimeoutModal()
+                            modal.cog = self.cog
+                            modal.report_id = self.report_id
+                            modal.message_link = self.message_link
+                            await interaction.response.send_modal(modal)
 
                         @discord.ui.button(label="Dismiss", style=discord.ButtonStyle.secondary, emoji="❌")
                         async def dismiss_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -482,6 +574,18 @@ class ReportsPro(commands.Cog):
                                 reports[self.report_id]["handled_by"] = str(interaction.user.id)
                                 reports[self.report_id]["handled_at"] = datetime.now(timezone.utc).isoformat()
                                 await self.cog.config.guild(interaction.guild).reports.set(reports)
+                            # Log embed
+                            log_embed = discord.Embed(
+                                title="Report Closed: Dismissed",
+                                color=discord.Color.green(),
+                                description=f"Report `{self.report_id}` has been **dismissed** by {interaction.user.mention}."
+                            )
+                            log_embed.add_field(name="Report ID", value=f"`{self.report_id}`", inline=True)
+                            log_embed.add_field(name="Action", value="Dismissed", inline=True)
+                            log_embed.add_field(name="Handled By", value=interaction.user.mention, inline=True)
+                            log_embed.add_field(name="Handled At", value=f"<t:{int(datetime.now(timezone.utc).timestamp())}:F>", inline=True)
+                            log_embed.add_field(name="Reported Message", value=f"[Jump to message]({self.message_link})", inline=False)
+                            await interaction.channel.send(embed=log_embed)
                             await interaction.response.send_message("Report dismissed and marked as closed.", ephemeral=True)
 
                     try:
@@ -680,7 +784,32 @@ class ReportsPro(commands.Cog):
             reported_user = ctx.guild.get_member(int(report_info['reported_user'])) if report_info.get('reported_user') else None
             reporter = ctx.guild.get_member(int(report_info['reporter'])) if report_info.get('reporter') else None
 
-            embed = discord.Embed(title=f"Report {report_id}", color=discord.Color.from_rgb(255, 255, 254))
+            # Determine embed color and title based on status/action
+            status = report_info.get("status", "Open")
+            action_taken = report_info.get("action_taken", None)
+            handled_by = report_info.get("handled_by", None)
+            handled_at = report_info.get("handled_at", None)
+            if status.lower() == "closed":
+                if action_taken == "Banned":
+                    color = discord.Color.red()
+                    title = f"Report {report_id} (Closed: Banned)"
+                elif action_taken == "Kicked":
+                    color = discord.Color.orange()
+                    title = f"Report {report_id} (Closed: Kicked)"
+                elif action_taken and action_taken.startswith("Timed out"):
+                    color = discord.Color.blue()
+                    title = f"Report {report_id} (Closed: {action_taken})"
+                elif action_taken == "Dismissed":
+                    color = discord.Color.green()
+                    title = f"Report {report_id} (Closed: Dismissed)"
+                else:
+                    color = discord.Color.dark_grey()
+                    title = f"Report {report_id} (Closed)"
+            else:
+                color = discord.Color.from_rgb(255, 255, 254)
+                title = f"Report {report_id} (Open - Action Needed)"
+
+            embed = discord.Embed(title=title, color=color)
             embed.add_field(
                 name="Reported User",
                 value=reported_user.mention if reported_user else f"Unknown User ({report_info.get('reported_user', 'N/A')})",
@@ -711,7 +840,7 @@ class ReportsPro(commands.Cog):
             )
             embed.add_field(
                 name="Status",
-                value=report_info.get("status", "Open"),
+                value=status,
                 inline=False
             )
             if report_info.get("details"):
@@ -732,6 +861,35 @@ class ReportsPro(commands.Cog):
                     value=report_info["reported_message_content"][:1024],
                     inline=False
                 )
+            if status.lower() == "closed" and action_taken:
+                embed.add_field(
+                    name="Action Taken",
+                    value=action_taken,
+                    inline=True
+                )
+                if handled_by:
+                    try:
+                        mod = ctx.guild.get_member(int(handled_by))
+                        mod_mention = mod.mention if mod else f"<@{handled_by}>"
+                    except Exception:
+                        mod_mention = f"<@{handled_by}>"
+                    embed.add_field(
+                        name="Handled By",
+                        value=mod_mention,
+                        inline=True
+                    )
+                if handled_at:
+                    try:
+                        dt = datetime.fromisoformat(handled_at)
+                        unix_ts = int(dt.timestamp())
+                        handled_at_str = f"<t:{unix_ts}:F>"
+                    except Exception:
+                        handled_at_str = handled_at
+                    embed.add_field(
+                        name="Handled At",
+                        value=handled_at_str,
+                        inline=True
+                    )
             embeds.append(embed)
 
         # Function to handle pagination
@@ -762,6 +920,26 @@ class ReportsPro(commands.Cog):
                         return
                     try:
                         await user.ban(reason=f"Staff action via report {self.report_id}")
+                        # Update report status in config
+                        reports = await self.cog.config.guild(interaction.guild).reports()
+                        if self.report_id in reports:
+                            reports[self.report_id]["status"] = "Closed"
+                            reports[self.report_id]["action_taken"] = "Banned"
+                            reports[self.report_id]["handled_by"] = str(interaction.user.id)
+                            reports[self.report_id]["handled_at"] = datetime.now(timezone.utc).isoformat()
+                            await self.cog.config.guild(interaction.guild).reports.set(reports)
+                        # Log embed
+                        log_embed = discord.Embed(
+                            title="Report Closed: User Banned",
+                            color=discord.Color.red(),
+                            description=f"Report `{self.report_id}` has been closed. {user.mention} was **banned** by {interaction.user.mention}."
+                        )
+                        log_embed.add_field(name="Report ID", value=f"`{self.report_id}`", inline=True)
+                        log_embed.add_field(name="Action", value="Banned", inline=True)
+                        log_embed.add_field(name="Handled By", value=interaction.user.mention, inline=True)
+                        log_embed.add_field(name="Handled At", value=f"<t:{int(datetime.now(timezone.utc).timestamp())}:F>", inline=True)
+                        log_embed.add_field(name="Reported Message", value=f"[Jump to message]({self.message_link})", inline=False)
+                        await interaction.channel.send(embed=log_embed)
                         await interaction.response.send_message(f"{user.mention} has been **banned**.", ephemeral=True)
                     except discord.Forbidden:
                         await interaction.response.send_message("I do not have permission to ban this user.", ephemeral=True)
@@ -777,31 +955,101 @@ class ReportsPro(commands.Cog):
                         return
                     try:
                         await user.kick(reason=f"Staff action via report {self.report_id}")
+                        # Update report status in config
+                        reports = await self.cog.config.guild(interaction.guild).reports()
+                        if self.report_id in reports:
+                            reports[self.report_id]["status"] = "Closed"
+                            reports[self.report_id]["action_taken"] = "Kicked"
+                            reports[self.report_id]["handled_by"] = str(interaction.user.id)
+                            reports[self.report_id]["handled_at"] = datetime.now(timezone.utc).isoformat()
+                            await self.cog.config.guild(interaction.guild).reports.set(reports)
+                        # Log embed
+                        log_embed = discord.Embed(
+                            title="Report Closed: User Kicked",
+                            color=discord.Color.orange(),
+                            description=f"Report `{self.report_id}` has been closed. {user.mention} was **kicked** by {interaction.user.mention}."
+                        )
+                        log_embed.add_field(name="Report ID", value=f"`{self.report_id}`", inline=True)
+                        log_embed.add_field(name="Action", value="Kicked", inline=True)
+                        log_embed.add_field(name="Handled By", value=interaction.user.mention, inline=True)
+                        log_embed.add_field(name="Handled At", value=f"<t:{int(datetime.now(timezone.utc).timestamp())}:F>", inline=True)
+                        log_embed.add_field(name="Reported Message", value=f"[Jump to message]({self.message_link})", inline=False)
+                        await interaction.channel.send(embed=log_embed)
                         await interaction.response.send_message(f"{user.mention} has been **kicked**.", ephemeral=True)
                     except discord.Forbidden:
                         await interaction.response.send_message("I do not have permission to kick this user.", ephemeral=True)
                     except Exception as e:
                         await interaction.response.send_message(f"Error kicking user: {e}", ephemeral=True)
 
-                @discord.ui.button(label="Timeout 24h", style=discord.ButtonStyle.primary, emoji="⏲️")
+                @discord.ui.button(label="Timeout", style=discord.ButtonStyle.primary, emoji="⏲️")
                 async def timeout_button(self, interaction: discord.Interaction, button: discord.ui.Button):
                     guild = interaction.guild
                     user = guild.get_member(int(self.reported_user_id))
                     if not user:
                         await interaction.response.send_message("User not found in this server.", ephemeral=True)
                         return
-                    try:
-                        if hasattr(user, "timeout"):
-                            await user.timeout(duration=86400)
-                        elif hasattr(user, "edit"):
-                            await user.edit(timeout_until=datetime.now(timezone.utc) + timedelta(seconds=86400))
-                        else:
-                            raise Exception("Timeout not supported on this bot version.")
-                        await interaction.response.send_message(f"{user.mention} has been **timed out for 24 hours**.", ephemeral=True)
-                    except discord.Forbidden:
-                        await interaction.response.send_message("I do not have permission to timeout this user.", ephemeral=True)
-                    except Exception as e:
-                        await interaction.response.send_message(f"Error timing out user: {e}", ephemeral=True)
+
+                    class TimeoutModal(discord.ui.Modal, title="Timeout User"):
+                        hours = discord.ui.TextInput(
+                            label="Timeout duration (hours, up to 672):",
+                            style=discord.TextStyle.short,
+                            required=True,
+                            max_length=4,
+                            placeholder="e.g. 24"
+                        )
+
+                        def __init__(self):
+                            super().__init__()
+
+                        async def on_submit(self, modal_interaction: discord.Interaction):
+                            try:
+                                hours_val = int(self.hours.value)
+                                if hours_val < 1 or hours_val > 672:
+                                    await modal_interaction.response.send_message("Please enter a value between 1 and 672 hours (28 days).", ephemeral=True)
+                                    return
+                            except Exception:
+                                await modal_interaction.response.send_message("Invalid number of hours.", ephemeral=True)
+                                return
+                            try:
+                                seconds = hours_val * 3600
+                                if hasattr(user, "timeout"):
+                                    await user.timeout(duration=seconds)
+                                elif hasattr(user, "edit"):
+                                    await user.edit(timeout_until=datetime.now(timezone.utc) + timedelta(seconds=seconds))
+                                else:
+                                    raise Exception("Timeout not supported on this bot version.")
+                                # Update report status in config
+                                reports = await self.cog.config.guild(modal_interaction.guild).reports()
+                                if self.report_id in reports:
+                                    reports[self.report_id]["status"] = "Closed"
+                                    reports[self.report_id]["action_taken"] = f"Timed out ({hours_val}h)"
+                                    reports[self.report_id]["handled_by"] = str(modal_interaction.user.id)
+                                    reports[self.report_id]["handled_at"] = datetime.now(timezone.utc).isoformat()
+                                    await self.cog.config.guild(modal_interaction.guild).reports.set(reports)
+                                # Log embed
+                                log_embed = discord.Embed(
+                                    title="Report Closed: User Timed Out",
+                                    color=discord.Color.blue(),
+                                    description=f"Report `{self.report_id}` has been closed. {user.mention} was **timed out for {hours_val} hours** by {modal_interaction.user.mention}."
+                                )
+                                log_embed.add_field(name="Report ID", value=f"`{self.report_id}`", inline=True)
+                                log_embed.add_field(name="Action", value=f"Timed out ({hours_val}h)", inline=True)
+                                log_embed.add_field(name="Handled By", value=modal_interaction.user.mention, inline=True)
+                                log_embed.add_field(name="Handled At", value=f"<t:{int(datetime.now(timezone.utc).timestamp())}:F>", inline=True)
+                                log_embed.add_field(name="Reported Message", value=f"[Jump to message]({self.message_link})", inline=False)
+                                await modal_interaction.channel.send(embed=log_embed)
+                                await modal_interaction.response.send_message(f"{user.mention} has been **timed out for {hours_val} hours**.", ephemeral=True)
+                            except discord.Forbidden:
+                                await modal_interaction.response.send_message("I do not have permission to timeout this user.", ephemeral=True)
+                            except Exception as e:
+                                await modal_interaction.response.send_message(f"Error timing out user: {e}", ephemeral=True)
+
+                    # Attach report_id/message_link to modal instance
+                    modal = TimeoutModal()
+                    modal.cog = self.cog
+                    modal.report_id = self.report_id
+                    modal.message_link = self.message_link
+                    await interaction.response.send_modal(modal)
 
                 @discord.ui.button(label="Dismiss", style=discord.ButtonStyle.secondary, emoji="❌")
                 async def dismiss_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -812,6 +1060,18 @@ class ReportsPro(commands.Cog):
                         reports[self.report_id]["handled_by"] = str(interaction.user.id)
                         reports[self.report_id]["handled_at"] = datetime.now(timezone.utc).isoformat()
                         await self.cog.config.guild(interaction.guild).reports.set(reports)
+                    # Log embed
+                    log_embed = discord.Embed(
+                        title="Report Closed: Dismissed",
+                        color=discord.Color.green(),
+                        description=f"Report `{self.report_id}` has been **dismissed** by {interaction.user.mention}."
+                    )
+                    log_embed.add_field(name="Report ID", value=f"`{self.report_id}`", inline=True)
+                    log_embed.add_field(name="Action", value="Dismissed", inline=True)
+                    log_embed.add_field(name="Handled By", value=interaction.user.mention, inline=True)
+                    log_embed.add_field(name="Handled At", value=f"<t:{int(datetime.now(timezone.utc).timestamp())}:F>", inline=True)
+                    log_embed.add_field(name="Reported Message", value=f"[Jump to message]({self.message_link})", inline=False)
+                    await interaction.channel.send(embed=log_embed)
                     await interaction.response.send_message("Report dismissed and marked as closed.", ephemeral=True)
 
             # Send the first embed with buttons
@@ -944,5 +1204,3 @@ class ReportsPro(commands.Cog):
             return (datetime.now(timezone.utc) - report_time).days < days
         except Exception:
             return False
-
-    # The handle_report command and interactive handling system are removed in favor of staff action buttons on each report.
