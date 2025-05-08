@@ -187,11 +187,6 @@ class ReportsPro(commands.Cog):
             ("Other", "Any other reason not listed but reasonably applicable.")
         ]
 
-        # --- FIXED: Modal/Dropdown logic for report submission ---
-        # The main issue is that the Modal's on_submit is not properly chained to the dropdown's logic,
-        # and the staticmethod finish_report_static is not being called with the correct context.
-        # We'll refactor the dropdown and modal logic to ensure the report is submitted correctly.
-
         class ReportDropdown(discord.ui.Select):
             def __init__(self, config, interaction, member, reports_channel, capture_chat_history, message):
                 self.config = config
@@ -223,7 +218,6 @@ class ReportsPro(commands.Cog):
 
                 # If "Other", show a modal and handle submission
                 if selected_reason == "Other":
-                    # We need to pass all context to the modal so it can call finish_report after submission
                     parent_dropdown = self
 
                     class OtherModal(discord.ui.Modal, title="Additional Details"):
@@ -238,9 +232,7 @@ class ReportsPro(commands.Cog):
                             super().__init__()
 
                         async def on_submit(self, modal_interaction: discord.Interaction):
-                            # Call finish_report_static with the details from the modal
                             extra_details = self.details.value
-                            # Compose the description for "Other"
                             full_description = selected_description + f"\n\nUser details: {extra_details}"
                             await ReportDropdown.finish_report_static(
                                 modal_interaction,
@@ -285,6 +277,13 @@ class ReportsPro(commands.Cog):
                 interaction, self_ref, config, orig_interaction, member, reports_channel,
                 capture_chat_history, message, selected_reason, selected_description, extra_details
             ):
+                # Defer the interaction if possible, to ensure it always completes
+                try:
+                    if hasattr(interaction, "response") and not interaction.response.is_done():
+                        await interaction.response.defer(thinking=False, ephemeral=True)
+                except Exception:
+                    pass
+
                 # Generate a unique report ID
                 try:
                     reports = await config.guild(interaction.guild).reports()
@@ -295,7 +294,10 @@ class ReportsPro(commands.Cog):
                         color=discord.Color.red()
                     )
                     try:
-                        await interaction.response.send_message(embed=embed, ephemeral=True)
+                        if hasattr(interaction, "followup"):
+                            await interaction.followup.send(embed=embed, ephemeral=True)
+                        elif hasattr(interaction, "response") and not interaction.response.is_done():
+                            await interaction.response.send_message(embed=embed, ephemeral=True)
                     except Exception:
                         pass
                     return
@@ -312,7 +314,10 @@ class ReportsPro(commands.Cog):
                         color=discord.Color.red()
                     )
                     try:
-                        await interaction.response.send_message(embed=embed, ephemeral=True)
+                        if hasattr(interaction, "followup"):
+                            await interaction.followup.send(embed=embed, ephemeral=True)
+                        elif hasattr(interaction, "response") and not interaction.response.is_done():
+                            await interaction.response.send_message(embed=embed, ephemeral=True)
                     except Exception:
                         pass
                     return
@@ -339,7 +344,10 @@ class ReportsPro(commands.Cog):
                         color=discord.Color.red()
                     )
                     try:
-                        await interaction.response.send_message(embed=embed, ephemeral=True)
+                        if hasattr(interaction, "followup"):
+                            await interaction.followup.send(embed=embed, ephemeral=True)
+                        elif hasattr(interaction, "response") and not interaction.response.is_done():
+                            await interaction.response.send_message(embed=embed, ephemeral=True)
                     except Exception:
                         pass
                     return
@@ -354,7 +362,10 @@ class ReportsPro(commands.Cog):
                         color=discord.Color.red()
                     )
                     try:
-                        await interaction.response.send_message(embed=embed, ephemeral=True)
+                        if hasattr(interaction, "followup"):
+                            await interaction.followup.send(embed=embed, ephemeral=True)
+                        elif hasattr(interaction, "response") and not interaction.response.is_done():
+                            await interaction.response.send_message(embed=embed, ephemeral=True)
                     except Exception:
                         pass
                     return
@@ -401,7 +412,10 @@ class ReportsPro(commands.Cog):
                             color=discord.Color.red()
                         )
                         try:
-                            await interaction.response.send_message(embed=embed, ephemeral=True)
+                            if hasattr(interaction, "followup"):
+                                await interaction.followup.send(embed=embed, ephemeral=True)
+                            elif hasattr(interaction, "response") and not interaction.response.is_done():
+                                await interaction.response.send_message(embed=embed, ephemeral=True)
                         except Exception:
                             pass
                         return
@@ -412,7 +426,10 @@ class ReportsPro(commands.Cog):
                             color=discord.Color.red()
                         )
                         try:
-                            await interaction.response.send_message(embed=embed, ephemeral=True)
+                            if hasattr(interaction, "followup"):
+                                await interaction.followup.send(embed=embed, ephemeral=True)
+                            elif hasattr(interaction, "response") and not interaction.response.is_done():
+                                await interaction.response.send_message(embed=embed, ephemeral=True)
                         except Exception:
                             pass
                         return
@@ -423,7 +440,10 @@ class ReportsPro(commands.Cog):
                         color=discord.Color.red()
                     )
                     try:
-                        await interaction.response.send_message(embed=embed, ephemeral=True)
+                        if hasattr(interaction, "followup"):
+                            await interaction.followup.send(embed=embed, ephemeral=True)
+                        elif hasattr(interaction, "response") and not interaction.response.is_done():
+                            await interaction.response.send_message(embed=embed, ephemeral=True)
                     except Exception:
                         pass
                     return
@@ -433,17 +453,13 @@ class ReportsPro(commands.Cog):
                     description="Your report has been submitted. Thank you for helping to keep this community safe. Our moderators will review your report as soon as possible.",
                     color=0x2bbd8e
                 )
-                # --- PATCH: Always complete the interaction to avoid "This interaction failed" ---
+                # Always complete the interaction to avoid "This interaction failed"
                 try:
-                    # Try to edit the original ephemeral message if possible
-                    if hasattr(interaction, "response") and hasattr(interaction.response, "is_done") and interaction.response.is_done():
+                    # Try to send a followup message (since we deferred above)
+                    if hasattr(interaction, "followup"):
                         await interaction.followup.send(embed=thank_you_embed, ephemeral=True)
-                    else:
-                        try:
-                            await interaction.response.edit_message(embed=thank_you_embed, view=None)
-                        except Exception:
-                            # If edit_message fails (e.g. not the original message), just send a followup
-                            await interaction.followup.send(embed=thank_you_embed, ephemeral=True)
+                    elif hasattr(interaction, "response") and not interaction.response.is_done():
+                        await interaction.response.send_message(embed=thank_you_embed, ephemeral=True)
                 except Exception:
                     # As a last resort, just acknowledge the interaction in some way
                     try:
