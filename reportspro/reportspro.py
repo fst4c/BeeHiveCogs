@@ -54,9 +54,9 @@ class ReportsPro(commands.Cog):
         """Set the channel where reports will be sent."""
         await self.config.guild(ctx.guild).reports_channel.set(channel.id)
         embed = discord.Embed(
-            title="Reports Channel Set",
-            description=f"The reports will now be sent to {channel.mention}.",
-            color=discord.Color.green()
+            title="Reports channel set",
+            description=f"Aubmitted reports will now be sent to {channel.mention}.",
+            color=0x2bbd8e
         )
         await ctx.send(embed=embed)
 
@@ -69,17 +69,17 @@ class ReportsPro(commands.Cog):
         if role is None:
             await self.config.guild(ctx.guild).mention_role.set(None)
             embed = discord.Embed(
-                title="Role cleaeed",
+                title="Role cleared",
                 description="The mention role for new reports has been cleared.",
-                color=discord.Color.green()
+                color=0x2bbd8e
             )
             await ctx.send(embed=embed)
         else:
             await self.config.guild(ctx.guild).mention_role.set(role.id)
             embed = discord.Embed(
-                title="Mention Role Set",
+                title="Mention role set",
                 description=f"The role {role.mention} will be notified for new reports.",
-                color=discord.Color.green()
+                color=0x2bbd8e
             )
             await ctx.send(embed=embed)
 
