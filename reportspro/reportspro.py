@@ -433,15 +433,22 @@ class ReportsPro(commands.Cog):
                     description="Your report has been submitted. Thank you for helping to keep this community safe. Our moderators will review your report as soon as possible.",
                     color=0x2bbd8e
                 )
+                # --- PATCH: Always complete the interaction to avoid "This interaction failed" ---
                 try:
                     # Try to edit the original ephemeral message if possible
-                    if interaction.response.is_done():
+                    if hasattr(interaction, "response") and hasattr(interaction.response, "is_done") and interaction.response.is_done():
                         await interaction.followup.send(embed=thank_you_embed, ephemeral=True)
                     else:
-                        await interaction.response.edit_message(embed=thank_you_embed, view=None)
+                        try:
+                            await interaction.response.edit_message(embed=thank_you_embed, view=None)
+                        except Exception:
+                            # If edit_message fails (e.g. not the original message), just send a followup
+                            await interaction.followup.send(embed=thank_you_embed, ephemeral=True)
                 except Exception:
+                    # As a last resort, just acknowledge the interaction in some way
                     try:
-                        await interaction.followup.send(embed=thank_you_embed, ephemeral=True)
+                        if hasattr(interaction, "response") and not interaction.response.is_done():
+                            await interaction.response.send_message(embed=thank_you_embed, ephemeral=True)
                     except Exception:
                         pass
 
@@ -452,7 +459,8 @@ class ReportsPro(commands.Cog):
                     for item in self_ref.view.children:
                         item.disabled = True
                     try:
-                        await interaction.message.edit(view=self_ref.view)
+                        if hasattr(interaction, "message") and interaction.message:
+                            await interaction.message.edit(view=self_ref.view)
                     except Exception:
                         pass
 
