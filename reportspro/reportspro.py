@@ -40,15 +40,27 @@ class ReportsPro(commands.Cog):
         await ctx.send(embed=embed)
 
     @reportset.command(name="mention")
-    async def set_mention_role(self, ctx, role: discord.Role):
-        """Set the role to be mentioned when new reports are sent."""
-        await self.config.guild(ctx.guild).mention_role.set(role.id)
-        embed = discord.Embed(
-            title="Mention Role Set",
-            description=f"The role {role.mention} will be notified for new reports.",
-            color=discord.Color.green()
-        )
-        await ctx.send(embed=embed)
+    async def set_mention_role(self, ctx, role: discord.Role = None):
+        """
+        Set the role to be mentioned when new reports are sent.
+        If no role is provided, the mention role will be cleared.
+        """
+        if role is None:
+            await self.config.guild(ctx.guild).mention_role.set(None)
+            embed = discord.Embed(
+                title="Mention Role Cleared",
+                description="The mention role for new reports has been cleared.",
+                color=discord.Color.green()
+            )
+            await ctx.send(embed=embed)
+        else:
+            await self.config.guild(ctx.guild).mention_role.set(role.id)
+            embed = discord.Embed(
+                title="Mention Role Set",
+                description=f"The role {role.mention} will be notified for new reports.",
+                color=discord.Color.green()
+            )
+            await ctx.send(embed=embed)
 
     @reportset.command(name="view")
     async def view_settings(self, ctx):
