@@ -187,7 +187,11 @@ class ReportsPro(commands.Cog):
             ("Other", "Any other reason not listed but reasonably applicable.")
         ]
 
-        # Create a dropdown menu for report reasons
+        # --- FIXED: Modal/Dropdown logic for report submission ---
+        # The main issue is that the Modal's on_submit is not properly chained to the dropdown's logic,
+        # and the staticmethod finish_report_static is not being called with the correct context.
+        # We'll refactor the dropdown and modal logic to ensure the report is submitted correctly.
+
         class ReportDropdown(discord.ui.Select):
             def __init__(self, config, interaction, member, reports_channel, capture_chat_history, message):
                 self.config = config
@@ -217,9 +221,11 @@ class ReportsPro(commands.Cog):
                 selected_reason = self.values[0]
                 selected_description = next(description for reason, description in report_reasons if reason == selected_reason)
 
-                # Ask for additional details if "Other" is selected
-                extra_details = ""
+                # If "Other", show a modal and handle submission
                 if selected_reason == "Other":
+                    # We need to pass all context to the modal so it can call finish_report after submission
+                    parent_dropdown = self
+
                     class OtherModal(discord.ui.Modal, title="Additional Details"):
                         details = discord.ui.TextInput(
                             label="Please describe the reason for your report:",
@@ -228,30 +234,50 @@ class ReportsPro(commands.Cog):
                             max_length=500,
                         )
 
-                        async def on_submit(self, modal_interaction: discord.Interaction):
-                            nonlocal extra_details, selected_description
-                            extra_details = self.details.value
-                            selected_description += f"\n\nUser details: {extra_details}"
-                            await self.finish_report(modal_interaction)
+                        def __init__(self):
+                            super().__init__()
 
-                        async def finish_report(self, modal_interaction):
+                        async def on_submit(self, modal_interaction: discord.Interaction):
+                            # Call finish_report_static with the details from the modal
+                            extra_details = self.details.value
+                            # Compose the description for "Other"
+                            full_description = selected_description + f"\n\nUser details: {extra_details}"
                             await ReportDropdown.finish_report_static(
-                                modal_interaction, self, self.config, self.interaction, self.member, self.reports_channel,
-                                self.capture_chat_history, self.message, selected_reason, selected_description, extra_details
+                                modal_interaction,
+                                parent_dropdown,
+                                parent_dropdown.config,
+                                parent_dropdown.interaction,
+                                parent_dropdown.member,
+                                parent_dropdown.reports_channel,
+                                parent_dropdown.capture_chat_history,
+                                parent_dropdown.message,
+                                selected_reason,
+                                full_description,
+                                extra_details
                             )
 
                     modal = OtherModal()
                     await interaction.response.send_modal(modal)
                     return
 
-                # If not "Other", finish the report
+                # If not "Other", finish the report directly
                 await self.finish_report(interaction)
 
             async def finish_report(self, interaction):
+                selected_reason = self.values[0]
+                selected_description = next(description for reason, description in report_reasons if reason == selected_reason)
                 await ReportDropdown.finish_report_static(
-                    interaction, self, self.config, self.interaction, self.member, self.reports_channel,
-                    self.capture_chat_history, self.message, self.values[0],
-                    next(description for reason, description in report_reasons if reason == self.values[0]), ""
+                    interaction,
+                    self,
+                    self.config,
+                    self.interaction,
+                    self.member,
+                    self.reports_channel,
+                    self.capture_chat_history,
+                    self.message,
+                    selected_reason,
+                    selected_description,
+                    ""
                 )
 
             @staticmethod
@@ -260,7 +286,20 @@ class ReportsPro(commands.Cog):
                 capture_chat_history, message, selected_reason, selected_description, extra_details
             ):
                 # Generate a unique report ID
-                reports = await config.guild(interaction.guild).reports()
+                try:
+                    reports = await config.guild(interaction.guild).reports()
+                except Exception as e:
+                    embed = discord.Embed(
+                        title="Error",
+                        description=f"Could not access reports config: {e}",
+                        color=discord.Color.red()
+                    )
+                    try:
+                        await interaction.response.send_message(embed=embed, ephemeral=True)
+                    except Exception:
+                        pass
+                    return
+
                 report_id = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
                 attempts = 0
                 while report_id in reports and attempts < 10000:
@@ -273,12 +312,9 @@ class ReportsPro(commands.Cog):
                         color=discord.Color.red()
                     )
                     try:
-                        await interaction.response.edit_message(embed=embed, view=None)
+                        await interaction.response.send_message(embed=embed, ephemeral=True)
                     except Exception:
-                        try:
-                            await interaction.followup.send(embed=embed, ephemeral=True)
-                        except Exception:
-                            pass
+                        pass
                     return
 
                 # Store the report in the config
@@ -303,12 +339,9 @@ class ReportsPro(commands.Cog):
                         color=discord.Color.red()
                     )
                     try:
-                        await interaction.response.edit_message(embed=embed, view=None)
+                        await interaction.response.send_message(embed=embed, ephemeral=True)
                     except Exception:
-                        try:
-                            await interaction.followup.send(embed=embed, ephemeral=True)
-                        except Exception:
-                            pass
+                        pass
                     return
 
                 # Capture chat history
@@ -321,12 +354,9 @@ class ReportsPro(commands.Cog):
                         color=discord.Color.red()
                     )
                     try:
-                        await interaction.response.edit_message(embed=embed, view=None)
+                        await interaction.response.send_message(embed=embed, ephemeral=True)
                     except Exception:
-                        try:
-                            await interaction.followup.send(embed=embed, ephemeral=True)
-                        except Exception:
-                            pass
+                        pass
                     return
 
                 # Count existing reports against the user by reason
@@ -371,12 +401,9 @@ class ReportsPro(commands.Cog):
                             color=discord.Color.red()
                         )
                         try:
-                            await interaction.response.edit_message(embed=embed, view=None)
+                            await interaction.response.send_message(embed=embed, ephemeral=True)
                         except Exception:
-                            try:
-                                await interaction.followup.send(embed=embed, ephemeral=True)
-                            except Exception:
-                                pass
+                            pass
                         return
                     except Exception as e:
                         embed = discord.Embed(
@@ -385,12 +412,9 @@ class ReportsPro(commands.Cog):
                             color=discord.Color.red()
                         )
                         try:
-                            await interaction.response.edit_message(embed=embed, view=None)
+                            await interaction.response.send_message(embed=embed, ephemeral=True)
                         except Exception:
-                            try:
-                                await interaction.followup.send(embed=embed, ephemeral=True)
-                            except Exception:
-                                pass
+                            pass
                         return
                 else:
                     embed = discord.Embed(
@@ -399,12 +423,9 @@ class ReportsPro(commands.Cog):
                         color=discord.Color.red()
                     )
                     try:
-                        await interaction.response.edit_message(embed=embed, view=None)
+                        await interaction.response.send_message(embed=embed, ephemeral=True)
                     except Exception:
-                        try:
-                            await interaction.followup.send(embed=embed, ephemeral=True)
-                        except Exception:
-                            pass
+                        pass
                     return
 
                 # Update the original ephemeral message with the thank you message and remove the view
@@ -413,20 +434,16 @@ class ReportsPro(commands.Cog):
                     color=0x2bbd8e
                 )
                 try:
-                    await interaction.response.edit_message(embed=thank_you_embed, view=None)
-                except discord.InteractionResponded:
+                    # Try to edit the original ephemeral message if possible
+                    if interaction.response.is_done():
+                        await interaction.followup.send(embed=thank_you_embed, ephemeral=True)
+                    else:
+                        await interaction.response.edit_message(embed=thank_you_embed, view=None)
+                except Exception:
                     try:
                         await interaction.followup.send(embed=thank_you_embed, ephemeral=True)
                     except Exception:
                         pass
-                except Exception:
-                    try:
-                        await interaction.edit_original_response(embed=thank_you_embed, view=None)
-                    except Exception:
-                        try:
-                            await interaction.followup.send(embed=thank_you_embed, ephemeral=True)
-                        except Exception:
-                            pass
 
                 # Disable the dropdown after use to prevent "This interaction failed"
                 if hasattr(self_ref, "disabled"):
