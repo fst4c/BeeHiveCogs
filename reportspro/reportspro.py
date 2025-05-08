@@ -1,5 +1,6 @@
 from redbot.core import commands, Config, checks
 import discord
+from discord import app_commands
 from datetime import datetime, timezone, timedelta
 import os
 import tempfile
@@ -22,6 +23,22 @@ class ReportsPro(commands.Cog):
             "auto_cleanup_enabled": False,
         }
         self.config.register_guild(**default_guild)
+        # Register the context menu
+        self.report_sender_context = app_commands.ContextMenu(
+            name="Report sender", callback=self.report_sender_context_menu
+        )
+        try:
+            self.bot.tree.add_command(self.report_sender_context)
+        except Exception:
+            # In case the tree is not ready yet, will be added in cog_load
+            pass
+
+    async def cog_load(self):
+        # Ensure context menu is registered on cog load
+        try:
+            self.bot.tree.add_command(self.report_sender_context)
+        except Exception:
+            pass
 
     # --- Settings Commands ---
 
@@ -112,13 +129,14 @@ class ReportsPro(commands.Cog):
 
     # --- Reporting Context Menu Command ---
 
-    @commands.guild_only()
-    @commands.message_command(name="Report sender")
-    async def report_sender_context(self, interaction: discord.Interaction, message: discord.Message):
-        """Context menu: Report sender of a message."""
-        ctx = await commands.Context.from_interaction(interaction)
-        member = message.author
+    async def report_sender_context_menu(self, interaction: discord.Interaction, message: discord.Message):
+        """Context menu to report the sender of a message."""
+        guild = interaction.guild
+        if not guild:
+            await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+            return
 
+        member = message.author
         if member == interaction.user:
             embed = discord.Embed(
                 title="Error",
@@ -128,7 +146,7 @@ class ReportsPro(commands.Cog):
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
-        reports_channel_id = await self.config.guild(interaction.guild).reports_channel()
+        reports_channel_id = await self.config.guild(guild).reports_channel()
         if not reports_channel_id:
             embed = discord.Embed(
                 title="Error",
@@ -138,7 +156,7 @@ class ReportsPro(commands.Cog):
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
-        reports_channel = interaction.guild.get_channel(reports_channel_id)
+        reports_channel = guild.get_channel(reports_channel_id)
         if not reports_channel:
             embed = discord.Embed(
                 title="Error",
@@ -150,11 +168,10 @@ class ReportsPro(commands.Cog):
 
         # Create an embed with report types
         report_embed = discord.Embed(
-            title=f"Report a User to the Moderators of {interaction.guild.name}",
+            title=f"Report a User to the Moderators of {guild.name}",
             color=discord.Color.from_rgb(255, 69, 69),
             description=f"**You're reporting {member.mention} ({member.id})**\n\n"
-                        f"Please choose a reason for the report from the dropdown below.\n\n"
-                        f"**Message:**\n{message.content[:4000]}"
+                        f"Please choose a reason for the report from the dropdown below."
         )
 
         # Define report reasons with descriptions and emojis
@@ -203,22 +220,47 @@ class ReportsPro(commands.Cog):
                 # Ask for additional details if "Other" is selected
                 extra_details = ""
                 if selected_reason == "Other":
-                    modal = discord.ui.Modal(title="Additional Details")
-                    modal.add_item(discord.ui.InputText(label="Please describe the reason for your report:", style=discord.InputTextStyle.long, required=True))
-                    try:
-                        await interaction.response.send_modal(modal)
-                        modal_interaction = await self.interaction.client.wait_for(
-                            "modal_submit",
-                            check=lambda i: i.user.id == self.allowed_user_id and i.message.id == interaction.message.id,
-                            timeout=120
+                    class OtherModal(discord.ui.Modal, title="Additional Details"):
+                        details = discord.ui.TextInput(
+                            label="Please describe the reason for your report:",
+                            style=discord.TextStyle.long,
+                            required=True,
+                            max_length=500,
                         )
-                        extra_details = modal_interaction.data["components"][0]["components"][0]["value"]
-                        selected_description += f"\n\nUser details: {extra_details}"
-                    except Exception:
-                        selected_description += "\n\n(No extra details provided.)"
 
+                        async def on_submit(self, modal_interaction: discord.Interaction):
+                            nonlocal extra_details, selected_description
+                            extra_details = self.details.value
+                            selected_description += f"\n\nUser details: {extra_details}"
+                            await self.finish_report(modal_interaction)
+
+                        async def finish_report(self, modal_interaction):
+                            await ReportDropdown.finish_report_static(
+                                modal_interaction, self, self.config, self.interaction, self.member, self.reports_channel,
+                                self.capture_chat_history, self.message, selected_reason, selected_description, extra_details
+                            )
+
+                    modal = OtherModal()
+                    await interaction.response.send_modal(modal)
+                    return
+
+                # If not "Other", finish the report
+                await self.finish_report(interaction)
+
+            async def finish_report(self, interaction):
+                await ReportDropdown.finish_report_static(
+                    interaction, self, self.config, self.interaction, self.member, self.reports_channel,
+                    self.capture_chat_history, self.message, self.values[0],
+                    next(description for reason, description in report_reasons if reason == self.values[0]), ""
+                )
+
+            @staticmethod
+            async def finish_report_static(
+                interaction, self_ref, config, orig_interaction, member, reports_channel,
+                capture_chat_history, message, selected_reason, selected_description, extra_details
+            ):
                 # Generate a unique report ID
-                reports = await self.config.guild(self.interaction.guild).reports()
+                reports = await config.guild(interaction.guild).reports()
                 report_id = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
                 attempts = 0
                 while report_id in reports and attempts < 10000:
@@ -242,18 +284,18 @@ class ReportsPro(commands.Cog):
                 # Store the report in the config
                 try:
                     reports[report_id] = {
-                        "reported_user": str(self.member.id),
-                        "reporter": str(self.interaction.user.id),
+                        "reported_user": str(member.id),
+                        "reporter": str(orig_interaction.user.id),
                         "reason": selected_reason,
                         "description": selected_description,
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                         "status": "Open",
                         "details": extra_details,
-                        "reported_message_id": str(self.message.id),
-                        "reported_message_content": self.message.content[:4000],
-                        "reported_message_link": self.message.jump_url,
+                        "reported_message_id": str(message.id),
+                        "reported_message_link": message.jump_url,
+                        "reported_message_content": message.content,
                     }
-                    await self.config.guild(self.interaction.guild).reports.set(reports)
+                    await config.guild(interaction.guild).reports.set(reports)
                 except Exception as e:
                     embed = discord.Embed(
                         title="Error",
@@ -271,7 +313,7 @@ class ReportsPro(commands.Cog):
 
                 # Capture chat history
                 try:
-                    chat_history = await self.capture_chat_history(self.interaction.guild, self.member)
+                    chat_history = await capture_chat_history(interaction.guild, member)
                 except Exception as e:
                     embed = discord.Embed(
                         title="Error",
@@ -288,39 +330,39 @@ class ReportsPro(commands.Cog):
                     return
 
                 # Count existing reports against the user by reason
-                reason_counts = Counter(report['reason'] for report in reports.values() if report['reported_user'] == str(self.member.id))
+                reason_counts = Counter(report['reason'] for report in reports.values() if report['reported_user'] == str(member.id))
 
                 # Send the report to the reports channel
-                if self.reports_channel:
+                if reports_channel:
                     report_message = discord.Embed(
                         title="A new report was filed",
                         color=0xff4545
                     )
                     report_message.add_field(name="Report ID", value=f"```{report_id}```", inline=False)
-                    report_message.add_field(name="Offender", value=f"{self.member.mention}", inline=True)
-                    report_message.add_field(name="Offender ID", value=f"`{self.member.id}`", inline=True)
+                    report_message.add_field(name="Offender", value=f"{member.mention}", inline=True)
+                    report_message.add_field(name="Offender ID", value=f"`{member.id}`", inline=True)
                     report_message.add_field(name="Date", value=f"<t:{int(datetime.now(timezone.utc).timestamp())}:D>", inline=True)
-                    report_message.add_field(name="Reporter", value=self.interaction.user.mention, inline=True)
-                    report_message.add_field(name="Reporter ID", value=f"`{self.interaction.user.id}`", inline=True)
+                    report_message.add_field(name="Reporter", value=orig_interaction.user.mention, inline=True)
+                    report_message.add_field(name="Reporter ID", value=f"`{orig_interaction.user.id}`", inline=True)
                     report_message.add_field(name="Time", value=f"<t:{int(datetime.now(timezone.utc).timestamp())}:R>", inline=True)
                     report_message.add_field(name="Reason", value=f"**{selected_reason}**\n*{selected_description}*", inline=False)
-                    report_message.add_field(name="Reported Message", value=f"[Jump to message]({self.message.jump_url})", inline=False)
-                    if self.message.content:
-                        report_message.add_field(name="Message Content", value=self.message.content[:1024], inline=False)
+                    report_message.add_field(name="Reported Message", value=f"[Jump to message]({message.jump_url})", inline=False)
+                    if message.content:
+                        report_message.add_field(name="Message Content", value=message.content[:1024], inline=False)
 
                     # Add a summary of existing report counts by reason
                     if reason_counts:
                         summary = "\n".join(f"**{reason}** x**{count}**" for reason, count in reason_counts.items())
                         report_message.add_field(name="Previous reports", value=summary, inline=False)
 
-                    mention_role_id = await self.config.guild(self.interaction.guild).mention_role()
-                    mention_role = self.interaction.guild.get_role(mention_role_id) if mention_role_id else None
+                    mention_role_id = await config.guild(interaction.guild).mention_role()
+                    mention_role = interaction.guild.get_role(mention_role_id) if mention_role_id else None
                     mention_text = mention_role.mention if mention_role else ""
 
                     try:
-                        await self.reports_channel.send(content=mention_text, embed=report_message, allowed_mentions=discord.AllowedMentions(roles=True))
+                        await reports_channel.send(content=mention_text, embed=report_message, allowed_mentions=discord.AllowedMentions(roles=True))
                         if chat_history:
-                            await self.reports_channel.send(file=discord.File(chat_history, filename=f"{self.member.id}_chat_history.txt"))
+                            await reports_channel.send(file=discord.File(chat_history, filename=f"{member.id}_chat_history.txt"))
                             os.remove(chat_history)  # Clean up the file after sending
                     except discord.Forbidden:
                         embed = discord.Embed(
@@ -387,12 +429,13 @@ class ReportsPro(commands.Cog):
                             pass
 
                 # Disable the dropdown after use to prevent "This interaction failed"
-                self.disabled = True
-                if self.view:
-                    for item in self.view.children:
+                if hasattr(self_ref, "disabled"):
+                    self_ref.disabled = True
+                if hasattr(self_ref, "view") and self_ref.view:
+                    for item in self_ref.view.children:
                         item.disabled = True
                     try:
-                        await interaction.message.edit(view=self.view)
+                        await interaction.message.edit(view=self_ref.view)
                     except Exception:
                         pass
 
