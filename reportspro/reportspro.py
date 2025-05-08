@@ -55,7 +55,7 @@ class ReportsPro(commands.Cog):
         await self.config.guild(ctx.guild).reports_channel.set(channel.id)
         embed = discord.Embed(
             title="Reports channel set",
-            description=f"Aubmitted reports will now be sent to {channel.mention}.",
+            description=f"Submitted reports will now be sent to {channel.mention}.",
             color=0x2bbd8e
         )
         await ctx.send(embed=embed)
