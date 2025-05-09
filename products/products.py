@@ -503,8 +503,8 @@ class Products(commands.Cog):
             await ctx.send(f"Failed to update the role color: {e}")
 
     @commands.has_permissions(manage_roles=True)
-    @commands.command(name="removerole", description="Remove a role from a user.")
-    async def removerole(self, ctx: commands.Context, member: discord.Member, role: discord.Role):
+    @commands.command(name="dellrole", description="Remove a role from a user.")
+    async def dellrole(self, ctx: commands.Context, member: discord.Member, role: discord.Role):
         """
         Remove a role from a user.
         """
