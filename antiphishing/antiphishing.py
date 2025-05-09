@@ -378,6 +378,12 @@ class AntiPhishing(commands.Cog):
 
         if action == "notify":
             if message.channel.permissions_for(message.guild.me).send_messages:
+                # Prevent double notification: only send notification if this is the original message, not an edit
+                # We'll use a custom attribute to mark the message as already notified
+                # This attribute is not persisted, but will prevent double notification in the same process
+                if getattr(message, "_antiphishing_notified", False):
+                    return
+                setattr(message, "_antiphishing_notified", True)
                 with contextlib.suppress(discord.NotFound):
                     mod_roles = await self.bot.get_mod_roles(message.guild)
                     mod_mentions = " ".join(role.mention for role in mod_roles) if mod_roles else ""
@@ -480,10 +486,15 @@ class AntiPhishing(commands.Cog):
         if await self.bot.cog_disabled_in_guild(self, after.guild):
             return
 
+        # Prevent double notification: only process if the message hasn't already been handled
+        if getattr(after, "_antiphishing_notified", False):
+            return
+
         links = self.get_links(after.content)
         if not links:
             return
 
+        # Only handle the first malicious link per message to avoid double alerts
         for url in links:
             domains_to_check = await self.follow_redirects(url)
             for domain_url in domains_to_check:
@@ -503,17 +514,22 @@ class AntiPhishing(commands.Cog):
         if await self.bot.cog_disabled_in_guild(self, message.guild):
             return
 
+        # Prevent double notification: only process if the message hasn't already been handled
+        if getattr(message, "_antiphishing_notified", False):
+            return
+
         links = self.get_links(message.content)
         if not links:
             return
 
+        # Only handle the first malicious link per message to avoid double alerts
         for url in links:
             domains_to_check = await self.follow_redirects(url)
             for domain_url in domains_to_check:
                 domain = urlparse(domain_url).netloc
                 if domain in self.domains:
                     await self.handle_phishing(message, domain, domains_to_check)
-                    # return  # Removed premature return to handle all links
+                    return  # Stop after first malicious link to avoid double notification
 
 
 
