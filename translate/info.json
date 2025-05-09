@@ -1,0 +1,13 @@
+{
+    "author": ["adminelevation"],
+    "min_bot_version": "3.5.0",
+    "min_python_version": [3,9,0],
+    "description": "Translate messages using Google Translate for free. Supports context menu commands.",
+    "hidden": false,
+    "install_msg": "Welcome to the **Translate** cog!\n\n**Getting Started:**\n1. Load the cog: `[p]load translate`\n2. Enable app commands: `[p]slash enablecog translate`\n3. Sync app commands: `[p]slash sync`\n4. (Optional) Restart Discord to refresh commands.\n\n**Usage Instructions:**\n- Translate a message: Right-click the message → Apps → Translate\n- Set your preferred language: Use `/setmylanguage`\n- Translate text directly: Use `/translate`\n",
+    "required_cogs": {},
+    "requirements": ["googletrans-py"],
+    "short": "Translate messages using Google Translate for free. Supports context menu commands.",
+    "end_user_data_statement": "This cog stores the preferred language of a user if they choose one.",
+    "tags": ["crab", "useful", "translate", "translation", "slash", "message", "context", "menu"]
+}
