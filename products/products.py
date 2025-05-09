@@ -501,3 +501,20 @@ class Products(commands.Cog):
             await ctx.send("Unable to update the role color due to permission issues.")
         except discord.HTTPException as e:
             await ctx.send(f"Failed to update the role color: {e}")
+
+    @commands.has_permissions(manage_roles=True)
+    @commands.command(name="removerole", description="Remove a role from a user.")
+    async def removerole(self, ctx: commands.Context, member: discord.Member, role: discord.Role):
+        """
+        Remove a role from a user.
+        """
+        if role not in member.roles:
+            await ctx.send(f"{member.mention} does not have the role '{role.name}'.")
+            return
+        try:
+            await member.remove_roles(role, reason=f"Removed by {ctx.author} via removerole command.")
+            await ctx.send(f"Successfully removed the role '{role.name}' from {member.mention}.")
+        except discord.Forbidden:
+            await ctx.send("I do not have permission to remove that role.")
+        except discord.HTTPException as e:
+            await ctx.send(f"Failed to remove the role: {e}")
