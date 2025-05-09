@@ -27,7 +27,7 @@ class Translate(commands.Cog):
         self.translator = googletrans.Translator()
         self.config = Config.get_conf(self, identifier=14000606, force_registration=True)
         self.config.register_user(preferred_language="english")
-        self.context_menu = app_commands.ContextMenu(name='Translate', callback=self.translate_slash)
+        self.context_menu = app_commands.ContextMenu(name='Translate message', callback=self.translate_slash)
         self.bot.tree.add_command(self.context_menu)
 
     async def cog_unload(self):
