@@ -25,6 +25,9 @@ class Omni(commands.Cog):
         self.memory_moderated_users = defaultdict(lambda: defaultdict(int))
         self.memory_category_counter = defaultdict(Counter)
 
+        # In-memory reminder tracking to prevent duplicate reminders
+        self._reminder_sent_at = defaultdict(dict)  # {guild_id: {channel_id: datetime}}
+
         # Start periodic save task
         self.bot.loop.create_task(self.periodic_save())
 
@@ -130,8 +133,14 @@ class Omni(commands.Cog):
 
         # Check if the message count has reached 75
         if self.memory_user_message_counts[guild.id][channel.id] >= 75:
-            await self.send_monitoring_reminder(channel)
-            # Reset the message count for the channel
+            # Prevent duplicate reminders by checking last sent time
+            now = datetime.utcnow()
+            last_sent = self._reminder_sent_at[guild.id].get(channel.id)
+            # Only send if not sent in the last 5 minutes (300 seconds)
+            if not last_sent or (now - last_sent).total_seconds() > 300:
+                await self.send_monitoring_reminder(channel)
+                self._reminder_sent_at[guild.id][channel.id] = now
+            # Reset the message count for the channel regardless
             self.memory_user_message_counts[guild.id][channel.id] = 0
 
     async def send_monitoring_reminder(self, channel):
@@ -761,6 +770,7 @@ class Omni(commands.Cog):
             self.memory_user_message_counts.clear()
             self.memory_moderated_users.clear()
             self.memory_category_counter.clear()
+            self._reminder_sent_at.clear()
 
             # Confirmation message
             confirmation_embed = discord.Embed(
