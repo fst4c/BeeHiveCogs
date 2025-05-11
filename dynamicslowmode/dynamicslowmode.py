@@ -313,16 +313,36 @@ class DynamicSlowmode(commands.Cog):
                 else:
                     # Within target, keep current
                     new_slowmode = current
+
+                embed = discord.Embed(
+                    title="Dynamic slowmode",
+                    color=0xfffffe
+                )
+
                 if new_slowmode != current:
                     try:
                         await channel.edit(slowmode_delay=new_slowmode, reason="Dynamic slowmode adjustment")
                         # Log the slowmode adjustment
-                        log_msg = (
-                            f"Slowmode for {channel.mention} adjusted: "
-                            f"{current}s → {new_slowmode}s "
-                            f"(messages in last 60s: {msg_count}, target: {target_mpm})"
+                        embed.add_field(
+                            name="Channel",
+                            value=channel.mention,
+                            inline=True
                         )
-                        await self._send_log(guild, log_msg)
+                        embed.add_field(
+                            name="Adjustment",
+                            value=f"{current}s → {new_slowmode}s",
+                            inline=True
+                        )
+                        embed.add_field(
+                            name="Message count",
+                            value=f"{msg_count} messages/60s",
+                            inline=True
+                        )
+                        embed.add_field(
+                            name="Target",
+                            value=f"{target_mpm} messages/60s",
+                            inline=True
+                        )
                     except discord.Forbidden:
                         print(f"Permission error: Cannot adjust slowmode for {channel.mention}.")
                     except discord.HTTPException as e:
@@ -331,10 +351,20 @@ class DynamicSlowmode(commands.Cog):
                         print(f"Unexpected error: Failed to adjust slowmode for {channel.mention}: {e}")
                 else:
                     # Log the current message rate vs slowmode trigger rate
-                    log_msg = (
-                        f"Monitoring {channel.mention}: "
-                        f"Current message rate: {msg_count} messages/60s, "
-                        f"Target message rate: {target_mpm} messages/60s."
+                    embed.add_field(
+                        name="Channel",
+                        value=channel.mention,
+                        inline=True
                     )
-                    await self._send_log(guild, log_msg)
+                    embed.add_field(
+                        name="Current message rate",
+                        value=f"{msg_count} messages/60s",
+                        inline=True
+                    )
+                    embed.add_field(
+                        name="Target message rate",
+                        value=f"{target_mpm} messages/60s",
+                        inline=True
+                    )
+                await self._send_log(guild, embed)
 
