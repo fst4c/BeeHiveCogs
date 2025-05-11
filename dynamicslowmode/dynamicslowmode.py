@@ -28,7 +28,8 @@ class DynamicSlowmode(commands.Cog):
         "min_slowmode": 0,
         "max_slowmode": 120,
         "target_msgs_per_min": 20,
-        "channels": []
+        "channels": [],
+        "log_channel": None,
     }
 
     def __init__(self, bot):
@@ -108,6 +109,29 @@ class DynamicSlowmode(commands.Cog):
         await ctx.send("Dynamic slowmode channels:\n" + "\n".join(channels))
 
     @dynamicslowmode.command()
+    async def logs(self, ctx, channel: discord.TextChannel = None):
+        """
+        Set the logging channel for dynamic slowmode events.
+        Use without a channel to clear the log channel.
+        """
+        if channel is None:
+            await self.config.guild(ctx.guild).log_channel.set(None)
+            await ctx.send("Dynamic slowmode log channel cleared.")
+        else:
+            await self.config.guild(ctx.guild).log_channel.set(channel.id)
+            await ctx.send(f"Dynamic slowmode log channel set to {channel.mention}.")
+
+    async def _send_log(self, guild: discord.Guild, message: str):
+        log_channel_id = await self.config.guild(guild).log_channel()
+        if log_channel_id:
+            log_channel = guild.get_channel(log_channel_id)
+            if log_channel and log_channel.permissions_for(guild.me).send_messages:
+                try:
+                    await log_channel.send(message)
+                except Exception:
+                    pass
+
+    @dynamicslowmode.command()
     async def survey(self, ctx, channel: discord.TextChannel = None):
         """
         Calibrate dynamic slowmode for a channel by measuring 5 minutes of activity.
@@ -155,7 +179,7 @@ class DynamicSlowmode(commands.Cog):
             if channel.id not in chans:
                 chans.append(channel.id)
 
-        await ctx.send(
+        survey_result = (
             f"✅ Calibration complete for {channel.mention}!\n"
             f"Messages in last 5 minutes: **{msg_count_5min}**\n"
             f"Average messages/minute: **{msgs_per_min:.2f}**\n"
@@ -163,6 +187,9 @@ class DynamicSlowmode(commands.Cog):
             f"Set min slowmode to **{min_slow}**s, max slowmode to **{max_slow}**s.\n"
             f"{channel.mention} is now enabled for dynamic slowmode."
         )
+
+        await ctx.send(survey_result)
+        await self._send_log(ctx.guild, f"[DynamicSlowmode] Survey results for {channel.mention}:\n{survey_result}")
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -192,6 +219,7 @@ class DynamicSlowmode(commands.Cog):
             min_slow = conf["min_slowmode"]
             max_slow = conf["max_slowmode"]
             target_mpm = conf["target_msgs_per_min"]
+            log_channel_id = conf.get("log_channel")
             for cid in conf["channels"]:
                 channel = guild.get_channel(cid)
                 if not channel or not isinstance(channel, discord.TextChannel):
@@ -217,6 +245,13 @@ class DynamicSlowmode(commands.Cog):
                 if new_slowmode != current:
                     try:
                         await channel.edit(slowmode_delay=new_slowmode, reason="Dynamic slowmode adjustment")
+                        # Log the slowmode adjustment
+                        log_msg = (
+                            f"[DynamicSlowmode] Slowmode for {channel.mention} adjusted: "
+                            f"{current}s → {new_slowmode}s "
+                            f"(messages in last 60s: {msg_count}, target: {target_mpm})"
+                        )
+                        await self._send_log(guild, log_msg)
                     except Exception:
                         pass
 
