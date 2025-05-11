@@ -1,6 +1,6 @@
 import discord
 from redbot.core import commands, Config, checks
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import asyncio
 from collections import deque, defaultdict
 
@@ -141,14 +141,14 @@ class DynamicSlowmode(commands.Cog):
         )
 
         # Record the start time and count messages after
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         msg_count_5min = 0
 
         def check(m):
             return m.channel == channel and m.created_at >= start_time
 
         try:
-            while (datetime.utcnow() - start_time).total_seconds() < 300:
+            while (datetime.now(timezone.utc) - start_time).total_seconds() < 300:
                 msg = await self.bot.wait_for('message', timeout=300, check=check)
                 if msg:
                     msg_count_5min += 1
@@ -199,7 +199,7 @@ class DynamicSlowmode(commands.Cog):
             return
         if message.channel.id not in conf["channels"]:
             return
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         async with self._lock:
             self._message_cache[message.channel.id].append(now)
 
@@ -222,7 +222,7 @@ class DynamicSlowmode(commands.Cog):
                 if not channel or not isinstance(channel, discord.TextChannel):
                     continue
                 async with self._lock:
-                    now = datetime.utcnow()
+                    now = datetime.now(timezone.utc)
                     # Remove messages older than 60 seconds
                     cache = self._message_cache[cid]
                     while cache and (now - cache[0]).total_seconds() > 60:
