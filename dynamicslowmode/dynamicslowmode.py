@@ -108,7 +108,7 @@ class DynamicSlowmode(commands.Cog):
         await ctx.send("Dynamic slowmode channels:\n" + "\n".join(channels))
 
     @dynamicslowmode.command()
-    async def calibrate(self, ctx, channel: discord.TextChannel = None):
+    async def survey(self, ctx, channel: discord.TextChannel = None):
         """
         Calibrate dynamic slowmode for a channel by measuring 5 minutes of activity.
         Sets the target messages per minute and suggests min/max slowmode.
