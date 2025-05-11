@@ -43,7 +43,7 @@ class DynamicSlowmode(commands.Cog):
         if hasattr(self, "_slowmode_task"):
             self._slowmode_task.cancel()
 
-    @commands.group()
+    @commands.group(aliases=["dsm"])
     @commands.guild_only()
     @checks.admin_or_permissions(manage_guild=True)
     async def dynamicslowmode(self, ctx):
