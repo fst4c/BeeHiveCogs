@@ -55,9 +55,9 @@ class DynamicSlowmode(commands.Cog):
         await self.config.guild(ctx.guild).enabled.set(True)
         embed = discord.Embed(
             title="Dynamic Slowmode",
-            description="Dynamic slowmode enabled.",
             color=discord.Color.green()
         )
+        embed.add_field(name="Status", value="Dynamic slowmode enabled.", inline=False)
         await ctx.send(embed=embed)
 
     @dynamicslowmode.command()
@@ -66,9 +66,9 @@ class DynamicSlowmode(commands.Cog):
         await self.config.guild(ctx.guild).enabled.set(False)
         embed = discord.Embed(
             title="Dynamic Slowmode",
-            description="Dynamic slowmode disabled.",
             color=discord.Color.red()
         )
+        embed.add_field(name="Status", value="Dynamic slowmode disabled.", inline=False)
         await ctx.send(embed=embed)
 
     @dynamicslowmode.command()
@@ -77,9 +77,9 @@ class DynamicSlowmode(commands.Cog):
         await self.config.guild(ctx.guild).min_slowmode.set(seconds)
         embed = discord.Embed(
             title="Dynamic Slowmode",
-            description=f"Minimum slowmode set to {seconds} seconds.",
             color=discord.Color.blue()
         )
+        embed.add_field(name="Minimum Slowmode", value=f"Set to {seconds} seconds.", inline=False)
         await ctx.send(embed=embed)
 
     @dynamicslowmode.command()
@@ -88,9 +88,9 @@ class DynamicSlowmode(commands.Cog):
         await self.config.guild(ctx.guild).max_slowmode.set(seconds)
         embed = discord.Embed(
             title="Dynamic Slowmode",
-            description=f"Maximum slowmode set to {seconds} seconds.",
             color=discord.Color.blue()
         )
+        embed.add_field(name="Maximum Slowmode", value=f"Set to {seconds} seconds.", inline=False)
         await ctx.send(embed=embed)
 
     @dynamicslowmode.command()
@@ -99,9 +99,9 @@ class DynamicSlowmode(commands.Cog):
         await self.config.guild(ctx.guild).target_msgs_per_min.set(msgs_per_min)
         embed = discord.Embed(
             title="Dynamic Slowmode",
-            description=f"Target messages per minute set to {msgs_per_min}.",
             color=discord.Color.blue()
         )
+        embed.add_field(name="Target Messages/Minute", value=f"Set to {msgs_per_min}.", inline=False)
         await ctx.send(embed=embed)
 
     @dynamicslowmode.command()
@@ -112,9 +112,9 @@ class DynamicSlowmode(commands.Cog):
                 chans.append(channel.id)
         embed = discord.Embed(
             title="Dynamic Slowmode",
-            description=f"{channel.mention} added to dynamic slowmode.",
             color=discord.Color.green()
         )
+        embed.add_field(name="Channel Added", value=f"{channel.mention} added to dynamic slowmode.", inline=False)
         await ctx.send(embed=embed)
 
     @dynamicslowmode.command()
@@ -125,9 +125,9 @@ class DynamicSlowmode(commands.Cog):
                 chans.remove(channel.id)
         embed = discord.Embed(
             title="Dynamic Slowmode",
-            description=f"{channel.mention} removed from dynamic slowmode.",
             color=discord.Color.red()
         )
+        embed.add_field(name="Channel Removed", value=f"{channel.mention} removed from dynamic slowmode.", inline=False)
         await ctx.send(embed=embed)
 
     @dynamicslowmode.command(name="settings")
@@ -167,17 +167,17 @@ class DynamicSlowmode(commands.Cog):
             await self.config.guild(ctx.guild).log_channel.set(None)
             embed = discord.Embed(
                 title="Dynamic Slowmode",
-                description="Dynamic slowmode log channel cleared.",
                 color=discord.Color.orange()
             )
+            embed.add_field(name="Log Channel", value="Dynamic slowmode log channel cleared.", inline=False)
             await ctx.send(embed=embed)
         else:
             await self.config.guild(ctx.guild).log_channel.set(channel.id)
             embed = discord.Embed(
                 title="Dynamic Slowmode",
-                description=f"Dynamic slowmode log channel set to {channel.mention}.",
                 color=discord.Color.green()
             )
+            embed.add_field(name="Log Channel", value=f"Dynamic slowmode log channel set to {channel.mention}.", inline=False)
             await ctx.send(embed=embed)
 
     async def _send_log(self, guild: discord.Guild, message: str):
@@ -187,10 +187,10 @@ class DynamicSlowmode(commands.Cog):
             if log_channel and log_channel.permissions_for(guild.me).send_messages:
                 try:
                     embed = discord.Embed(
-                        title="Dynamic slowmode",
-                        description=message,
+                        title="Dynamic Slowmode Log",
                         color=discord.Color.green()
                     )
+                    embed.add_field(name="Log Message", value=message, inline=False)
                     await log_channel.send(embed=embed)
                 except Exception as e:
                     print(f"Failed to send log message: {e}")
@@ -203,10 +203,10 @@ class DynamicSlowmode(commands.Cog):
         """
         channel = channel or ctx.channel
         embed = discord.Embed(
-            title="Dynamic Slowmode Survey",
-            description=f"🕒 Survey started for {channel.mention}. I'll be back soon with results...",
-            color=discord.Color.blue()
+            title="Engagement Survey Ongoing",
+            color=0x2bbd8e
         )
+        embed.add_field(name="Status", value=f"Survey started for {channel.mention}. I'll be back soon with results...", inline=False)
         await ctx.send(embed=embed)
 
         # Record the start time and count messages after
@@ -246,22 +246,19 @@ class DynamicSlowmode(commands.Cog):
             if channel.id not in chans:
                 chans.append(channel.id)
 
-        survey_result = (
-            f"✅ Calibration complete for {channel.mention}!\n"
-            f"Messages in last 5 minutes: **{msg_count_5min}**\n"
-            f"Average messages/minute: **{msgs_per_min:.2f}**\n"
-            f"Set target messages/minute to **{int(msgs_per_min)}**\n"
-            f"Set min slowmode to **{min_slow}**s, max slowmode to **{max_slow}**s.\n"
-            f"{channel.mention} is now enabled for dynamic slowmode."
-        )
-
         embed = discord.Embed(
             title="Dynamic Slowmode Survey Results",
-            description=survey_result,
             color=discord.Color.green()
         )
+        embed.add_field(name="Calibration Complete", value=f"✅ Calibration complete for {channel.mention}!", inline=False)
+        embed.add_field(name="Messages in Last 5 Minutes", value=f"**{msg_count_5min}**", inline=True)
+        embed.add_field(name="Average Messages/Minute", value=f"**{msgs_per_min:.2f}**", inline=True)
+        embed.add_field(name="Set Target Messages/Minute", value=f"**{int(msgs_per_min)}**", inline=True)
+        embed.add_field(name="Set Min Slowmode", value=f"**{min_slow}**s", inline=True)
+        embed.add_field(name="Set Max Slowmode", value=f"**{max_slow}**s", inline=True)
+        embed.add_field(name="Status", value=f"{channel.mention} is now enabled for dynamic slowmode.", inline=False)
         await ctx.send(embed=embed)
-        await self._send_log(ctx.guild, f"[DynamicSlowmode] Survey results for {channel.mention}:\n{survey_result}")
+        await self._send_log(ctx.guild, f"[DynamicSlowmode] Survey results for {channel.mention}:\n{embed.to_dict()}")
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
