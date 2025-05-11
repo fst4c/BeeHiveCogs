@@ -1,6 +1,6 @@
 import discord
 from redbot.core import commands, Config, checks
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import asyncio
 from collections import deque, defaultdict
 
@@ -130,25 +130,31 @@ class DynamicSlowmode(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @dynamicslowmode.command(name="list")
-    async def _list(self, ctx):
-        """List channels with dynamic slowmode enabled."""
-        chans = await self.config.guild(ctx.guild).channels()
-        if not chans:
-            embed = discord.Embed(
-                title="Dynamic Slowmode",
-                description="No channels are set for dynamic slowmode.",
-                color=discord.Color.orange()
-            )
-            await ctx.send(embed=embed)
-            return
+    @dynamicslowmode.command(name="settings")
+    async def _settings(self, ctx):
+        """Show current dynamic slowmode settings and status."""
+        conf = await self.config.guild(ctx.guild).all()
+        enabled = conf["enabled"]
+        min_slowmode = conf["min_slowmode"]
+        max_slowmode = conf["max_slowmode"]
+        target_mpm = conf["target_msgs_per_min"]
+        log_channel_id = conf["log_channel"]
+        log_channel = ctx.guild.get_channel(log_channel_id) if log_channel_id else None
+        chans = conf["channels"]
         channels = [ctx.guild.get_channel(cid) for cid in chans]
         channels = [c.mention for c in channels if c]
+
         embed = discord.Embed(
-            title="Dynamic Slowmode Channels",
-            description="\n".join(channels),
+            title="Dynamic Slowmode Settings",
             color=discord.Color.blue()
         )
+        embed.add_field(name="Enabled", value=str(enabled), inline=False)
+        embed.add_field(name="Min Slowmode", value=f"{min_slowmode} seconds", inline=True)
+        embed.add_field(name="Max Slowmode", value=f"{max_slowmode} seconds", inline=True)
+        embed.add_field(name="Target Messages/Minute", value=str(target_mpm), inline=True)
+        embed.add_field(name="Log Channel", value=log_channel.mention if log_channel else "None", inline=False)
+        embed.add_field(name="Channels", value="\n".join(channels) if channels else "No channels set", inline=False)
+
         await ctx.send(embed=embed)
 
     @dynamicslowmode.command()
