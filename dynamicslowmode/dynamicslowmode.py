@@ -180,20 +180,19 @@ class DynamicSlowmode(commands.Cog):
             )
             await ctx.send(embed=embed)
 
-    async def _send_log(self, guild: discord.Guild, message: str):
+    async def _send_log(self, guild: discord.Guild, embed: discord.Embed):
         log_channel_id = await self.config.guild(guild).log_channel()
         if log_channel_id:
             log_channel = guild.get_channel(log_channel_id)
             if log_channel and log_channel.permissions_for(guild.me).send_messages:
                 try:
-                    embed = discord.Embed(
-                        title="Dynamic slowmode",
-                        description=message,
-                        color=discord.Color.green()
-                    )
                     await log_channel.send(embed=embed)
+                except discord.Forbidden:
+                    print(f"Permission error: Cannot send log message to {log_channel.mention}.")
+                except discord.HTTPException as e:
+                    print(f"HTTP error: Failed to send log message to {log_channel.mention}: {e}")
                 except Exception as e:
-                    print(f"Failed to send log message: {e}")
+                    print(f"Unexpected error: Failed to send log message to {log_channel.mention}: {e}")
 
     @dynamicslowmode.command()
     async def survey(self, ctx, channel: discord.TextChannel = None):
@@ -261,7 +260,7 @@ class DynamicSlowmode(commands.Cog):
             color=discord.Color.green()
         )
         await ctx.send(embed=embed)
-        await self._send_log(ctx.guild, f"Survey results for {channel.mention}:\n{survey_result}")
+        await self._send_log(ctx.guild, embed)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
