@@ -4,8 +4,6 @@ from datetime import datetime, timedelta
 import asyncio
 from collections import deque, defaultdict
 
-import asyncio
-
 def loop(*, seconds=0, minutes=0, hours=0):
     """A simple replacement for tasks.loop for Red 3.5+ compatibility."""
     def decorator(func):
@@ -128,8 +126,8 @@ class DynamicSlowmode(commands.Cog):
             if log_channel and log_channel.permissions_for(guild.me).send_messages:
                 try:
                     await log_channel.send(message)
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Failed to send log message: {e}")
 
     @dynamicslowmode.command()
     async def survey(self, ctx, channel: discord.TextChannel = None):
@@ -142,22 +140,25 @@ class DynamicSlowmode(commands.Cog):
             f"🕒 Survey started for {channel.mention}. I'll be back soon with results..."
         )
 
-        # Do NOT clear the cache here; instead, record the start time and count messages after
+        # Record the start time and count messages after
         start_time = datetime.utcnow()
-        await asyncio.sleep(300)
-        end_time = datetime.utcnow()
+        msg_count_5min = 0
 
-        async with self._lock:
-            cache = self._message_cache[channel.id]
-            # Only count messages in this channel that arrived after start_time
-            msg_count_5min = sum(1 for t in cache if t >= start_time)
+        def check(m):
+            return m.channel == channel and m.created_at >= start_time
+
+        try:
+            while (datetime.utcnow() - start_time).total_seconds() < 300:
+                msg = await self.bot.wait_for('message', timeout=300, check=check)
+                if msg:
+                    msg_count_5min += 1
+        except asyncio.TimeoutError:
+            pass
 
         # Calculate messages per minute
         msgs_per_min = msg_count_5min / 5
 
         # Suggest min/max slowmode based on activity
-        # Heuristic: If >60 msg/min, suggest min_slowmode=2, max_slowmode=10
-        # If 20-60 msg/min, min=0, max=10; If <20, min=0, max=5
         if msgs_per_min > 60:
             min_slow = 2
             max_slow = 10
@@ -216,7 +217,6 @@ class DynamicSlowmode(commands.Cog):
             min_slow = conf["min_slowmode"]
             max_slow = conf["max_slowmode"]
             target_mpm = conf["target_msgs_per_min"]
-            log_channel_id = conf.get("log_channel")
             for cid in conf["channels"]:
                 channel = guild.get_channel(cid)
                 if not channel or not isinstance(channel, discord.TextChannel):
@@ -249,6 +249,6 @@ class DynamicSlowmode(commands.Cog):
                             f"(messages in last 60s: {msg_count}, target: {target_mpm})"
                         )
                         await self._send_log(guild, log_msg)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        print(f"Failed to adjust slowmode for {channel.mention}: {e}")
 
