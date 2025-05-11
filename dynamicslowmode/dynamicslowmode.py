@@ -325,4 +325,12 @@ class DynamicSlowmode(commands.Cog):
                         await self._send_log(guild, log_msg)
                     except Exception as e:
                         print(f"Failed to adjust slowmode for {channel.mention}: {e}")
+                else:
+                    # Log the current message rate vs slowmode trigger rate
+                    log_msg = (
+                        f"[DynamicSlowmode] Monitoring {channel.mention}: "
+                        f"Current message rate: {msg_count} messages/60s, "
+                        f"Target message rate: {target_mpm} messages/60s."
+                    )
+                    await self._send_log(guild, log_msg)
 
