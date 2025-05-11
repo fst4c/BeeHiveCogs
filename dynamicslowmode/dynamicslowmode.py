@@ -116,7 +116,6 @@ class DynamicSlowmode(commands.Cog):
         channel = channel or ctx.channel
         await ctx.send(
             f"🕒 Calibration started for {channel.mention}. "
-            "Counting messages for the next 60 seconds. Please do not delete messages during this time."
         )
 
         # Clear cache for this channel for accurate measurement
