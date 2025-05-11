@@ -187,9 +187,9 @@ class DynamicSlowmode(commands.Cog):
             if log_channel and log_channel.permissions_for(guild.me).send_messages:
                 try:
                     embed = discord.Embed(
-                        title="Dynamic Slowmode Log",
+                        title="Dynamic slowmode",
                         description=message,
-                        color=discord.Color.blue()
+                        color=discord.Color.green()
                     )
                     await log_channel.send(embed=embed)
                 except Exception as e:
