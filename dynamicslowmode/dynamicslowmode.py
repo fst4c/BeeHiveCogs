@@ -323,8 +323,12 @@ class DynamicSlowmode(commands.Cog):
                             f"(messages in last 60s: {msg_count}, target: {target_mpm})"
                         )
                         await self._send_log(guild, log_msg)
+                    except discord.Forbidden:
+                        print(f"Permission error: Cannot adjust slowmode for {channel.mention}.")
+                    except discord.HTTPException as e:
+                        print(f"HTTP error: Failed to adjust slowmode for {channel.mention}: {e}")
                     except Exception as e:
-                        print(f"Failed to adjust slowmode for {channel.mention}: {e}")
+                        print(f"Unexpected error: Failed to adjust slowmode for {channel.mention}: {e}")
                 else:
                     # Log the current message rate vs slowmode trigger rate
                     log_msg = (
