@@ -142,18 +142,15 @@ class DynamicSlowmode(commands.Cog):
             f"🕒 Survey started for {channel.mention}. I'll be back soon with results..."
         )
 
-        # Clear cache for this channel for accurate measurement
-        async with self._lock:
-            self._message_cache[channel.id] = deque(maxlen=500)
-
+        # Do NOT clear the cache here; instead, record the start time and count messages after
         start_time = datetime.utcnow()
         await asyncio.sleep(300)
         end_time = datetime.utcnow()
 
         async with self._lock:
             cache = self._message_cache[channel.id]
-            # Only count messages in the last 5 minutes (300 seconds)
-            msg_count_5min = sum(1 for t in cache if (end_time - t).total_seconds() <= 300)
+            # Only count messages in this channel that arrived after start_time
+            msg_count_5min = sum(1 for t in cache if t >= start_time)
 
         # Calculate messages per minute
         msgs_per_min = msg_count_5min / 5
