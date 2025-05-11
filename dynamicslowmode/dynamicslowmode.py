@@ -320,7 +320,7 @@ class DynamicSlowmode(commands.Cog):
 
                 if new_slowmode != current:
                     try:
-                        await channel.edit(slowmode_delay=new_slowmode, reason="Dynamic slowmode adjustment")
+                        await channel.edit(slowmode_delay=new_slowmode, reason="Adjusting slowmode based on current channel activity")
                         # Log the slowmode adjustment
                         embed.add_field(
                             name="Channel",
