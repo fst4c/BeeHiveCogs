@@ -110,34 +110,37 @@ class DynamicSlowmode(commands.Cog):
     @dynamicslowmode.command()
     async def calibrate(self, ctx, channel: discord.TextChannel = None):
         """
-        Calibrate dynamic slowmode for a channel by measuring 60 seconds of activity.
+        Calibrate dynamic slowmode for a channel by measuring 5 minutes of activity.
         Sets the target messages per minute and suggests min/max slowmode.
         """
         channel = channel or ctx.channel
         await ctx.send(
-            f"🕒 Calibration started for {channel.mention}. "
+            f"🕒 Survey started for {channel.mention}. I'll be back soon with results..."
         )
 
         # Clear cache for this channel for accurate measurement
         async with self._lock:
-            self._message_cache[channel.id] = deque(maxlen=100)
+            self._message_cache[channel.id] = deque(maxlen=500)
 
         start_time = datetime.utcnow()
-        await asyncio.sleep(60)
+        await asyncio.sleep(300)
         end_time = datetime.utcnow()
 
         async with self._lock:
             cache = self._message_cache[channel.id]
-            # Only count messages in the last 60 seconds
-            msg_count = sum(1 for t in cache if (end_time - t).total_seconds() <= 60)
+            # Only count messages in the last 5 minutes (300 seconds)
+            msg_count_5min = sum(1 for t in cache if (end_time - t).total_seconds() <= 300)
+
+        # Calculate messages per minute
+        msgs_per_min = msg_count_5min / 5
 
         # Suggest min/max slowmode based on activity
         # Heuristic: If >60 msg/min, suggest min_slowmode=2, max_slowmode=10
         # If 20-60 msg/min, min=0, max=10; If <20, min=0, max=5
-        if msg_count > 60:
+        if msgs_per_min > 60:
             min_slow = 2
             max_slow = 10
-        elif msg_count > 20:
+        elif msgs_per_min > 20:
             min_slow = 0
             max_slow = 10
         else:
@@ -145,7 +148,7 @@ class DynamicSlowmode(commands.Cog):
             max_slow = 5
 
         # Save these as the new config for the guild
-        await self.config.guild(ctx.guild).target_msgs_per_min.set(msg_count)
+        await self.config.guild(ctx.guild).target_msgs_per_min.set(int(msgs_per_min))
         await self.config.guild(ctx.guild).min_slowmode.set(min_slow)
         await self.config.guild(ctx.guild).max_slowmode.set(max_slow)
         async with self.config.guild(ctx.guild).channels() as chans:
@@ -154,8 +157,9 @@ class DynamicSlowmode(commands.Cog):
 
         await ctx.send(
             f"✅ Calibration complete for {channel.mention}!\n"
-            f"Messages in last 60s: **{msg_count}**\n"
-            f"Set target messages/minute to **{msg_count}**\n"
+            f"Messages in last 5 minutes: **{msg_count_5min}**\n"
+            f"Average messages/minute: **{msgs_per_min:.2f}**\n"
+            f"Set target messages/minute to **{int(msgs_per_min)}**\n"
             f"Set min slowmode to **{min_slow}**s, max slowmode to **{max_slow}**s.\n"
             f"{channel.mention} is now enabled for dynamic slowmode."
         )
