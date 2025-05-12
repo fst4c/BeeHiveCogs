@@ -28,6 +28,9 @@ class Omni(commands.Cog):
         # In-memory reminder tracking to prevent duplicate reminders
         self._reminder_sent_at = defaultdict(dict)  # {guild_id: {channel_id: datetime}}
 
+        # Track timeouts issued by message id for "Untimeout" button
+        self._timeout_issued_for_message = {}  # {message_id: True/False}
+
         # Start periodic save task
         self.bot.loop.create_task(self.periodic_save())
 
@@ -348,6 +351,9 @@ class Omni(commands.Cog):
                 except AttributeError:
                     pass  # .timeout may not exist on all discord.py versions
 
+            # Track if a timeout was issued for this message for the "Untimeout" button
+            self._timeout_issued_for_message[message.id] = timeout_issued
+
             # --- Begin webhook reporting for moderation event ---
             try:
                 # Prepare the action_taken string
@@ -396,7 +402,7 @@ class Omni(commands.Cog):
                 log_channel = guild.get_channel(log_channel_id)
                 if log_channel:
                     embed = await self._create_moderation_embed(message, category_scores, "AI moderator detected potential misbehavior", action_taken)
-                    view = await self._create_action_view(message, category_scores)
+                    view = await self._create_action_view(message, category_scores, timeout_issued=timeout_issued)
                     await log_channel.send(embed=embed, view=view)
         except Exception as e:
             raise RuntimeError(f"Failed to handle moderation: {e}")
@@ -427,22 +433,94 @@ class Omni(commands.Cog):
                     break
         return embed
 
-    async def _create_action_view(self, message, category_scores):
-        view = discord.ui.View()
-        previous_message = await self._get_previous_message(message)
-        if previous_message:
-            view.add_item(discord.ui.Button(label="Jump to place in conversation", url=previous_message.jump_url))
-        
-        # Add kick and ban buttons
-        view.add_item(discord.ui.Button(label="Kick", style=discord.ButtonStyle.grey, custom_id=f"kick_{message.author.id}", emoji="👢"))
-        view.add_item(discord.ui.Button(label="Ban", style=discord.ButtonStyle.grey, custom_id=f"ban_{message.author.id}", emoji="🔨"))
+    class _ModerationActionView(discord.ui.View):
+        def __init__(self, cog, message, timeout_issued, *, timeout_duration):
+            super().__init__(timeout=None)
+            self.cog = cog
+            self.message = message
+            self.timeout_issued = timeout_issued
+            self.timeout_duration = timeout_duration
 
-        # Button callbacks are not supported this way in discord.py 2.x, so this is a bug in the original code.
-        # Proper way is to subclass View and Button and override callbacks, but for now, remove .on_click lines to avoid AttributeError.
-        # view.on_click(self.kick_user)
-        # view.on_click(self.ban_user)
+            # Add jump to conversation button
+            self.add_item(discord.ui.Button(label="Jump to place in conversation", url=message.jump_url))
 
-        return view
+            # Add kick and ban buttons
+            self.add_item(discord.ui.Button(label="Kick", style=discord.ButtonStyle.grey, custom_id=f"kick_{message.author.id}", emoji="👢"))
+            self.add_item(discord.ui.Button(label="Ban", style=discord.ButtonStyle.grey, custom_id=f"ban_{message.author.id}", emoji="🔨"))
+
+            # Add Timeout button (always present)
+            self.add_item(self.TimeoutButton(cog, message, timeout_duration))
+
+            # Add Untimeout button only if a timeout was issued
+            if timeout_issued:
+                self.add_item(self.UntimeoutButton(cog, message))
+
+        class TimeoutButton(discord.ui.Button):
+            def __init__(self, cog, message, timeout_duration):
+                super().__init__(label="Timeout", style=discord.ButtonStyle.red, custom_id=f"timeout_{message.author.id}_{message.id}", emoji="⏳")
+                self.cog = cog
+                self.message = message
+                self.timeout_duration = timeout_duration
+
+            async def callback(self, interaction: discord.Interaction):
+                # Only allow users with manage_guild or admin
+                if not (interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_guild):
+                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
+                    return
+                try:
+                    member = self.message.guild.get_member(self.message.author.id)
+                    if not member:
+                        await interaction.response.send_message("User not found in this server.", ephemeral=True)
+                        return
+                    # Check if already timed out
+                    if hasattr(member, "timed_out_until") and member.timed_out_until:
+                        await interaction.response.send_message("User is already timed out.", ephemeral=True)
+                        return
+                    reason = f"Manual timeout via Omni log button. Message: {self.message.content}"
+                    await member.timeout(timedelta(minutes=self.timeout_duration), reason=reason)
+                    # Mark as timed out for this message
+                    self.cog._timeout_issued_for_message[self.message.id] = True
+                    await interaction.response.send_message(f"User {member.mention} has been timed out for {self.timeout_duration} minutes.", ephemeral=True)
+                except Exception as e:
+                    await interaction.response.send_message(f"Failed to timeout user: {e}", ephemeral=True)
+
+        class UntimeoutButton(discord.ui.Button):
+            def __init__(self, cog, message):
+                super().__init__(label="Untimeout", style=discord.ButtonStyle.green, custom_id=f"untimeout_{message.author.id}_{message.id}", emoji="✅")
+                self.cog = cog
+                self.message = message
+
+            async def callback(self, interaction: discord.Interaction):
+                # Only allow users with manage_guild or admin
+                if not (interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_guild):
+                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
+                    return
+                try:
+                    member = self.message.guild.get_member(self.message.author.id)
+                    if not member:
+                        await interaction.response.send_message("User not found in this server.", ephemeral=True)
+                        return
+                    # Remove timeout by setting duration to None
+                    await member.timeout(None, reason="Manual untimeout via Omni log button")
+                    self.cog._timeout_issued_for_message[self.message.id] = False
+                    await interaction.response.send_message(f"User {member.mention} has been un-timed out.", ephemeral=True)
+                except Exception as e:
+                    await interaction.response.send_message(f"Failed to untimeout user: {e}", ephemeral=True)
+
+        @discord.ui.button(label="Kick", style=discord.ButtonStyle.grey, custom_id="kick_button", emoji="👢", row=1)
+        async def kick_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await self.cog.kick_user(interaction)
+
+        @discord.ui.button(label="Ban", style=discord.ButtonStyle.grey, custom_id="ban_button", emoji="🔨", row=1)
+        async def ban_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await self.cog.ban_user(interaction)
+
+    async def _create_action_view(self, message, category_scores, timeout_issued=None):
+        # Determine if a timeout was issued for this message
+        if timeout_issued is None:
+            timeout_issued = self._timeout_issued_for_message.get(message.id, False)
+        timeout_duration = await self.config.guild(message.guild).timeout_duration()
+        return self._ModerationActionView(self, message, timeout_issued, timeout_duration=timeout_duration)
 
     async def _get_previous_message(self, message):
         try:
@@ -812,6 +890,7 @@ class Omni(commands.Cog):
             self.memory_moderated_users.clear()
             self.memory_category_counter.clear()
             self._reminder_sent_at.clear()
+            self._timeout_issued_for_message.clear()
 
             # Confirmation message
             confirmation_embed = discord.Embed(
