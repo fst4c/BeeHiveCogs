@@ -388,7 +388,8 @@ class Omni(commands.Cog):
                 log_channel = guild.get_channel(log_channel_id)
                 if log_channel:
                     embed = await self._create_moderation_embed(message, category_scores, "AI moderator detected potential misbehavior", action_taken)
-                    await log_channel.send(embed=embed, view=await self._create_jump_view(message))
+                    view = await self._create_action_view(message, category_scores)
+                    await log_channel.send(embed=embed, view=view)
         except Exception as e:
             raise RuntimeError(f"Failed to handle moderation: {e}")
 
@@ -418,17 +419,44 @@ class Omni(commands.Cog):
                     break
         return embed
 
-    async def _create_jump_view(self, message):
+    async def _create_action_view(self, message, category_scores):
         view = discord.ui.View()
         previous_message = await self._get_previous_message(message)
         if previous_message:
             view.add_item(discord.ui.Button(label="Jump to place in conversation", url=previous_message.jump_url))
+        
+        # Add kick and ban buttons
+        view.add_item(discord.ui.Button(label="Kick User", style=discord.ButtonStyle.danger, custom_id=f"kick_{message.author.id}"))
+        view.add_item(discord.ui.Button(label="Ban User", style=discord.ButtonStyle.danger, custom_id=f"ban_{message.author.id}"))
+
+        # Add button callbacks
+        view.on_click(self.kick_user)
+        view.on_click(self.ban_user)
+
         return view
 
     async def _get_previous_message(self, message):
         async for msg in message.channel.history(limit=2, before=message):
             return msg
         return None
+
+    async def kick_user(self, interaction: discord.Interaction):
+        user_id = int(interaction.custom_id.split("_")[1])
+        guild = interaction.guild
+        user = guild.get_member(user_id)
+        if user:
+            reason = f"Kicked by moderator action. Message: {interaction.message.content}"
+            await user.kick(reason=reason)
+            await interaction.response.send_message(f"User {user} has been kicked.", ephemeral=True)
+
+    async def ban_user(self, interaction: discord.Interaction):
+        user_id = int(interaction.custom_id.split("_")[1])
+        guild = interaction.guild
+        user = guild.get_member(user_id)
+        if user:
+            reason = f"Banned by moderator action. Message: {interaction.message.content}"
+            await user.ban(reason=reason)
+            await interaction.response.send_message(f"User {user} has been banned.", ephemeral=True)
 
     async def log_message(self, message, category_scores, error_code=None):
         try:
@@ -441,7 +469,8 @@ class Omni(commands.Cog):
                     embed = await self._create_moderation_embed(message, category_scores, "Message processed by Omni")
                     if error_code:
                         embed.add_field(name="Error", value=f":x: `{error_code}` Failed to send to moderation endpoint.", inline=False)
-                    await log_channel.send(embed=embed, view=await self._create_jump_view(message))
+                    view = await self._create_action_view(message, category_scores)
+                    await log_channel.send(embed=embed, view=view)
         except Exception as e:
             raise RuntimeError(f"Failed to log message: {e}")
 
