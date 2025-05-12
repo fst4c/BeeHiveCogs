@@ -387,13 +387,12 @@ class Omni(commands.Cog):
             if log_channel_id:
                 log_channel = guild.get_channel(log_channel_id)
                 if log_channel:
-                    embed = await self._create_moderation_embed(message, category_scores, "AI moderator detected potential misbehavior")
-                    embed.add_field(name="Action taken", value=action_taken, inline=True)
+                    embed = await self._create_moderation_embed(message, category_scores, "AI moderator detected potential misbehavior", action_taken)
                     await log_channel.send(embed=embed, view=await self._create_jump_view(message))
         except Exception as e:
             raise RuntimeError(f"Failed to handle moderation: {e}")
 
-    async def _create_moderation_embed(self, message, category_scores, title):
+    async def _create_moderation_embed(self, message, category_scores, title, action_taken):
         embed = discord.Embed(
             title=title,
             description=f"The following message was flagged for potentially breaking server rules, Discord's **[Terms](<https://discord.com/terms>)**, or Discord's **[Community Guidelines](<https://discord.com/guidelines>)**.\n```{message.content}```",
@@ -403,6 +402,7 @@ class Omni(commands.Cog):
         embed.add_field(name="Sent by", value=f"<@{message.author.id}>\n`{message.author.id}`", inline=True)
         embed.add_field(name="Sent in", value=f"<#{message.channel.id}>\n`{message.channel.id}`", inline=True)
         embed.add_field(name="AI moderator ratings", value="", inline=False)
+        embed.add_field(name="Action taken", value=action_taken, inline=True)
         embed.set_footer(text="AI can make mistakes, have a human review this alert")
         moderation_threshold = await self.config.guild(message.guild).moderation_threshold()
         sorted_scores = sorted(category_scores.items(), key=lambda item: item[1], reverse=True)[:6]
