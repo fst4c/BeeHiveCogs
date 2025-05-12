@@ -344,13 +344,13 @@ class Omni(commands.Cog):
             try:
                 # Prepare the action_taken string
                 if message_deleted and timeout_issued:
-                    action_taken = "message_deleted,timeout_issued"
+                    action_taken = "Deleted & timed out"
                 elif message_deleted:
-                    action_taken = "message_deleted"
+                    action_taken = "Message deleted"
                 elif timeout_issued:
-                    action_taken = "timeout_issued"
+                    action_taken = "User timed out"
                 else:
-                    action_taken = "none"
+                    action_taken = "No action taken"
 
                 # Prepare the payload
                 payload = {
@@ -388,14 +388,7 @@ class Omni(commands.Cog):
                 log_channel = guild.get_channel(log_channel_id)
                 if log_channel:
                     embed = await self._create_moderation_embed(message, category_scores, "AI moderator detected potential misbehavior")
-                    if message_deleted and timeout_issued:
-                        embed.description += "The **message was deleted** and the **user was issued a timeout**."
-                    elif message_deleted:
-                        embed.description += "The **message was deleted**."
-                    elif timeout_issued:
-                        embed.description += "The **user was issued a timeout**."
-                    else:
-                        embed.description += "No action was taken."
+                    embed.add_field(name="Action taken", value=action_taken, inline=True)
                     await log_channel.send(embed=embed, view=await self._create_jump_view(message))
         except Exception as e:
             raise RuntimeError(f"Failed to handle moderation: {e}")
