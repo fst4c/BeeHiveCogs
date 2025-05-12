@@ -426,8 +426,8 @@ class Omni(commands.Cog):
             view.add_item(discord.ui.Button(label="Jump to place in conversation", url=previous_message.jump_url))
         
         # Add kick and ban buttons
-        view.add_item(discord.ui.Button(label="Kick User", style=discord.ButtonStyle.danger, custom_id=f"kick_{message.author.id}"))
-        view.add_item(discord.ui.Button(label="Ban User", style=discord.ButtonStyle.danger, custom_id=f"ban_{message.author.id}"))
+        view.add_item(discord.ui.Button(label="Kick", style=discord.ButtonStyle.danger, custom_id=f"kick_{message.author.id}", emoji="👢"))
+        view.add_item(discord.ui.Button(label="Ban", style=discord.ButtonStyle.danger, custom_id=f"ban_{message.author.id}", emoji="🔨"))
 
         # Add button callbacks
         view.on_click(self.kick_user)
