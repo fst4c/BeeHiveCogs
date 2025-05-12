@@ -434,8 +434,8 @@ class Omni(commands.Cog):
             view.add_item(discord.ui.Button(label="Jump to place in conversation", url=previous_message.jump_url))
         
         # Add kick and ban buttons
-        view.add_item(discord.ui.Button(label="Kick", style=discord.ButtonStyle.danger, custom_id=f"kick_{message.author.id}", emoji="👢"))
-        view.add_item(discord.ui.Button(label="Ban", style=discord.ButtonStyle.danger, custom_id=f"ban_{message.author.id}", emoji="🔨"))
+        view.add_item(discord.ui.Button(label="Kick", style=discord.ButtonStyle.grey, custom_id=f"kick_{message.author.id}", emoji="👢"))
+        view.add_item(discord.ui.Button(label="Ban", style=discord.ButtonStyle.grey, custom_id=f"ban_{message.author.id}", emoji="🔨"))
 
         # Button callbacks are not supported this way in discord.py 2.x, so this is a bug in the original code.
         # Proper way is to subclass View and Button and override callbacks, but for now, remove .on_click lines to avoid AttributeError.
