@@ -454,7 +454,7 @@ class Omni(commands.Cog):
 
         class TimeoutButton(discord.ui.Button):
             def __init__(self, cog, message, timeout_duration):
-                super().__init__(label="Timeout", style=discord.ButtonStyle.red, custom_id=f"timeout_{message.author.id}_{message.id}", emoji="⏳")
+                super().__init__(label="Timeout", style=discord.ButtonStyle.grey, custom_id=f"timeout_{message.author.id}_{message.id}", emoji="⏳")
                 self.cog = cog
                 self.message = message
                 self.timeout_duration = timeout_duration
@@ -483,7 +483,7 @@ class Omni(commands.Cog):
 
         class UntimeoutButton(discord.ui.Button):
             def __init__(self, cog, message):
-                super().__init__(label="Untimeout", style=discord.ButtonStyle.green, custom_id=f"untimeout_{message.author.id}_{message.id}", emoji="✅")
+                super().__init__(label="Untimeout", style=discord.ButtonStyle.grey, custom_id=f"untimeout_{message.author.id}_{message.id}", emoji="✅")
                 self.cog = cog
                 self.message = message
 
