@@ -407,12 +407,12 @@ class Omni(commands.Cog):
             color=0xff4545,
             timestamp=datetime.utcnow()
         )
-        embed.add_field(name="Sent by", value=f"<@{message.author.id}> - `{message.author.id}`", inline=True)
-        embed.add_field(name="Sent in", value=f"<#{message.channel.id}> - `{message.channel.id}`", inline=True)
+        embed.add_field(name="Sent by", value=f"<@{message.author.id}>\n`{message.author.id}`", inline=True)
+        embed.add_field(name="Sent in", value=f"<#{message.channel.id}>\n`{message.channel.id}`", inline=True)
         embed.add_field(name="AI moderator ratings", value="", inline=False)
         embed.set_footer(text="AI can make mistakes, have a human review this alert")
         moderation_threshold = await self.config.guild(message.guild).moderation_threshold()
-        sorted_scores = sorted(category_scores.items(), key=lambda item: item[1], reverse=True)[:3]
+        sorted_scores = sorted(category_scores.items(), key=lambda item: item[1], reverse=True)[:6]
         for category, score in sorted_scores:
             score_percentage = score * 100
             score_display = f"**{score_percentage:.0f}%**" if score > moderation_threshold else f"{score_percentage:.0f}%"
