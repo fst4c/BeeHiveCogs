@@ -74,7 +74,8 @@ class Omni(commands.Cog):
     async def initialize(self):
         """Initialize the aiohttp session."""
         try:
-            self.session = aiohttp.ClientSession()
+            if self.session is None or self.session.closed:
+                self.session = aiohttp.ClientSession()
         except Exception as e:
             raise RuntimeError(f"Failed to initialize Omni cog: {e}")
 
@@ -116,16 +117,16 @@ class Omni(commands.Cog):
         if channel.id in whitelisted_channels:
             return
         # Check if channel's category is whitelisted
-        if channel.category_id in whitelisted_categories:
+        if getattr(channel, "category_id", None) in whitelisted_categories:
             return
         # Check if any of the author's roles are whitelisted
-        if hasattr(message.author, "roles") and any(role.id in whitelisted_roles for role in message.author.roles):
+        if hasattr(message.author, "roles") and any(role.id in whitelisted_roles for role in getattr(message.author, "roles", [])):
             return
         # Check if author is whitelisted
         if message.author.id in whitelisted_users:
             return
         # Check if NSFW bypass is enabled and channel is NSFW
-        if hasattr(channel, "is_nsfw") and channel.is_nsfw() and bypass_nsfw:
+        if hasattr(channel, "is_nsfw") and callable(getattr(channel, "is_nsfw", None)) and channel.is_nsfw() and bypass_nsfw:
             return
 
         # Increment the message count for the channel
@@ -146,7 +147,8 @@ class Omni(commands.Cog):
     async def send_monitoring_reminder(self, channel):
         """Send a monitoring reminder to the specified channel."""
         try:
-            command_prefix = (await self.bot.get_valid_prefixes())[0]
+            command_prefixes = await self.bot.get_valid_prefixes()
+            command_prefix = command_prefixes[0] if command_prefixes else "!"
             embed = discord.Embed(
                 title="This conversation is subject to automatic moderation",
                 description=(
@@ -154,7 +156,7 @@ class Omni(commands.Cog):
                 ),
                 color=0xfffffe
             )
-            embed.set_footer(text=f"Use \"{command_prefix}omni vote\" to give feedback on this server's moderation")
+            embed.set_footer(text=f'Use "{command_prefix}omni vote" to give feedback on this server\'s moderation')
             embed.set_thumbnail(url="https://www.beehive.systems/hubfs/Icon%20Packs/White/sparkles.png")
             await channel.send(embed=embed)
         except discord.HTTPException as e:
@@ -177,17 +179,17 @@ class Omni(commands.Cog):
                 return
 
             whitelisted_categories = await self.config.guild(guild).whitelisted_categories()
-            if message.channel.category_id in whitelisted_categories:
+            if getattr(message.channel, "category_id", None) in whitelisted_categories:
                 return
 
             whitelisted_roles = await self.config.guild(guild).whitelisted_roles()
-            if any(role.id in whitelisted_roles for role in message.author.roles):
+            if hasattr(message.author, "roles") and any(role.id in whitelisted_roles for role in getattr(message.author, "roles", [])):
                 return
 
             if message.author.id in await self.config.guild(guild).whitelisted_users():
                 return
 
-            if message.channel.is_nsfw() and await self.config.guild(guild).bypass_nsfw():
+            if hasattr(message.channel, "is_nsfw") and callable(getattr(message.channel, "is_nsfw", None)) and message.channel.is_nsfw() and await self.config.guild(guild).bypass_nsfw():
                 return
 
             self.increment_statistic(guild.id, 'message_count')
@@ -208,7 +210,7 @@ class Omni(commands.Cog):
             image_attachments = []
             if message.attachments:
                 for attachment in message.attachments:
-                    if attachment.content_type and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif"):
+                    if getattr(attachment, "content_type", None) and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif"):
                         image_attachments.append(attachment)
                         self.increment_statistic(guild.id, 'image_count')
                         self.increment_statistic('global', 'global_image_count')
@@ -254,7 +256,7 @@ class Omni(commands.Cog):
         self.update_category_counter(guild_id, text_category_scores)
         self.update_category_counter('global', text_category_scores)
 
-        if any(attachment.content_type and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif") for attachment in message.attachments):
+        if any(getattr(attachment, "content_type", None) and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif") for attachment in getattr(message, "attachments", [])):
             self.increment_statistic(guild_id, 'moderated_image_count')
             self.increment_statistic('global', 'global_moderated_image_count')
 
@@ -273,6 +275,8 @@ class Omni(commands.Cog):
         attempt = 0
         while attempt < max_attempts:
             try:
+                if self.session is None or self.session.closed:
+                    self.session = aiohttp.ClientSession()
                 async with self.session.post(
                     "https://api.openai.com/v1/moderations",
                     headers={
@@ -322,6 +326,8 @@ class Omni(commands.Cog):
                     message_deleted = True
                 except discord.NotFound:
                     pass
+                except discord.Forbidden:
+                    pass
 
             timeout_issued = False
             if timeout_duration > 0:
@@ -339,6 +345,8 @@ class Omni(commands.Cog):
                     timeout_issued = True
                 except discord.Forbidden:
                     pass
+                except AttributeError:
+                    pass  # .timeout may not exist on all discord.py versions
 
             # --- Begin webhook reporting for moderation event ---
             try:
@@ -357,7 +365,7 @@ class Omni(commands.Cog):
                     "server_id": str(guild.id),
                     "server_name": guild.name,
                     "channel_id": str(message.channel.id),
-                    "channel_name": message.channel.name if hasattr(message.channel, "name") else "",
+                    "channel_name": getattr(message.channel, "name", ""),
                     "sender_id": str(message.author.id),
                     "sender_username": str(message.author),
                     "message_id": str(message.id),
@@ -381,7 +389,7 @@ class Omni(commands.Cog):
                     pass
                 if session is not self.session:
                     await session.close()
-            except Exception as e:
+            except Exception:
                 pass
 
             if log_channel_id:
@@ -412,9 +420,9 @@ class Omni(commands.Cog):
             score_display = f"**{score_percentage:.0f}%**" if score > moderation_threshold else f"{score_percentage:.0f}%"
             embed.add_field(name=category.capitalize(), value=score_display, inline=True)
 
-        if message.attachments:
+        if getattr(message, "attachments", None):
             for attachment in message.attachments:
-                if attachment.content_type and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif"):
+                if getattr(attachment, "content_type", None) and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif"):
                     embed.set_image(url=attachment.url)
                     break
         return embed
@@ -429,15 +437,19 @@ class Omni(commands.Cog):
         view.add_item(discord.ui.Button(label="Kick", style=discord.ButtonStyle.danger, custom_id=f"kick_{message.author.id}", emoji="👢"))
         view.add_item(discord.ui.Button(label="Ban", style=discord.ButtonStyle.danger, custom_id=f"ban_{message.author.id}", emoji="🔨"))
 
-        # Add button callbacks
-        view.on_click(self.kick_user)
-        view.on_click(self.ban_user)
+        # Button callbacks are not supported this way in discord.py 2.x, so this is a bug in the original code.
+        # Proper way is to subclass View and Button and override callbacks, but for now, remove .on_click lines to avoid AttributeError.
+        # view.on_click(self.kick_user)
+        # view.on_click(self.ban_user)
 
         return view
 
     async def _get_previous_message(self, message):
-        async for msg in message.channel.history(limit=2, before=message):
-            return msg
+        try:
+            async for msg in message.channel.history(limit=2, before=message):
+                return msg
+        except Exception:
+            return None
         return None
 
     async def kick_user(self, interaction: discord.Interaction):
@@ -445,18 +457,24 @@ class Omni(commands.Cog):
         guild = interaction.guild
         user = guild.get_member(user_id)
         if user:
-            reason = f"Kicked by moderator action. Message: {interaction.message.content}"
-            await user.kick(reason=reason)
-            await interaction.response.send_message(f"User {user} has been kicked.", ephemeral=True)
+            reason = f"Kicked by moderator action. Message: {getattr(interaction.message, 'content', '')}"
+            try:
+                await user.kick(reason=reason)
+                await interaction.response.send_message(f"User {user} has been kicked.", ephemeral=True)
+            except Exception:
+                await interaction.response.send_message("Failed to kick user.", ephemeral=True)
 
     async def ban_user(self, interaction: discord.Interaction):
         user_id = int(interaction.custom_id.split("_")[1])
         guild = interaction.guild
         user = guild.get_member(user_id)
         if user:
-            reason = f"Banned by moderator action. Message: {interaction.message.content}"
-            await user.ban(reason=reason)
-            await interaction.response.send_message(f"User {user} has been banned.", ephemeral=True)
+            reason = f"Banned by moderator action. Message: {getattr(interaction.message, 'content', '')}"
+            try:
+                await user.ban(reason=reason)
+                await interaction.response.send_message(f"User {user} has been banned.", ephemeral=True)
+            except Exception:
+                await interaction.response.send_message("Failed to ban user.", ephemeral=True)
 
     async def log_message(self, message, category_scores, error_code=None):
         try:
@@ -466,7 +484,7 @@ class Omni(commands.Cog):
             if log_channel_id:
                 log_channel = guild.get_channel(log_channel_id)
                 if log_channel:
-                    embed = await self._create_moderation_embed(message, category_scores, "Message processed by Omni")
+                    embed = await self._create_moderation_embed(message, category_scores, "Message processed by Omni", "No action taken")
                     if error_code:
                         embed.add_field(name="Error", value=f":x: `{error_code}` Failed to send to moderation endpoint.", inline=False)
                     view = await self._create_action_view(message, category_scores)
@@ -717,7 +735,8 @@ class Omni(commands.Cog):
             whitelisted_channels_names = ", ".join([guild.get_channel(ch_id).mention for ch_id in whitelisted_channels if guild.get_channel(ch_id)]) or "None"
             whitelisted_roles_names = ", ".join([guild.get_role(role_id).mention for role_id in whitelisted_roles if guild.get_role(role_id)]) or "None"
             whitelisted_users_names = ", ".join([f"<@{user_id}>" for user_id in whitelisted_users]) or "None"
-            whitelisted_categories_names = ", ".join([guild.get_channel_category(cat_id).name for cat_id in whitelisted_categories if guild.get_channel_category(cat_id)]) or "None"
+            # get_channel_category does not exist, so fix this:
+            whitelisted_categories_names = ", ".join([cat.name for cat in guild.categories if cat.id in whitelisted_categories]) or "None"
             last_reminder_display = last_reminder_time if last_reminder_time else "Never"
 
             embed = discord.Embed(title="Omni settings", color=0xfffffe)
@@ -879,15 +898,21 @@ class Omni(commands.Cog):
                 await interaction.message.edit(embed=updated_embed, view=None)
                 await interaction.response.send_message("Thank you for taking the time to help make this server a better place. If you have additional feedback about this server's AI-assisted moderation, please contact a member of the staff or administration team.", ephemeral=True)
 
+            # Button callbacks must be coroutines, so use partial or closure, not lambda with coroutine
+            async def too_weak_callback(interaction):
+                await vote_callback(interaction, "too weak")
+            async def just_right_callback(interaction):
+                await vote_callback(interaction, "just right")
+            async def too_tough_callback(interaction):
+                await vote_callback(interaction, "too strict")
+
             too_weak_button = discord.ui.Button(label="Moderation is too forgiving", style=discord.ButtonStyle.red)
-            too_weak_button.callback = lambda interaction: vote_callback(interaction, "too weak")
-
             just_right_button = discord.ui.Button(label="Moderation is just right", style=discord.ButtonStyle.green)
-            just_right_button.callback = lambda interaction: vote_callback(interaction, "just right")
-
             too_tough_button = discord.ui.Button(label="Moderation is too strict", style=discord.ButtonStyle.red)
-            too_tough_button.callback = lambda interaction: vote_callback(interaction, "too strict")
 
+            too_weak_button.callback = too_weak_callback
+            just_right_button.callback = just_right_callback
+            too_tough_button.callback = too_tough_callback
 
             view.add_item(too_weak_button)
             view.add_item(just_right_button)
