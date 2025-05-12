@@ -445,9 +445,9 @@ class Omni(commands.Cog):
             if log_channel_id:
                 log_channel = guild.get_channel(log_channel_id)
                 if log_channel:
-                    embed = await self._create_moderation_embed(message, category_scores, "✨ Message processed using AI")
+                    embed = await self._create_moderation_embed(message, category_scores, "Message processed by Omni")
                     if error_code:
-                        embed.add_field(name="Error", value=f":x: `{error_code}` Failed to send to OpenAI endpoint.", inline=False)
+                        embed.add_field(name="Error", value=f":x: `{error_code}` Failed to send to moderation endpoint.", inline=False)
                     await log_channel.send(embed=embed, view=await self._create_jump_view(message))
         except Exception as e:
             raise RuntimeError(f"Failed to log message: {e}")
