@@ -9,6 +9,22 @@ import random
 class Honeypot(commands.Cog, name="Honeypot"):
     """Create a channel at the top of the server to attract self bots/scammers and notify/mute/kick/ban them immediately!"""
 
+    # Add a vanity name for each scam type for user-friendly display
+    SCAM_TYPE_VANITY = {
+        "nitro": "Fake Discord Nitro",
+        "steam": "Fake Steam/Valve",
+        "csam": "Illegal/CSAM Content",
+        "crypto": "Crypto Scam",
+        "phishing": "Phishing/Account Stealing",
+        "roblox": "Fake Roblox/Robux",
+        "giveaway": "Fake Giveaway/Prize",
+        "adult": "Adult Content/NSFW",
+        "malware": "Malware/Virus",
+        "giftcard": "Gift Card Scam",
+        "selfbot": "Selfbot/Spam",
+        "other": "Uncategorized/Other",
+    }
+
     SCAM_TYPES = {
         "nitro": [
             "nitro", "free nitro", "discord nitro", "gift nitro", "nitro giveaway", "nitro drop", "nitro for free", "nitro rewards", "nitro event", "nitro boost",
@@ -367,7 +383,13 @@ class Honeypot(commands.Cog, name="Honeypot"):
         embed.add_field(name="User display name", value=message.author.display_name, inline=True)
         embed.add_field(name="User mention", value=message.author.mention, inline=True)
         embed.add_field(name="User ID", value=message.author.id, inline=True)
-        embed.add_field(name="Scam type", value=scam_type.upper(), inline=True)
+        # Show both the vanity name and the code name for clarity
+        scam_type_vanity = self.SCAM_TYPE_VANITY.get(scam_type, scam_type.capitalize())
+        embed.add_field(
+            name="Scam type",
+            value=f"{scam_type_vanity} (`{scam_type}`)",
+            inline=True
+        )
 
         failed = None
         if action:
@@ -481,7 +503,12 @@ class Honeypot(commands.Cog, name="Honeypot"):
         embed.add_field(name="User display name", value=member.display_name, inline=True)
         embed.add_field(name="User mention", value=member.mention, inline=True)
         embed.add_field(name="User ID", value=member.id, inline=True)
-        embed.add_field(name="Scam type", value=scam_type.upper(), inline=True)
+        scam_type_vanity = self.SCAM_TYPE_VANITY.get(scam_type, scam_type.capitalize())
+        embed.add_field(
+            name="Scam type",
+            value=f"{scam_type_vanity} (`{scam_type}`)",
+            inline=True
+        )
         failed = None
         if action:
             try:
@@ -817,20 +844,20 @@ class Honeypot(commands.Cog, name="Honeypot"):
             # Prepare server stats lines
             server_lines = []
             for stype in self.SCAM_TYPES:
+                vanity = self.SCAM_TYPE_VANITY.get(stype, stype.replace("_", " ").capitalize())
                 if stype == "other":
-                    server_lines.append(f"**Uncategorized detections:** {scam_stats.get(stype, 0)}")
+                    server_lines.append(f"**{vanity}:** {scam_stats.get(stype, 0)}")
                 else:
-                    pretty = stype.replace("_", " ").capitalize()
-                    server_lines.append(f"**{pretty} flags:** {scam_stats.get(stype, 0)}")
+                    server_lines.append(f"**{vanity}:** {scam_stats.get(stype, 0)}")
 
             # Prepare global stats lines
             global_lines = []
             for stype in self.SCAM_TYPES:
+                vanity = self.SCAM_TYPE_VANITY.get(stype, stype.replace("_", " ").capitalize())
                 if stype == "other":
-                    global_lines.append(f"**Uncategorized detections:** {global_stats.get(stype, 0)}")
+                    global_lines.append(f"**{vanity}:** {global_stats.get(stype, 0)}")
                 else:
-                    pretty = stype.replace("_", " ").capitalize()
-                    global_lines.append(f"**{pretty} flags:** {global_stats.get(stype, 0)}")
+                    global_lines.append(f"**{vanity}:** {global_stats.get(stype, 0)}")
 
             embed = discord.Embed(title="Honeypot detection statistics", color=0xfffffe)
             embed.add_field(
