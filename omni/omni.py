@@ -444,12 +444,9 @@ class Omni(commands.Cog):
             # Add jump to conversation button
             self.add_item(discord.ui.Button(label="Jump to place in conversation", url=message.jump_url))
 
-            # Add kick and ban buttons
-            self.add_item(discord.ui.Button(label="Kick", style=discord.ButtonStyle.grey, custom_id=f"kick_{message.author.id}", emoji="👢"))
-            self.add_item(discord.ui.Button(label="Ban", style=discord.ButtonStyle.grey, custom_id=f"ban_{message.author.id}", emoji="🔨"))
-
-            # Add Timeout button (always present)
-            self.add_item(self.TimeoutButton(cog, message, timeout_duration))
+            # Only show Timeout button if timeouts are not enabled (timeout_duration == 0)
+            if self.timeout_duration == 0:
+                self.add_item(self.TimeoutButton(cog, message, timeout_duration))
 
             # Add Untimeout button only if a timeout was issued
             if timeout_issued:
