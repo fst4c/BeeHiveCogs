@@ -441,9 +441,6 @@ class Omni(commands.Cog):
             self.timeout_issued = timeout_issued
             self.timeout_duration = timeout_duration
 
-            # Add jump to conversation button
-            self.add_item(discord.ui.Button(label="Jump to place in conversation", url=message.jump_url))
-
             # Only show Timeout button if timeouts are not enabled (timeout_duration == 0)
             if self.timeout_duration == 0:
                 self.add_item(self.TimeoutButton(cog, message, timeout_duration))
@@ -451,6 +448,9 @@ class Omni(commands.Cog):
             # Add Untimeout button only if a timeout was issued
             if timeout_issued:
                 self.add_item(self.UntimeoutButton(cog, message))
+
+            # Add jump to conversation button LAST (so it appears underneath)
+            self.add_item(discord.ui.Button(label="Jump to place in conversation", url=message.jump_url))
 
         class TimeoutButton(discord.ui.Button):
             def __init__(self, cog, message, timeout_duration):
