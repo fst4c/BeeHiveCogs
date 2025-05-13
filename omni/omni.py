@@ -582,32 +582,27 @@ class Omni(commands.Cog):
                 if not channel:
                     await interaction.response.send_message("Original channel not found.", ephemeral=True)
                     return
-                # Find or create a webhook
-                webhook = None
-                try:
-                    webhooks = await channel.webhooks()
-                    for wh in webhooks:
-                        if wh.user and wh.user.id == interaction.client.user.id:
-                            webhook = wh
-                            break
-                    if not webhook:
-                        webhook = await channel.create_webhook(name="Omni Restore")
-                except Exception:
-                    webhook = None
+
                 # Prepare content and avatar
                 content = deleted_info.get("content", "")
+                # Use the display name and avatar of the original sender
                 username = deleted_info.get("author_name", "Unknown")
                 avatar_url = deleted_info.get("author_avatar", None)
-                # Only support image attachments for now
                 attachments = deleted_info.get("attachments", [])
-                # Defensive: ensure attachments is a list
                 if not isinstance(attachments, list):
                     attachments = []
-                # Send the message as the user via webhook
+
+                # Always create a new webhook named after the sender with their avatar
+                try:
+                    webhook = await channel.create_webhook(name=username, avatar=None)
+                    # Discord API: avatar param is bytes, not URL. We use avatar_url in webhook.send below.
+                except Exception as e:
+                    await interaction.response.send_message(f"Failed to create webhook: {e}", ephemeral=True)
+                    return
+
                 try:
                     # Only send content if it is a non-empty string
                     send_content = content if isinstance(content, str) and content.strip() else None
-                    # Defensive: ensure send_content is not None and not empty, and not NoneType
                     if send_content is not None and isinstance(send_content, str) and len(send_content) > 0:
                         await webhook.send(
                             content=send_content,
@@ -629,6 +624,12 @@ class Omni(commands.Cog):
                     await interaction.response.send_message("Message restored in the original channel.", ephemeral=True)
                 except Exception as e:
                     await interaction.response.send_message(f"Failed to restore message: {e}", ephemeral=True)
+                finally:
+                    # Clean up: delete the webhook after use to avoid clutter
+                    try:
+                        await webhook.delete()
+                    except Exception:
+                        pass
 
     async def _create_action_view(self, message, category_scores, timeout_issued=None):
         # Determine if a timeout was issued for this message
