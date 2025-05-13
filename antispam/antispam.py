@@ -12,12 +12,12 @@ class AntiSpam(commands.Cog):
     Detects and mitigates message spam, flooding, copypasta, ascii art, and more.
     """
 
-    __author__ = "aikaterna, max, etc"
+    __author__ = "adminelevation"
     __version__ = "1.0.0"
 
     def __init__(self, bot):
         self.bot = bot
-        self.config = Config.get_conf(self, identifier=0xA17A5A9A)
+        self.config = Config.get_conf(self, identifier=73947298374)
         default_guild = {
             "enabled": True,
             "message_limit": 6,
@@ -312,13 +312,6 @@ class AntiSpam(commands.Cog):
             elif punishment == "ban":
                 await user.ban(reason="AntiSpam: " + reason, delete_message_days=1)
             # else: none
-        except Exception:
-            pass
-
-        try:
-            await user.send(
-                f"You were punished in **{guild.name}** for spam: {reason}"
-            )
         except Exception:
             pass
 
