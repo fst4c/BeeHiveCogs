@@ -25,6 +25,9 @@ class Omni(commands.Cog):
         self.memory_moderated_users = defaultdict(lambda: defaultdict(int))
         self.memory_category_counter = defaultdict(Counter)
 
+        # In-memory per-user violation tracking (guild_id -> user_id -> [violation dicts])
+        self.memory_user_violations = defaultdict(lambda: defaultdict(list))
+
         # In-memory reminder tracking to prevent duplicate reminders
         self._reminder_sent_at = defaultdict(dict)  # {guild_id: {channel_id: datetime}}
 
@@ -72,7 +75,8 @@ class Omni(commands.Cog):
             delete_violatory_messages=True,
             last_reminder_time=None,
             bypass_nsfw=False,
-            monitoring_warning_enabled=True
+            monitoring_warning_enabled=True,
+            user_violations={},  # {user_id: [violation_dict, ...]}
         )
         self.config.register_global(
             global_message_count=0,
@@ -298,6 +302,23 @@ class Omni(commands.Cog):
         self.memory_moderated_users['global'][message.author.id] += 1
         self.update_category_counter(guild_id, text_category_scores)
         self.update_category_counter('global', text_category_scores)
+
+        # --- Per-user violation tracking ---
+        # Only store if at least one score > 0.2 (to avoid noise)
+        violation_categories = {cat: score for cat, score in text_category_scores.items() if score > 0.2}
+        if violation_categories:
+            violation_entry = {
+                "message_id": message.id,
+                "timestamp": getattr(message, "created_at", datetime.utcnow()).timestamp(),
+                "content": message.content,
+                "categories": violation_categories,
+                "channel_id": getattr(message.channel, "id", None),
+                "channel_name": getattr(message.channel, "name", ""),
+                "author_id": getattr(message.author, "id", None),
+                "author_name": getattr(message.author, "display_name", str(message.author)),
+                "attachments": [a.url for a in getattr(message, "attachments", []) if getattr(a, "content_type", None) and a.content_type.startswith("image/") and not a.content_type.endswith("gif")],
+            }
+            self.memory_user_violations[guild_id][message.author.id].append(violation_entry)
 
         if any(getattr(attachment, "content_type", None) and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif") for attachment in getattr(message, "attachments", [])):
             self.increment_statistic(guild_id, 'moderated_image_count')
@@ -944,11 +965,24 @@ class Omni(commands.Cog):
                 current_counter.update(counter)
                 await guild_conf.category_counter.set(dict(current_counter))
 
+        # Save per-user violation history
+        for guild_id, user_violations in self.memory_user_violations.items():
+            guild_conf = self.config.guild_from_id(guild_id)
+            current_violations = await guild_conf.user_violations()
+            for user_id, violations in user_violations.items():
+                # Append new violations to existing list
+                if str(user_id) not in current_violations:
+                    current_violations[str(user_id)] = []
+                # Only keep the last 50 violations per user to avoid unbounded growth
+                current_violations[str(user_id)] = (current_violations[str(user_id)] + violations)[-50:]
+            await guild_conf.user_violations.set(current_violations)
+
         # Clear in-memory statistics after saving
         self.memory_stats.clear()
         self.memory_user_message_counts.clear()
         self.memory_moderated_users.clear()
         self.memory_category_counter.clear()
+        self.memory_user_violations.clear()
         # Also clear flagged image tracking after save
         self._flagged_image_for_message.clear()
 
@@ -961,7 +995,6 @@ class Omni(commands.Cog):
         Read more about **[omni-moderation-latest](<https://platform.openai.com/docs/models/omni-moderation-latest>)** or [visit OpenAI's website](<https://openai.com>) to learn more.
         """
         pass
-
 
     @omni.command()
     async def stats(self, ctx):
@@ -1088,6 +1121,61 @@ class Omni(commands.Cog):
 
     @omni.command()
     @commands.admin_or_permissions(manage_guild=True)
+    async def history(self, ctx, user: discord.Member = None):
+        """
+        Show the violation history for a user in this server.
+        If no user is provided, shows your own history (if you are not a bot).
+        """
+        try:
+            guild = ctx.guild
+            if user is None:
+                user = ctx.author
+            # Only staff can view others' history
+            if user != ctx.author and not (ctx.author.guild_permissions.administrator or ctx.author.guild_permissions.manage_guild):
+                await ctx.send("You do not have permission to view other users' violation history.")
+                return
+
+            guild_conf = self.config.guild(guild)
+            user_violations = await guild_conf.user_violations()
+            violations = user_violations.get(str(user.id), [])
+
+            # Add in-memory violations not yet saved
+            mem_violations = self.memory_user_violations[guild.id].get(user.id, [])
+            if mem_violations:
+                violations = (violations + mem_violations)[-50:]
+
+            if not violations:
+                await ctx.send(f"No violations found for {user.mention}.")
+                return
+
+            # Show up to 5 most recent violations
+            violations_to_show = violations[-5:]
+            embed = discord.Embed(
+                title=f"Violation history for {user.display_name}",
+                color=0xff4545,
+                description=f"Showing the {len(violations_to_show)} most recent violation(s) for {user.mention}."
+            )
+            for v in violations_to_show:
+                ts = v.get("timestamp")
+                dt = datetime.utcfromtimestamp(ts) if ts else None
+                time_str = f"<t:{int(ts)}:R>" if ts else "Unknown time"
+                content = v.get("content", "*No content*")
+                categories = v.get("categories", {})
+                cat_str = ", ".join(f"{cat}: {score*100:.0f}%" for cat, score in categories.items())
+                channel_id = v.get("channel_id")
+                channel_mention = f"<#{channel_id}>" if channel_id else "Unknown"
+                embed.add_field(
+                    name=f"{time_str} in {channel_mention}",
+                    value=f"**Categories:** {cat_str}\n**Message:** {content[:300]}{'...' if len(content) > 300 else ''}",
+                    inline=False
+                )
+            embed.set_footer(text="Only the last 50 violations are kept per user.")
+            await ctx.send(embed=embed)
+        except Exception as e:
+            raise RuntimeError(f"Failed to display violation history: {e}")
+
+    @omni.command()
+    @commands.admin_or_permissions(manage_guild=True)
     async def settings(self, ctx):
         """Show the current settings of the cog."""
         try:
@@ -1169,6 +1257,7 @@ class Omni(commands.Cog):
                 await guild_conf.too_weak_votes.set(0)
                 await guild_conf.too_tough_votes.set(0)
                 await guild_conf.just_right_votes.set(0)
+                await guild_conf.user_violations.set({})
 
             # Reset global statistics
             await self.config.global_message_count.set(0)
@@ -1185,6 +1274,7 @@ class Omni(commands.Cog):
             self.memory_user_message_counts.clear()
             self.memory_moderated_users.clear()
             self.memory_category_counter.clear()
+            self.memory_user_violations.clear()
             self._reminder_sent_at.clear()
             self._timeout_issued_for_message.clear()
             self._deleted_messages.clear()
