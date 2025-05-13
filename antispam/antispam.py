@@ -179,7 +179,10 @@ class AntiSpam(commands.Cog):
         recent_msgs = [t for t, _ in cache if now - t < interval]
         if len(recent_msgs) >= message_limit:
             reason = f"Sent {len(recent_msgs)} messages in {interval} seconds."
-            await self._punish(message, reason)
+            evidence = "\n".join(
+                f"[{i+1}] {content[:200]}" for i, (_, content) in enumerate(list(cache)[-len(recent_msgs):])
+            )
+            await self._punish(message, reason, evidence=evidence)
             return
 
         # Heuristic 2: Message Similarity (Copypasta/Repeat)
@@ -187,12 +190,19 @@ class AntiSpam(commands.Cog):
         if len(cache) >= 3:
             last = cache[-1][1]
             similar_count = 0
-            for _, prev in list(cache)[-4:-1]:
+            similar_msgs = []
+            for idx, (_, prev) in enumerate(list(cache)[-4:-1]):
                 if self._similar(last, prev, similarity_threshold):
                     similar_count += 1
+                    similar_msgs.append(prev)
             if similar_count >= 2:
                 reason = f"Sent {similar_count+1} highly similar messages."
-                await self._punish(message, reason)
+                evidence = (
+                    f"Latest message:\n{last[:400]}\n\n"
+                    f"Previous similar messages:\n" +
+                    "\n\n".join(f"[{i+1}] {msg[:400]}" for i, msg in enumerate(similar_msgs))
+                )
+                await self._punish(message, reason, evidence=evidence)
                 return
 
         # Heuristic 3: ASCII Art / Large Block Messages
@@ -200,19 +210,32 @@ class AntiSpam(commands.Cog):
         ascii_art_min_lines = await conf.ascii_art_min_lines()
         if self._is_ascii_art(message.content, ascii_art_threshold, ascii_art_min_lines):
             reason = "Sent ASCII art or large block message."
-            await self._punish(message, reason)
+            evidence = f"Message content (first 600 chars):\n{message.content[:600]}"
+            await self._punish(message, reason, evidence=evidence)
             return
 
         # Heuristic 4: Zalgo/Unicode Spam
         if self._is_zalgo(message.content):
             reason = "Sent Zalgo/unicode spam."
-            await self._punish(message, reason)
+            zalgo_chars = re.findall(r'[\u0300-\u036F\u0489]', message.content)
+            evidence = (
+                f"Message content (first 400 chars):\n{message.content[:400]}\n\n"
+                f"Number of zalgo/unicode marks: {len(zalgo_chars)}"
+            )
+            await self._punish(message, reason, evidence=evidence)
             return
 
         # Heuristic 5: Mass Mentions
         if self._is_mass_mention(message):
             reason = "Mass mention spam."
-            await self._punish(message, reason)
+            mention_list = [f"<@{m.id}>" for m in message.mentions]
+            evidence = (
+                f"Mentions: {', '.join(mention_list) if mention_list else 'None'}\n"
+                f"@everyone: {'@everyone' in message.content}\n"
+                f"@here: {'@here' in message.content}\n"
+                f"Message content (first 400 chars):\n{message.content[:400]}"
+            )
+            await self._punish(message, reason, evidence=evidence)
             return
 
     def _similar(self, a, b, threshold):
@@ -246,7 +269,7 @@ class AntiSpam(commands.Cog):
             return True
         return False
 
-    async def _punish(self, message, reason):
+    async def _punish(self, message, reason, evidence=None):
         guild = message.guild
         conf = self.config.guild(guild)
         punishment = await conf.punishment()
@@ -313,6 +336,11 @@ class AntiSpam(commands.Cog):
                     )
                     embed.add_field(name="Punishment", value=punishment)
                     embed.add_field(name="Channel", value=message.channel.mention)
+                    if evidence:
+                        # Truncate evidence if too long for Discord
+                        if len(evidence) > 1000:
+                            evidence = evidence[:1000] + "\n...(truncated)"
+                        embed.add_field(name="Evidence", value=evidence, inline=False)
                     await log_channel.send(embed=embed)
                 except Exception:
                     pass
