@@ -468,6 +468,8 @@ class Omni(commands.Cog):
                 if getattr(attachment, "content_type", None) and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif"):
                     embed.set_image(url=attachment.url)
                     break
+        # Attach the scores to the embed for parsing in the WarnButton
+        embed._omni_category_scores = category_scores
         return embed
 
     class _ModerationActionView(discord.ui.View):
@@ -609,7 +611,36 @@ class Omni(commands.Cog):
                     )
                     await interaction.response.send_message(embed=embed, ephemeral=True)
                     return
-                # Compose warning embed for DM
+
+                # Try to parse the moderation scores from the log embed, if available
+                # The log embed is interaction.message.embeds[0], and we attached _omni_category_scores to it in _create_moderation_embed
+                category_scores = None
+                moderation_threshold = None
+                if interaction.message and interaction.message.embeds:
+                    log_embed = interaction.message.embeds[0]
+                    # Try to get the attached attribute (if present)
+                    category_scores = getattr(log_embed, "_omni_category_scores", None)
+                    # If not present, try to parse from fields
+                    if category_scores is None:
+                        # Try to parse from fields
+                        category_scores = {}
+                        for field in log_embed.fields:
+                            if field.name and field.value and field.name.lower() not in ["sent by", "sent in", "action taken", "ai moderator ratings", "error"]:
+                                # Remove bolding if present
+                                value = field.value.replace("**", "").replace("%", "")
+                                try:
+                                    score = float(value) / 100.0
+                                except Exception:
+                                    score = None
+                                if score is not None:
+                                    category_scores[field.name.lower()] = score
+                    # Try to get moderation threshold from the embed if possible
+                    # (not available, so fallback to config)
+                if not category_scores:
+                    # Fallback: no scores found, so just send a warning without scores
+                    category_scores = {}
+
+                # Compose warning embed for DM, including moderation scores
                 warning_embed = discord.Embed(
                     title="⚠️ You have received a warning",
                     description=(
@@ -622,6 +653,29 @@ class Omni(commands.Cog):
                     value=self.message.content or "*No content*",
                     inline=False
                 )
+                # Add moderation scores if available
+                if category_scores:
+                    # Get moderation threshold for bolding
+                    if moderation_threshold is None:
+                        try:
+                            moderation_threshold = await self.cog.config.guild(self.message.guild).moderation_threshold()
+                        except Exception:
+                            moderation_threshold = 0.75
+                    # Sort and show top 6
+                    sorted_scores = sorted(category_scores.items(), key=lambda item: item[1], reverse=True)[:6]
+                    score_lines = []
+                    for category, score in sorted_scores:
+                        score_percentage = score * 100
+                        if moderation_threshold is not None and score > moderation_threshold:
+                            score_display = f"**{score_percentage:.0f}%**"
+                        else:
+                            score_display = f"{score_percentage:.0f}%"
+                        score_lines.append(f"{category.capitalize()}: {score_display}")
+                    warning_embed.add_field(
+                        name="AI moderation scores",
+                        value="\n".join(score_lines),
+                        inline=False
+                    )
                 warning_embed.add_field(
                     name="Next Steps",
                     value="Please review the server rules and Discord's [Terms of Service](https://discord.com/terms) and [Community Guidelines](https://discord.com/guidelines).",
