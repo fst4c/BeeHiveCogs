@@ -9,7 +9,7 @@ from difflib import SequenceMatcher
 class AntiSpam(commands.Cog):
     """
     Heuristic-based anti-spam cog for Red-DiscordBot.
-    Detects and mitigates message spam, flooding, copypasta, ascii art, and more.
+    Detects and mitigates message spam, flooding, copypasta, ascii art, emoji spam, and more.
     """
 
     __author__ = "adminelevation"
@@ -25,6 +25,8 @@ class AntiSpam(commands.Cog):
             "similarity_threshold": 0.85,
             "ascii_art_threshold": 12,
             "ascii_art_min_lines": 6,
+            "emoji_spam_threshold": 15,  # New: max emojis per message before considered spam
+            "emoji_spam_unique_threshold": 10,  # New: max unique emojis per message before considered spam
             "punishment": "timeout",  # timeout, kick, ban, none
             "timeout_time": 60,  # seconds
             "ignored_channels": [],
@@ -87,6 +89,16 @@ class AntiSpam(commands.Cog):
             return
         await self.config.guild(ctx.guild).timeout_time.set(seconds)
         await ctx.send(f"Timeout time set to {seconds} seconds.")
+
+    @antispam.command()
+    async def setemojispam(self, ctx, max_emojis: int = 15, max_unique: int = 10):
+        """Set emoji spam thresholds: max_emojis per message, max_unique emojis per message."""
+        if max_emojis < 1 or max_unique < 1:
+            await ctx.send("Both emoji thresholds must be greater than 0.")
+            return
+        await self.config.guild(ctx.guild).emoji_spam_threshold.set(max_emojis)
+        await self.config.guild(ctx.guild).emoji_spam_unique_threshold.set(max_unique)
+        await ctx.send(f"Emoji spam thresholds set: {max_emojis} total, {max_unique} unique per message.")
 
     @antispam.command(name="setlogchannel")
     async def set_log_channel(self, ctx, channel: discord.TextChannel = None):
@@ -243,7 +255,26 @@ class AntiSpam(commands.Cog):
             await self._punish(message, reason, evidence=evidence)
             return
 
-        # Heuristic 4: Zalgo/Unicode Spam
+        # Heuristic 4: Emoji Spam/Excessive Emoji Usage
+        try:
+            emoji_spam_threshold = await conf.emoji_spam_threshold()
+            emoji_spam_unique_threshold = await conf.emoji_spam_unique_threshold()
+        except Exception:
+            emoji_spam_threshold = 15
+            emoji_spam_unique_threshold = 10
+        emoji_count, unique_emoji_count, emoji_list = self._count_emojis(message.content)
+        if emoji_count >= emoji_spam_threshold or unique_emoji_count >= emoji_spam_unique_threshold:
+            reason = "Emoji spam/excessive emoji usage."
+            evidence = (
+                f"Total emojis: {emoji_count}\n"
+                f"Unique emojis: {unique_emoji_count}\n"
+                f"Emojis: {' '.join(emoji_list)[:400]}\n"
+                f"Message content (first 400 chars):\n{message.content[:400]}"
+            )
+            await self._punish(message, reason, evidence=evidence)
+            return
+
+        # Heuristic 5: Zalgo/Unicode Spam
         if self._is_zalgo(message.content):
             reason = "Sent Zalgo/unicode spam."
             zalgo_chars = re.findall(r'[\u0300-\u036F\u0489]', message.content)
@@ -254,7 +285,7 @@ class AntiSpam(commands.Cog):
             await self._punish(message, reason, evidence=evidence)
             return
 
-        # Heuristic 5: Mass Mentions
+        # Heuristic 6: Mass Mentions
         if self._is_mass_mention(message):
             reason = "Mass mention spam."
             mention_list = [f"<@{m.id}>" for m in message.mentions]
@@ -304,6 +335,38 @@ class AntiSpam(commands.Cog):
         if "@everyone" in message.content or "@here" in message.content:
             return True
         return False
+
+    def _count_emojis(self, content):
+        # Returns (total_emoji_count, unique_emoji_count, emoji_list)
+        # Discord custom emoji: <a?:name:id>
+        custom_emoji_re = re.compile(r'<a?:\w+:\d+>')
+        # Unicode emoji: use a broad regex for emoji blocks
+        # This regex is not perfect but covers most emoji
+        unicode_emoji_re = re.compile(
+            "["
+            "\U0001F600-\U0001F64F"  # emoticons
+            "\U0001F300-\U0001F5FF"  # symbols & pictographs
+            "\U0001F680-\U0001F6FF"  # transport & map symbols
+            "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+            "\U00002700-\U000027BF"  # Dingbats
+            "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
+            "\U00002600-\U000026FF"  # Misc symbols
+            "\U00002B50"             # ⭐
+            "\U00002B06"             # ⬆
+            "\U00002B07"             # ⬇
+            "\U00002B1B-\U00002B1C"  # ⬛⬜
+            "\U0000231A-\U0000231B"  # ⌚⌛
+            "\U000025AA-\U000025AB"  # ▪▫
+            "\U000025FB-\U000025FE"  # ◻◾
+            "\U0001F004"             # 🀄
+            "\U0001F0CF"             # 🃏
+            "]+"
+        )
+        custom_emojis = custom_emoji_re.findall(content)
+        unicode_emojis = unicode_emoji_re.findall(content)
+        emoji_list = custom_emojis + unicode_emojis
+        unique_emoji_set = set(emoji_list)
+        return len(emoji_list), len(unique_emoji_set), emoji_list
 
     async def _punish(self, message, reason, evidence=None):
         guild = message.guild
@@ -430,6 +493,8 @@ class AntiSpam(commands.Cog):
             ignored_roles = await conf.ignored_roles()
             ignored_users = await conf.ignored_users()
             log_channel_id = await conf.log_channel()
+            emoji_spam_threshold = await conf.emoji_spam_threshold()
+            emoji_spam_unique_threshold = await conf.emoji_spam_unique_threshold()
         except Exception:
             await ctx.send("Failed to fetch AntiSpam settings.")
             return
@@ -445,6 +510,7 @@ class AntiSpam(commands.Cog):
         embed.add_field(name="Punishment", value=punishment)
         if punishment == "timeout":
             embed.add_field(name="Timeout Time", value=f"{timeout_time}s")
+        embed.add_field(name="Emoji Spam Threshold", value=f"{emoji_spam_threshold} total, {emoji_spam_unique_threshold} unique", inline=False)
         if log_channel:
             embed.add_field(name="Log Channel", value=log_channel.mention, inline=False)
         if ignored_channels:
