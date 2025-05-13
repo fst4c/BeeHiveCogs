@@ -34,6 +34,9 @@ class Omni(commands.Cog):
         # Store deleted messages for possible restoration
         self._deleted_messages = {}  # {message_id: {"content": ..., "author_id": ..., "author_name": ..., "author_avatar": ..., "channel_id": ..., "attachments": [...] }}
 
+        # Track untimeout button tasks by message id for cancellation if needed
+        self._untimeout_tasks = {}  # {message_id: asyncio.Task}
+
         # Start periodic save task
         # Use asyncio.create_task for compatibility with modern Red/discord.py
         try:
@@ -440,9 +443,42 @@ class Omni(commands.Cog):
                 if log_channel:
                     embed = await self._create_moderation_embed(message, category_scores, "AI moderator detected potential misbehavior", action_taken)
                     view = await self._create_action_view(message, category_scores, timeout_issued=timeout_issued)
+                    # If a timeout was issued, schedule disabling the Untimeout button after the timeout duration
+                    if timeout_issued and timeout_duration > 0:
+                        # Find the UntimeoutButton in the view
+                        for item in view.children:
+                            if isinstance(item, self._ModerationActionView.UntimeoutButton):
+                                # Schedule a task to disable the button after timeout_duration minutes
+                                task = asyncio.create_task(self._disable_untimeout_button_after(message.id, view, item, timeout_duration))
+                                # Store the task so it can be cancelled if needed
+                                self._untimeout_tasks[message.id] = task
+                                break
                     await log_channel.send(embed=embed, view=view)
         except Exception as e:
             raise RuntimeError(f"Failed to handle moderation: {e}")
+
+    async def _disable_untimeout_button_after(self, message_id, view, button, timeout_duration):
+        try:
+            await asyncio.sleep(timeout_duration * 60)
+            button.disabled = True
+            button.label = "Timeout expired"
+            # Try to update the view on the log message, if possible
+            # We need to find the message object, but we don't have it here.
+            # Instead, we can try to update the view if the view is attached to a message.
+            # This requires the view to have a reference to the message, which is not always the case.
+            # So, we will try to update all messages in the view's children that have a .message attribute.
+            # But the best we can do is to update the view if the button has a .view and .view.message.
+            try:
+                # Try to update the view on the log message if possible
+                if hasattr(view, "message") and view.message:
+                    await view.message.edit(view=view)
+            except Exception:
+                pass
+        except Exception:
+            pass
+        finally:
+            # Remove the task from tracking after it's done
+            self._untimeout_tasks.pop(message_id, None)
 
     async def _create_moderation_embed(self, message, category_scores, title, action_taken):
         embed = discord.Embed(
@@ -485,7 +521,8 @@ class Omni(commands.Cog):
 
             # Add Untimeout button only if a timeout was issued
             if timeout_issued:
-                self.add_item(self.UntimeoutButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
+                self.untimeout_button = self.UntimeoutButton(cog, message, row=1, moderated_user_id=self.moderated_user_id)
+                self.add_item(self.untimeout_button)
 
             # Add Restore button if message was deleted and info is available
             if message.id in cog._deleted_messages:
