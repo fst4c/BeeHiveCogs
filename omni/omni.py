@@ -636,14 +636,6 @@ class Omni(commands.Cog):
                     )
                     await interaction.response.send_message(embed=embed, ephemeral=True)
                     return
-                # Only allow users with manage_guild or admin
-                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
-                    embed = discord.Embed(
-                        description="You do not have permission to use this button.",
-                        color=discord.Color.red()
-                    )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
-                    return
                 member = self.message.guild.get_member(self.message.author.id)
                 if not member:
                     embed = discord.Embed(
@@ -674,20 +666,11 @@ class Omni(commands.Cog):
                 # Try to send DM only
                 try:
                     await member.send(embed=warning_embed)
-                    response_embed = discord.Embed(
-                        description=f"User {member.mention} has been warned via DM.",
-                        color=discord.Color.green()
-                    )
-                    await interaction.response.send_message(embed=response_embed, ephemeral=True)
                     self.label = "Warning sent"
                 except Exception:
-                    response_embed = discord.Embed(
-                        description=f"User {member.mention} could not be DMed. DM's closed.",
-                        color=discord.Color.red()
-                    )
-                    await interaction.response.send_message(embed=response_embed, ephemeral=True)
                     self.label = "DM's closed"
                 self.disabled = True
+                await interaction.response.defer()
                 try:
                     await interaction.message.edit(view=self.view)
                 except Exception:
