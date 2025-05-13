@@ -601,19 +601,21 @@ class Omni(commands.Cog):
                 # Only support image attachments for now
                 attachments = deleted_info.get("attachments", [])
                 # Defensive: ensure attachments is a list
-                if attachments is None:
+                if not isinstance(attachments, list):
                     attachments = []
                 # Send the message as the user via webhook
                 try:
                     # Only send content if it is a non-empty string
                     send_content = content if isinstance(content, str) and content.strip() else None
-                    await webhook.send(
-                        content=send_content,
-                        username=username,
-                        avatar_url=avatar_url,
-                        files=None,
-                        embeds=None
-                    )
+                    # Defensive: ensure send_content is not None and not empty, and not NoneType
+                    if send_content is not None and isinstance(send_content, str) and len(send_content) > 0:
+                        await webhook.send(
+                            content=send_content,
+                            username=username,
+                            avatar_url=avatar_url,
+                            files=None,
+                            embeds=None
+                        )
                     # If there are image attachments, send them as separate messages
                     for img_url in attachments:
                         if img_url:
