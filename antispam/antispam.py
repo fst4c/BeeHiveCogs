@@ -165,7 +165,7 @@ class AntiSpam(commands.Cog):
         await ctx.send(f"Removed user from whitelist: {user.mention}")
 
     @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
+    async def on_message_without_command(self, message: discord.Message):
         if not message.guild or message.author.bot:
             return
 
