@@ -529,9 +529,16 @@ class Omni(commands.Cog):
                         await interaction.response.send_message("User not found in this server.", ephemeral=True)
                         return
                     # Remove timeout by setting duration to None
-                    await member.timeout(None, reason="Manual untimeout via Omni log button")
+                    await member.timeout(None, reason="Staff member removed a timeout issued by Omni")
                     self.cog._timeout_issued_for_message[self.message.id] = False
                     await interaction.response.send_message(f"User {member.mention} has been un-timed out.", ephemeral=True)
+                    # Disable the button after successful untimeout
+                    self.disabled = True
+                    # Try to update the view to reflect the disabled state
+                    try:
+                        await interaction.message.edit(view=self.view)
+                    except Exception:
+                        pass
                 except Exception as e:
                     await interaction.response.send_message(f"Failed to untimeout user: {e}", ephemeral=True)
 
