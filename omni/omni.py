@@ -443,18 +443,22 @@ class Omni(commands.Cog):
 
             # Only show Timeout button if timeouts are not enabled (timeout_duration == 0)
             if self.timeout_duration == 0:
-                self.add_item(self.TimeoutButton(cog, message, timeout_duration))
+                self.add_item(self.TimeoutButton(cog, message, timeout_duration, row=1))
 
             # Add Untimeout button only if a timeout was issued
             if timeout_issued:
-                self.add_item(self.UntimeoutButton(cog, message))
+                self.add_item(self.UntimeoutButton(cog, message, row=1))
 
-            # Add jump to conversation button LAST (so it appears underneath)
-            self.add_item(discord.ui.Button(label="Jump to place in conversation", url=message.jump_url))
+            # Add kick and ban buttons (always on row 1)
+            self.add_item(self.KickButton(cog, message, row=1))
+            self.add_item(self.BanButton(cog, message, row=1))
+
+            # Add jump to conversation button LAST (so it appears underneath, on row 2)
+            self.add_item(discord.ui.Button(label="Jump to place in conversation", url=message.jump_url, row=2))
 
         class TimeoutButton(discord.ui.Button):
-            def __init__(self, cog, message, timeout_duration):
-                super().__init__(label="Timeout", style=discord.ButtonStyle.grey, custom_id=f"timeout_{message.author.id}_{message.id}", emoji="⏳")
+            def __init__(self, cog, message, timeout_duration, row=1):
+                super().__init__(label="Timeout", style=discord.ButtonStyle.grey, custom_id=f"timeout_{message.author.id}_{message.id}", emoji="⏳", row=row)
                 self.cog = cog
                 self.message = message
                 self.timeout_duration = timeout_duration
@@ -482,8 +486,8 @@ class Omni(commands.Cog):
                     await interaction.response.send_message(f"Failed to timeout user: {e}", ephemeral=True)
 
         class UntimeoutButton(discord.ui.Button):
-            def __init__(self, cog, message):
-                super().__init__(label="Untimeout", style=discord.ButtonStyle.grey, custom_id=f"untimeout_{message.author.id}_{message.id}", emoji="✅")
+            def __init__(self, cog, message, row=1):
+                super().__init__(label="Untimeout", style=discord.ButtonStyle.grey, custom_id=f"untimeout_{message.author.id}_{message.id}", emoji="✅", row=row)
                 self.cog = cog
                 self.message = message
 
@@ -504,13 +508,23 @@ class Omni(commands.Cog):
                 except Exception as e:
                     await interaction.response.send_message(f"Failed to untimeout user: {e}", ephemeral=True)
 
-        @discord.ui.button(label="Kick", style=discord.ButtonStyle.grey, custom_id="kick_button", emoji="👢", row=1)
-        async def kick_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-            await self.cog.kick_user(interaction)
+        class KickButton(discord.ui.Button):
+            def __init__(self, cog, message, row=1):
+                super().__init__(label="Kick", style=discord.ButtonStyle.grey, custom_id=f"kick_{message.author.id}_{message.id}", emoji="👢", row=row)
+                self.cog = cog
+                self.message = message
 
-        @discord.ui.button(label="Ban", style=discord.ButtonStyle.grey, custom_id="ban_button", emoji="🔨", row=1)
-        async def ban_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-            await self.cog.ban_user(interaction)
+            async def callback(self, interaction: discord.Interaction):
+                await self.cog.kick_user(interaction)
+
+        class BanButton(discord.ui.Button):
+            def __init__(self, cog, message, row=1):
+                super().__init__(label="Ban", style=discord.ButtonStyle.grey, custom_id=f"ban_{message.author.id}_{message.id}", emoji="🔨", row=row)
+                self.cog = cog
+                self.message = message
+
+            async def callback(self, interaction: discord.Interaction):
+                await self.cog.ban_user(interaction)
 
     async def _create_action_view(self, message, category_scores, timeout_issued=None):
         # Determine if a timeout was issued for this message
@@ -528,7 +542,20 @@ class Omni(commands.Cog):
         return None
 
     async def kick_user(self, interaction: discord.Interaction):
-        user_id = int(interaction.custom_id.split("_")[1])
+        # Accept both new and old custom_id formats for backward compatibility
+        custom_id = getattr(interaction, "custom_id", None) or getattr(interaction.data, "custom_id", None)
+        if not custom_id:
+            custom_id = interaction.data.get("custom_id", "")
+        # Accept both "kick_button" and "kick_{user_id}_{message_id}"
+        if custom_id.startswith("kick_"):
+            parts = custom_id.split("_")
+            if len(parts) >= 3:
+                user_id = int(parts[1])
+            else:
+                await interaction.response.send_message("Invalid kick button.", ephemeral=True)
+                return
+        else:
+            user_id = int(interaction.custom_id.split("_")[1])
         guild = interaction.guild
         user = guild.get_member(user_id)
         if user:
@@ -540,7 +567,20 @@ class Omni(commands.Cog):
                 await interaction.response.send_message("Failed to kick user.", ephemeral=True)
 
     async def ban_user(self, interaction: discord.Interaction):
-        user_id = int(interaction.custom_id.split("_")[1])
+        # Accept both new and old custom_id formats for backward compatibility
+        custom_id = getattr(interaction, "custom_id", None) or getattr(interaction.data, "custom_id", None)
+        if not custom_id:
+            custom_id = interaction.data.get("custom_id", "")
+        # Accept both "ban_button" and "ban_{user_id}_{message_id}"
+        if custom_id.startswith("ban_"):
+            parts = custom_id.split("_")
+            if len(parts) >= 3:
+                user_id = int(parts[1])
+            else:
+                await interaction.response.send_message("Invalid ban button.", ephemeral=True)
+                return
+        else:
+            user_id = int(interaction.custom_id.split("_")[1])
         guild = interaction.guild
         user = guild.get_member(user_id)
         if user:
