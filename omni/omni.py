@@ -482,7 +482,7 @@ class Omni(commands.Cog):
             self.moderated_user_id = message.author.id
 
             # Add Untimeout button only if a timeout was issued
-            if timeout_issued == 0:
+            if timeout_issued:
                 self.add_item(self.UntimeoutButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
 
             # Add Restore button if message was deleted and info is available
