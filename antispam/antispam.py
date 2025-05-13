@@ -212,7 +212,10 @@ class AntiSpam(commands.Cog):
             return
         recent_msgs = [t for t, _ in cache if now - t < interval]
         if len(recent_msgs) >= message_limit:
-            reason = f"Sent {len(recent_msgs)} messages in {interval} seconds."
+            reason = (
+                f"Failed antispam check 1 for message flooding: "
+                f"Sent {len(recent_msgs)} messages in {interval} seconds."
+            )
             evidence = "\n".join(
                 f"[{i+1}] {content[:200]}" for i, (_, content) in enumerate(list(cache)[-len(recent_msgs):])
             )
@@ -233,7 +236,10 @@ class AntiSpam(commands.Cog):
                     similar_count += 1
                     similar_msgs.append(prev)
             if similar_count >= 2:
-                reason = f"Sent {similar_count+1} highly similar messages."
+                reason = (
+                    f"Failed antispam check 2 for copypasta/repeat: "
+                    f"Sent {similar_count+1} highly similar messages."
+                )
                 evidence = (
                     f"Latest message:\n{last[:400]}\n\n"
                     f"Previous similar messages:\n" +
@@ -250,7 +256,10 @@ class AntiSpam(commands.Cog):
             ascii_art_threshold = 12
             ascii_art_min_lines = 6
         if self._is_ascii_art(message.content, ascii_art_threshold, ascii_art_min_lines):
-            reason = "Sent ASCII art or large block message."
+            reason = (
+                "Failed antispam check 3 for ASCII art/large block message: "
+                "Sent ASCII art or large block message."
+            )
             evidence = f"Message content (first 600 chars):\n`{message.content[:600]}`"
             await self._punish(message, reason, evidence=evidence)
             return
@@ -264,7 +273,11 @@ class AntiSpam(commands.Cog):
             emoji_spam_unique_threshold = 10
         emoji_count, unique_emoji_count, emoji_list = self._count_emojis(message.content)
         if emoji_count >= emoji_spam_threshold or unique_emoji_count >= emoji_spam_unique_threshold:
-            reason = "Emoji spam/excessive emoji usage."
+            reason = (
+                f"Failed antispam check 4 for emoji spam: "
+                f"Emoji spam/excessive emoji usage. "
+                f"Total emojis: {emoji_count}, Unique emojis: {unique_emoji_count}."
+            )
             evidence = (
                 f"Total emojis: {emoji_count}\n"
                 f"Unique emojis: {unique_emoji_count}\n"
@@ -276,8 +289,11 @@ class AntiSpam(commands.Cog):
 
         # Heuristic 5: Zalgo/Unicode Spam
         if self._is_zalgo(message.content):
-            reason = "Sent Zalgo/unicode spam."
             zalgo_chars = re.findall(r'[\u0300-\u036F\u0489]', message.content)
+            reason = (
+                f"Failed antispam check 5 for Zalgo/unicode spam: "
+                f"Sent Zalgo/unicode spam. Number of zalgo/unicode marks: {len(zalgo_chars)}."
+            )
             evidence = (
                 f"Message content (first 400 chars):\n{message.content[:400]}\n\n"
                 f"Number of zalgo/unicode marks: {len(zalgo_chars)}"
@@ -287,8 +303,12 @@ class AntiSpam(commands.Cog):
 
         # Heuristic 6: Mass Mentions
         if self._is_mass_mention(message):
-            reason = "Mass mention spam."
             mention_list = [f"<@{m.id}>" for m in message.mentions]
+            reason = (
+                f"Failed antispam check 6 for mass mention spam: "
+                f"Mass mention spam. Mentions: {len(message.mentions)}, "
+                f"@everyone: {'@everyone' in message.content}, @here: {'@here' in message.content}."
+            )
             evidence = (
                 f"Mentions: {', '.join(mention_list) if mention_list else 'None'}\n"
                 f"@everyone: {'@everyone' in message.content}\n"
@@ -399,12 +419,13 @@ class AntiSpam(commands.Cog):
             pass
 
         try:
+            # The reason string is already descriptive from the calling context
             if punishment == "timeout":
                 # Use Discord's timeout (communication disabled) if available
                 if hasattr(user, "timeout"):
                     import datetime
                     until = discord.utils.utcnow() + datetime.timedelta(seconds=timeout_time)
-                    await user.timeout(until, reason="AntiSpam: " + reason)
+                    await user.timeout(until, reason=reason)
                 else:
                     # Fallback: try to find a Muted role (legacy, not recommended)
                     muted = discord.utils.get(guild.roles, name="Muted")
@@ -420,19 +441,19 @@ class AntiSpam(commands.Cog):
                             except Exception:
                                 continue
                         try:
-                            await user.add_roles(muted, reason="AntiSpam: " + reason)
+                            await user.add_roles(muted, reason=reason)
                             await asyncio.sleep(timeout_time)
                             await user.remove_roles(muted, reason="AntiSpam: timeout expired")
                         except Exception:
                             pass
             elif punishment == "kick":
                 try:
-                    await user.kick(reason="AntiSpam: " + reason)
+                    await user.kick(reason=reason)
                 except Exception:
                     pass
             elif punishment == "ban":
                 try:
-                    await user.ban(reason="AntiSpam: " + reason, delete_message_days=1)
+                    await user.ban(reason=reason, delete_message_days=1)
                 except Exception:
                     pass
             # else: none
