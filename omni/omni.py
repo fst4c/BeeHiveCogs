@@ -10,7 +10,7 @@ import asyncio
 import tempfile
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from datetime import timezone
+from datetime import timezone, timedelta
 
 class Omni(commands.Cog):
     """AI-powered automatic text moderation provided by frontier moderation models"""
@@ -1207,7 +1207,7 @@ class Omni(commands.Cog):
                         # Per day
                         group_fmt = "%Y-%m-%d"
                         label_fmt = "%b %d"
-                        date_list = [(first + mdates.timedelta(days=i)).date() for i in range(days_span)]
+                        date_list = [(first + timedelta(days=i)).date() for i in range(days_span)]
                         group_by = lambda dt: dt.strftime(group_fmt)
                     else:
                         # Per week
@@ -1215,10 +1215,10 @@ class Omni(commands.Cog):
                         label_fmt = "W%W\n%Y"
                         # Find all week starts in range
                         week_starts = []
-                        current = first - mdates.timedelta(days=first.weekday())
+                        current = first - timedelta(days=first.weekday())
                         while current <= last:
                             week_starts.append(current.date())
-                            current += mdates.timedelta(days=7)
+                            current += timedelta(days=7)
                         date_list = week_starts
                         group_by = lambda dt: dt.strftime(group_fmt)
                     # Count violations per group
