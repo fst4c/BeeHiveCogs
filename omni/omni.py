@@ -594,16 +594,20 @@ class Omni(commands.Cog):
                 except Exception:
                     webhook = None
                 # Prepare content and avatar
-                content = deleted_info["content"]
-                username = deleted_info["author_name"]
-                avatar_url = deleted_info["author_avatar"]
-                files = []
+                content = deleted_info.get("content", "")
+                username = deleted_info.get("author_name", "Unknown")
+                avatar_url = deleted_info.get("author_avatar", None)
                 # Only support image attachments for now
                 attachments = deleted_info.get("attachments", [])
+                # Defensive: ensure attachments is a list
+                if attachments is None:
+                    attachments = []
                 # Send the message as the user via webhook
                 try:
+                    # Only send content if it is a non-empty string
+                    send_content = content if isinstance(content, str) and content.strip() else None
                     await webhook.send(
-                        content=content if content else None,
+                        content=send_content,
                         username=username,
                         avatar_url=avatar_url,
                         files=None,
@@ -611,12 +615,14 @@ class Omni(commands.Cog):
                     )
                     # If there are image attachments, send them as separate messages
                     for img_url in attachments:
-                        await webhook.send(
-                            content=None,
-                            username=username,
-                            avatar_url=avatar_url,
-                            embed=discord.Embed().set_image(url=img_url)
-                        )
+                        if img_url:
+                            embed = discord.Embed().set_image(url=img_url)
+                            await webhook.send(
+                                content=None,
+                                username=username,
+                                avatar_url=avatar_url,
+                                embed=embed
+                            )
                     await interaction.response.send_message("Message restored in the original channel.", ephemeral=True)
                 except Exception as e:
                     await interaction.response.send_message(f"Failed to restore message: {e}", ephemeral=True)
