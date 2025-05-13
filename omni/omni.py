@@ -481,24 +481,25 @@ class Omni(commands.Cog):
             # Store the ID of the user who was moderated (the message author)
             self.moderated_user_id = message.author.id
 
-            # Only show Timeout button if timeouts are enabled (timeout_duration > 0)
-            if self.timeout_duration == 0:
-                self.add_item(self.TimeoutButton(cog, message, timeout_duration, row=1, moderated_user_id=self.moderated_user_id))
-
             # Add Untimeout button only if a timeout was issued
             if timeout_issued:
                 self.add_item(self.UntimeoutButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
 
+            # Add Restore button if message was deleted and info is available
+            if message.id in cog._deleted_messages:
+                self.add_item(self.RestoreButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
+
             # Add Warn button (always on row 1)
             self.add_item(self.WarnButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
+
+            # Only show Timeout button if timeouts are enabled (timeout_duration > 0)
+            if self.timeout_duration == 0:
+                self.add_item(self.TimeoutButton(cog, message, timeout_duration, row=1, moderated_user_id=self.moderated_user_id))
+
 
             # Add kick and ban buttons (always on row 1)
             self.add_item(self.KickButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
             self.add_item(self.BanButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
-
-            # Add Restore button if message was deleted and info is available
-            if message.id in cog._deleted_messages:
-                self.add_item(self.RestoreButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
 
             # Add Dismiss button to delete the log message (row 2)
             self.add_item(self.DismissButton(cog, message, row=2, moderated_user_id=self.moderated_user_id))
