@@ -812,11 +812,11 @@ class Omni(commands.Cog):
                     # After restoring, disable the button and change the label
                     self.label = "Message re-sent"
                     self.disabled = True
+                    await interaction.response.defer()
                     try:
                         await interaction.message.edit(view=self.view)
                     except Exception:
                         pass
-                    await interaction.defer()
                 except Exception as e:
                     await interaction.response.send_message(f"Failed to restore message: {e}", ephemeral=True)
 
