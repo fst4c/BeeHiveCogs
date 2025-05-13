@@ -744,10 +744,14 @@ class Omni(commands.Cog):
                     if description.strip():
                         author = self.message.author
                         embed = discord.Embed(
-                            title=f"{author.display_name} said",
+                            title=f"",
                             description=description,
                             color=0xfffffe
                         )
+                        if author.avatar:
+                            embed.set_author(name=author.display_name, icon_url=author.avatar.url)
+                        else:
+                            embed.set_author(name=author.display_name)
                         embed.set_footer(text=f"This message was flagged by the AI moderator, but a staff member subsequently approved it to be sent.")
                         await channel.send(embed=embed)
                     # If there are image attachments, send them as separate messages
