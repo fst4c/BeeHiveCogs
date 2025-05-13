@@ -395,7 +395,7 @@ class Omni(commands.Cog):
             try:
                 # Prepare the action_taken string
                 if message_deleted and timeout_issued:
-                    action_taken = "Deleted\nTimed out"
+                    action_taken = "Message deleted\nTimeout issued"
                 elif message_deleted:
                     action_taken = "Message deleted"
                 elif timeout_issued:
