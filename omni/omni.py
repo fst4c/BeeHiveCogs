@@ -611,11 +611,11 @@ class Omni(commands.Cog):
                     return
                 # Compose warning embed for DM
                 warning_embed = discord.Embed(
-                    title="⚠️ You have received a warning",
+                    title="Conduct warning",
                     description=(
-                        f"Your message was flagged by the AI moderator in **{self.message.guild.name}**."
+                        f"Your message was flagged by the AI moderator in **{self.message.guild.name}**. A server moderator later reviewed this alert and has issued you a conduct warning as a result."
                     ),
-                    color=discord.Color.orange()
+                    color=0xff4545
                 )
                 warning_embed.add_field(
                     name="Your message",
@@ -668,11 +668,11 @@ class Omni(commands.Cog):
                         )
                 # --- End: Add message scores to warning DM ---
                 warning_embed.add_field(
-                    name="Next Steps",
-                    value="Please review the server rules and Discord's [Terms of Service](https://discord.com/terms) and [Community Guidelines](https://discord.com/guidelines).",
+                    name="Next steps",
+                    value="Please review the server rules and Discord's [Terms of Service](https://discord.com/terms) and [Community Guidelines](https://discord.com/guidelines). Further violations of the server's rules may lead to additional punishments, like timeouts, documented warnings, kicks, and bans.",
                     inline=False
                 )
-                warning_embed.set_footer(text="This is an automated warning from the moderation team.")
+                warning_embed.set_footer(text="We appreciate your cooperation in making the server a safe place")
                 # Try to send DM only
                 try:
                     await member.send(embed=warning_embed)
