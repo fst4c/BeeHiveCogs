@@ -299,7 +299,7 @@ class DynamicSlowmode(commands.Cog):
         def __init__(self, cog, channel: discord.TextChannel, current: int, max_slow: int):
             super().__init__(
                 label="Increase slowmode",
-                style=discord.ButtonStyle.blurple,
+                style=discord.ButtonStyle.grey,
                 emoji="⏫",
                 custom_id=f"increase_slowmode_{channel.id}",
                 row=0,
@@ -329,7 +329,7 @@ class DynamicSlowmode(commands.Cog):
         def __init__(self, cog, channel: discord.TextChannel, current: int, min_slow: int):
             super().__init__(
                 label="Decrease slowmode",
-                style=discord.ButtonStyle.green,
+                style=discord.ButtonStyle.grey,
                 emoji="⏬",
                 custom_id=f"decrease_slowmode_{channel.id}",
                 row=0,
