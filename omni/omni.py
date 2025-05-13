@@ -1,5 +1,5 @@
 import discord
-from redbot.core import commands, Config
+from redbot.core import commands, Config, app_commands
 import aiohttp
 from datetime import timedelta, datetime
 from collections import Counter, defaultdict
@@ -40,9 +40,9 @@ class Omni(commands.Cog):
         # Start periodic save task
         # Use asyncio.create_task for compatibility with modern Red/discord.py
         try:
-            self.bot.loop.create_task(self.periodic_save())
-        except Exception:
             asyncio.create_task(self.periodic_save())
+        except Exception:
+            pass
 
     def _register_config(self):
         """Register configuration defaults."""
@@ -85,13 +85,19 @@ class Omni(commands.Cog):
             global_total_timeout_duration=0
         )
 
-    async def initialize(self):
-        """Initialize the aiohttp session."""
+    async def cog_load(self):
+        # Red 3.5+ async cog load
+        if self.session is None or getattr(self.session, "closed", True):
+            self.session = aiohttp.ClientSession()
         try:
-            if self.session is None or getattr(self.session, "closed", True):
-                self.session = aiohttp.ClientSession()
-        except Exception as e:
-            raise RuntimeError(f"Failed to initialize Omni cog: {e}")
+            asyncio.create_task(self.periodic_save())
+        except Exception:
+            pass
+
+    async def cog_unload(self):
+        # Red 3.5+ async cog unload
+        if self.session and not self.session.closed:
+            await self.session.close()
 
     def normalize_text(self, text):
         """Normalize text to replace with standard alphabetical/numeric characters."""
@@ -108,11 +114,11 @@ class Omni(commands.Cog):
             raise ValueError(f"Failed to normalize text: {e}")
 
     @commands.Cog.listener()
-    async def on_message(self, message):
+    async def on_message(self, message: discord.Message):
         await self.process_message(message)
         await self.check_monitoring_reminder(message)
 
-    async def check_monitoring_reminder(self, message):
+    async def check_monitoring_reminder(self, message: discord.Message):
         """Check and send a monitoring reminder if needed."""
         if getattr(message.author, "bot", False) or not getattr(message, "guild", None):
             return
@@ -168,7 +174,7 @@ class Omni(commands.Cog):
             # Reset the message count for the channel regardless
             self.memory_user_message_counts[guild.id][channel.id] = 0
 
-    async def send_monitoring_reminder(self, channel):
+    async def send_monitoring_reminder(self, channel: discord.abc.Messageable):
         """Send a monitoring reminder to the specified channel."""
         try:
             # Check if monitoring warning is enabled for this guild
@@ -192,10 +198,10 @@ class Omni(commands.Cog):
             raise RuntimeError(f"Failed to send monitoring reminder: {e}")
 
     @commands.Cog.listener()
-    async def on_message_edit(self, before, after):
+    async def on_message_edit(self, before: discord.Message, after: discord.Message):
         await self.process_message(after)
 
-    async def process_message(self, message):
+    async def process_message(self, message: discord.Message):
         try:
             if getattr(message.author, "bot", False) or not getattr(message, "guild", None):
                 return
@@ -465,14 +471,7 @@ class Omni(commands.Cog):
             await asyncio.sleep(timeout_duration * 60)
             button.disabled = True
             button.label = "Timeout expired"
-            # Try to update the view on the log message, if possible
-            # We need to find the message object, but we don't have it here.
-            # Instead, we can try to update the view if the view is attached to a message.
-            # This requires the view to have a reference to the message, which is not always the case.
-            # So, we will try to update all messages in the view's children that have a .message attribute.
-            # But the best we can do is to update the view if the button has a .view and .view.message.
             try:
-                # Try to update the view on the log message if possible
                 if hasattr(view, "message") and view.message:
                     await view.message.edit(view=view)
             except Exception:
@@ -480,7 +479,6 @@ class Omni(commands.Cog):
         except Exception:
             pass
         finally:
-            # Remove the task from tracking after it's done
             self._untimeout_tasks.pop(message_id, None)
 
     async def _create_moderation_embed(self, message, category_scores, title, action_taken, moderated_image=None):
@@ -502,7 +500,6 @@ class Omni(commands.Cog):
             score_display = f"**{score_percentage:.0f}%**" if score > moderation_threshold else f"{score_percentage:.0f}%"
             embed.add_field(name=category.capitalize(), value=score_display, inline=True)
 
-        # If this is an image moderation event, show the correct image in the embed
         if moderated_image is not None and hasattr(moderated_image, "url"):
             embed.set_image(url=moderated_image.url)
         else:
@@ -511,7 +508,6 @@ class Omni(commands.Cog):
                     if getattr(attachment, "content_type", None) and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif"):
                         embed.set_image(url=attachment.url)
                         break
-        # Attach the scores to the embed for parsing in the WarnButton
         embed._omni_category_scores = category_scores
         return embed
 
@@ -523,34 +519,25 @@ class Omni(commands.Cog):
             self.timeout_issued = timeout_issued
             self.timeout_duration = timeout_duration
 
-            # Store the ID of the user who was moderated (the message author)
             self.moderated_user_id = message.author.id
 
-            # Add Untimeout button only if a timeout was issued
             if timeout_issued:
                 self.untimeout_button = self.UntimeoutButton(cog, message, row=1, moderated_user_id=self.moderated_user_id)
                 self.add_item(self.untimeout_button)
 
-            # Add Restore button if message was deleted and info is available
             if message.id in cog._deleted_messages:
                 self.add_item(self.RestoreButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
 
-            # Add Warn button (always on row 1)
             self.add_item(self.WarnButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
 
-            # Only show Timeout button if timeouts are enabled (timeout_duration > 0)
             if self.timeout_duration == 0:
-                self.add_item(self.TimeoutButton(cog, message, timeout_duration, row=1, moderated_user_id=self.moderated_user_id))
+                self.add_item(self.TimeoutButton(cog, message, self.timeout_duration, row=1, moderated_user_id=self.moderated_user_id))
 
-
-            # Add kick and ban buttons (always on row 1)
             self.add_item(self.KickButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
             self.add_item(self.BanButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
 
-            # Add Dismiss button to delete the log message (row 2)
             self.add_item(self.DismissButton(cog, message, row=2, moderated_user_id=self.moderated_user_id))
 
-            # Add jump to conversation button LAST (so it appears underneath, on row 2)
             self.add_item(discord.ui.Button(label="See conversation", url=message.jump_url, row=2))
 
         class TimeoutButton(discord.ui.Button):
@@ -562,26 +549,19 @@ class Omni(commands.Cog):
                 self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
                 if interaction.user.id == self.moderated_user_id:
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
-                    return
-                # Only allow users with manage_guild or admin
-                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
-                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
                     return
                 try:
                     member = self.message.guild.get_member(self.message.author.id)
                     if not member:
                         await interaction.response.send_message("User not found in this server.", ephemeral=True)
                         return
-                    # Check if already timed out
                     if hasattr(member, "timed_out_until") and getattr(member, "timed_out_until", None):
                         await interaction.response.send_message("User is already timed out.", ephemeral=True)
                         return
                     reason = f"Manual timeout via Omni log button. Message: {self.message.content}"
                     await member.timeout(timedelta(minutes=self.timeout_duration), reason=reason)
-                    # Mark as timed out for this message
                     self.cog._timeout_issued_for_message[self.message.id] = True
                     await interaction.response.send_message(f"User {member.mention} has been timed out for {self.timeout_duration} minutes.", ephemeral=True)
                 except Exception as e:
@@ -595,27 +575,19 @@ class Omni(commands.Cog):
                 self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
                 if interaction.user.id == self.moderated_user_id:
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
-                    return
-                # Only allow users with manage_guild or admin
-                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
-                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
                     return
                 try:
                     member = self.message.guild.get_member(self.message.author.id)
                     if not member:
                         await interaction.response.send_message("User not found in this server.", ephemeral=True)
                         return
-                    # Remove timeout by setting duration to None
                     await member.timeout(None, reason="Staff member removed a timeout issued by Omni")
                     self.cog._timeout_issued_for_message[self.message.id] = False
                     await interaction.response.send_message(f"User {member.mention} has been un-timed out.", ephemeral=True)
-                    # Update the button: change label and disable it
                     self.label = "Timeout lifted"
                     self.disabled = True
-                    # Try to update the view to reflect the new label and disabled state
                     try:
                         await interaction.message.edit(view=self.view)
                     except Exception:
@@ -631,19 +603,10 @@ class Omni(commands.Cog):
                 self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
                 if interaction.user.id == self.moderated_user_id:
                     embed = discord.Embed(
                         description="You cannot interact with moderation logs of your own actions.",
                         color=discord.Color.orange()
-                    )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
-                    return
-                # Only allow users with manage_guild or admin
-                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
-                    embed = discord.Embed(
-                        description="You do not have permission to use this button.",
-                        color=discord.Color.red()
                     )
                     await interaction.response.send_message(embed=embed, ephemeral=True)
                     return
@@ -656,21 +619,15 @@ class Omni(commands.Cog):
                     await interaction.response.send_message(embed=embed, ephemeral=True)
                     return
 
-                # Try to parse the moderation scores from the log embed, if available
-                # The log embed is interaction.message.embeds[0], and we attached _omni_category_scores to it in _create_moderation_embed
                 category_scores = None
                 moderation_threshold = None
                 if interaction.message and interaction.message.embeds:
                     log_embed = interaction.message.embeds[0]
-                    # Try to get the attached attribute (if present)
                     category_scores = getattr(log_embed, "_omni_category_scores", None)
-                    # If not present, try to parse from fields
                     if category_scores is None:
-                        # Try to parse from fields
                         category_scores = {}
                         for field in log_embed.fields:
                             if field.name and field.value and field.name.lower() not in ["sent by", "sent in", "action taken", "ai moderator ratings", "error"]:
-                                # Remove bolding if present
                                 value = field.value.replace("**", "").replace("%", "")
                                 try:
                                     score = float(value) / 100.0
@@ -678,13 +635,9 @@ class Omni(commands.Cog):
                                     score = None
                                 if score is not None:
                                     category_scores[field.name.lower()] = score
-                    # Try to get moderation threshold from the embed if possible
-                    # (not available, so fallback to config)
                 if not category_scores:
-                    # Fallback: no scores found, so just send a warning without scores
                     category_scores = {}
 
-                # Compose warning embed for DM, including moderation scores
                 warning_embed = discord.Embed(
                     title="⚠️ You have received a warning",
                     description=(
@@ -697,15 +650,12 @@ class Omni(commands.Cog):
                     value=self.message.content or "*No content*",
                     inline=False
                 )
-                # Add moderation scores if available
                 if category_scores:
-                    # Get moderation threshold for bolding
                     if moderation_threshold is None:
                         try:
                             moderation_threshold = await self.cog.config.guild(self.message.guild).moderation_threshold()
                         except Exception:
                             moderation_threshold = 0.75
-                    # Sort and show top 6
                     sorted_scores = sorted(category_scores.items(), key=lambda item: item[1], reverse=True)[:6]
                     score_lines = []
                     for category, score in sorted_scores:
@@ -726,7 +676,6 @@ class Omni(commands.Cog):
                     inline=False
                 )
                 warning_embed.set_footer(text="This is an automated warning from the moderation team.")
-                # Try to send DM only
                 try:
                     await member.send(embed=warning_embed)
                     response_embed = discord.Embed(
@@ -756,7 +705,6 @@ class Omni(commands.Cog):
                 self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
                 if interaction.user.id == self.moderated_user_id:
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
                     return
@@ -770,7 +718,6 @@ class Omni(commands.Cog):
                 self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
                 if interaction.user.id == self.moderated_user_id:
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
                     return
@@ -784,13 +731,8 @@ class Omni(commands.Cog):
                 self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
                 if interaction.user.id == self.moderated_user_id:
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
-                    return
-                # Only allow users with manage_guild or admin
-                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
-                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
                     return
                 msg_id = self.message.id
                 deleted_info = self.cog._deleted_messages.get(msg_id)
@@ -803,21 +745,16 @@ class Omni(commands.Cog):
                     await interaction.response.send_message("Original channel not found.", ephemeral=True)
                     return
 
-                # Prepare content and attachments
                 content = deleted_info.get("content", "")
                 attachments = deleted_info.get("attachments", [])
                 if not isinstance(attachments, list):
                     attachments = []
 
-                # Get the original message timestamp, if available
                 timestamp = deleted_info.get("created_at")
-                # If not present, fallback to self.message.created_at if possible
                 if not timestamp and hasattr(self.message, "created_at"):
                     timestamp = self.message.created_at
-                # Format the timestamp for Discord (dynamic)
                 timestamp_str = ""
                 if timestamp:
-                    # If it's a datetime object, convert to unix timestamp
                     import datetime
                     if isinstance(timestamp, datetime.datetime):
                         unix_ts = int(timestamp.timestamp())
@@ -828,7 +765,6 @@ class Omni(commands.Cog):
                             unix_ts = None
                     if unix_ts:
                         timestamp_str = f"<t:{unix_ts}:R>"
-                # Compose the description with timestamp
                 if content and timestamp_str:
                     description = f"{content}\n\n*Originally sent {timestamp_str}*"
                 elif content:
@@ -852,12 +788,10 @@ class Omni(commands.Cog):
                             embed.set_author(name=author.display_name)
                         embed.set_footer(text=f"This message was flagged by the AI moderator, but a staff member subsequently approved it to be sent.")
                         await channel.send(embed=embed)
-                    # If there are image attachments, send them as separate messages
                     for img_url in attachments:
                         if img_url:
                             embed = discord.Embed().set_image(url=img_url)
                             await channel.send(embed=embed)
-                    # After restoring, disable the button and change the label
                     self.label = "Message reshared"
                     self.disabled = True
                     try:
@@ -876,13 +810,8 @@ class Omni(commands.Cog):
                 self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
                 if interaction.user.id == self.moderated_user_id:
                     await interaction.response.send_message("You cannot dismiss moderation logs of your own actions.", ephemeral=True)
-                    return
-                # Only allow users with manage_guild or admin
-                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
-                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
                     return
                 try:
                     await interaction.message.delete()
@@ -890,7 +819,6 @@ class Omni(commands.Cog):
                     await interaction.response.send_message(f"Failed to delete log message: {e}", ephemeral=True)
 
     async def _create_action_view(self, message, category_scores, timeout_issued=None):
-        # Determine if a timeout was issued for this message
         if timeout_issued is None:
             timeout_issued = self._timeout_issued_for_message.get(message.id, False)
         timeout_duration = await self.config.guild(message.guild).timeout_duration()
@@ -905,11 +833,9 @@ class Omni(commands.Cog):
         return None
 
     async def kick_user(self, interaction: discord.Interaction):
-        # Accept both new and old custom_id formats for backward compatibility
         custom_id = getattr(interaction, "custom_id", None) or getattr(interaction.data, "custom_id", None)
         if not custom_id:
             custom_id = interaction.data.get("custom_id", "")
-        # Accept both "kick_button" and "kick_{user_id}_{message_id}"
         if custom_id.startswith("kick_"):
             parts = custom_id.split("_")
             if len(parts) >= 3:
@@ -930,11 +856,9 @@ class Omni(commands.Cog):
                 await interaction.response.send_message("Failed to kick user.", ephemeral=True)
 
     async def ban_user(self, interaction: discord.Interaction):
-        # Accept both new and old custom_id formats for backward compatibility
         custom_id = getattr(interaction, "custom_id", None) or getattr(interaction.data, "custom_id", None)
         if not custom_id:
             custom_id = interaction.data.get("custom_id", "")
-        # Accept both "ban_button" and "ban_{user_id}_{message_id}"
         if custom_id.startswith("ban_"):
             parts = custom_id.split("_")
             if len(parts) >= 3:
@@ -1024,7 +948,6 @@ class Omni(commands.Cog):
                 current_counter.update(counter)
                 await guild_conf.category_counter.set(dict(current_counter))
 
-        # Clear in-memory statistics after saving
         self.memory_stats.clear()
         self.memory_user_message_counts.clear()
         self.memory_moderated_users.clear()
