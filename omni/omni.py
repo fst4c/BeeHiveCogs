@@ -489,6 +489,9 @@ class Omni(commands.Cog):
             if timeout_issued:
                 self.add_item(self.UntimeoutButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
 
+            # Add Warn button (always on row 1)
+            self.add_item(self.WarnButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
+
             # Add kick and ban buttons (always on row 1)
             self.add_item(self.KickButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
             self.add_item(self.BanButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
@@ -572,6 +575,79 @@ class Omni(commands.Cog):
                         pass
                 except Exception as e:
                     await interaction.response.send_message(f"Failed to untimeout user: {e}", ephemeral=True)
+
+        class WarnButton(discord.ui.Button):
+            def __init__(self, cog, message, row=1, moderated_user_id=None):
+                super().__init__(label="Warn", style=discord.ButtonStyle.grey, custom_id=f"warn_{message.author.id}_{message.id}", emoji="⚠️", row=row)
+                self.cog = cog
+                self.message = message
+                self.moderated_user_id = moderated_user_id
+
+            async def callback(self, interaction: discord.Interaction):
+                # Prevent the moderated user from interacting with their own log
+                if interaction.user.id == self.moderated_user_id:
+                    embed = discord.Embed(
+                        description="You cannot interact with moderation logs of your own actions.",
+                        color=discord.Color.orange()
+                    )
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    return
+                # Only allow users with manage_guild or admin
+                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
+                    embed = discord.Embed(
+                        description="You do not have permission to use this button.",
+                        color=discord.Color.red()
+                    )
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    return
+                member = self.message.guild.get_member(self.message.author.id)
+                if not member:
+                    embed = discord.Embed(
+                        description="User not found in this server.",
+                        color=discord.Color.red()
+                    )
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                    return
+                # Compose warning embed for DM
+                warning_embed = discord.Embed(
+                    title="⚠️ You have received a warning",
+                    description=(
+                        f"Your message was flagged by the AI moderator in **{self.message.guild.name}**."
+                    ),
+                    color=discord.Color.orange()
+                )
+                warning_embed.add_field(
+                    name="Your message",
+                    value=self.message.content or "*No content*",
+                    inline=False
+                )
+                warning_embed.add_field(
+                    name="Next Steps",
+                    value="Please review the server rules and Discord's [Terms of Service](https://discord.com/terms) and [Community Guidelines](https://discord.com/guidelines).",
+                    inline=False
+                )
+                warning_embed.set_footer(text="This is an automated warning from the moderation team.")
+                # Try to send DM only
+                try:
+                    await member.send(embed=warning_embed)
+                    response_embed = discord.Embed(
+                        description=f"User {member.mention} has been warned via DM.",
+                        color=discord.Color.green()
+                    )
+                    await interaction.response.send_message(embed=response_embed, ephemeral=True)
+                    self.label = "Warning sent"
+                except Exception:
+                    response_embed = discord.Embed(
+                        description=f"User {member.mention} could not be DMed. DM's closed.",
+                        color=discord.Color.red()
+                    )
+                    await interaction.response.send_message(embed=response_embed, ephemeral=True)
+                    self.label = "DM's closed"
+                self.disabled = True
+                try:
+                    await interaction.message.edit(view=self.view)
+                except Exception:
+                    pass
 
         class KickButton(discord.ui.Button):
             def __init__(self, cog, message, row=1, moderated_user_id=None):
