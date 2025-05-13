@@ -603,11 +603,45 @@ class Omni(commands.Cog):
                 if not isinstance(attachments, list):
                     attachments = []
 
-                # Send the message content as a copy
+                # Get the original message timestamp, if available
+                timestamp = deleted_info.get("created_at")
+                # If not present, fallback to self.message.created_at if possible
+                if not timestamp and hasattr(self.message, "created_at"):
+                    timestamp = self.message.created_at
+                # Format the timestamp for Discord (dynamic)
+                timestamp_str = ""
+                if timestamp:
+                    # If it's a datetime object, convert to unix timestamp
+                    import datetime
+                    if isinstance(timestamp, datetime.datetime):
+                        unix_ts = int(timestamp.timestamp())
+                    else:
+                        try:
+                            unix_ts = int(timestamp)
+                        except Exception:
+                            unix_ts = None
+                    if unix_ts:
+                        timestamp_str = f"<t:{unix_ts}:F>"
+                # Compose the description with timestamp
+                if content and timestamp_str:
+                    description = f"{content}\n\n**Original message sent:** {timestamp_str}"
+                elif content:
+                    description = content
+                elif timestamp_str:
+                    description = f"**Original message sent:** {timestamp_str}"
+                else:
+                    description = ""
+
                 try:
-                    send_content = content if isinstance(content, str) and content.strip() else None
-                    if send_content is not None and isinstance(send_content, str) and len(send_content) > 0:
-                        await channel.send(content=send_content)
+                    if description.strip():
+                        author = self.message.author
+                        embed = discord.Embed(
+                            title="Message restored from moderation",
+                            description=description,
+                            color=discord.Color.blurple()
+                        )
+                        embed.set_footer(text=f"Sent by: {author.display_name} (ID: {author.id})")
+                        await channel.send(embed=embed)
                     # If there are image attachments, send them as separate messages
                     for img_url in attachments:
                         if img_url:
