@@ -31,6 +31,9 @@ class Omni(commands.Cog):
         # Track timeouts issued by message id for "Untimeout" button
         self._timeout_issued_for_message = {}  # {message_id: True/False}
 
+        # Store deleted messages for possible restoration
+        self._deleted_messages = {}  # {message_id: {"content": ..., "author_id": ..., "author_name": ..., "author_avatar": ..., "channel_id": ..., "attachments": [...] }}
+
         # Start periodic save task
         self.bot.loop.create_task(self.periodic_save())
 
@@ -335,6 +338,15 @@ class Omni(commands.Cog):
             message_deleted = False
             if delete_violatory_messages:
                 try:
+                    # Store deleted message info for restoration
+                    self._deleted_messages[message.id] = {
+                        "content": message.content,
+                        "author_id": message.author.id,
+                        "author_name": message.author.display_name if hasattr(message.author, "display_name") else str(message.author),
+                        "author_avatar": str(message.author.display_avatar.url) if hasattr(message.author, "display_avatar") else str(message.author.avatar_url),
+                        "channel_id": message.channel.id,
+                        "attachments": [a.url for a in getattr(message, "attachments", []) if getattr(a, "content_type", None) and a.content_type.startswith("image/") and not a.content_type.endswith("gif")]
+                    }
                     await message.delete()
                     self.memory_moderated_users[guild.id][message.author.id] += 1
                     message_deleted = True
@@ -464,6 +476,10 @@ class Omni(commands.Cog):
             self.add_item(self.KickButton(cog, message, row=1))
             self.add_item(self.BanButton(cog, message, row=1))
 
+            # Add Restore button if message was deleted and info is available
+            if message.id in cog._deleted_messages:
+                self.add_item(self.RestoreButton(cog, message, row=1))
+
             # Add jump to conversation button LAST (so it appears underneath, on row 2)
             self.add_item(discord.ui.Button(label="Jump to place in conversation", url=message.jump_url, row=2))
 
@@ -536,6 +552,67 @@ class Omni(commands.Cog):
 
             async def callback(self, interaction: discord.Interaction):
                 await self.cog.ban_user(interaction)
+
+        class RestoreButton(discord.ui.Button):
+            def __init__(self, cog, message, row=1):
+                super().__init__(label="Restore", style=discord.ButtonStyle.blurple, custom_id=f"restore_{message.author.id}_{message.id}", emoji="♻️", row=row)
+                self.cog = cog
+                self.message = message
+
+            async def callback(self, interaction: discord.Interaction):
+                # Only allow users with manage_guild or admin
+                if not (interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_guild):
+                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
+                    return
+                msg_id = self.message.id
+                deleted_info = self.cog._deleted_messages.get(msg_id)
+                if not deleted_info:
+                    await interaction.response.send_message("No deleted message data found to restore.", ephemeral=True)
+                    return
+                guild = interaction.guild
+                channel = guild.get_channel(deleted_info["channel_id"])
+                if not channel:
+                    await interaction.response.send_message("Original channel not found.", ephemeral=True)
+                    return
+                # Find or create a webhook
+                webhook = None
+                try:
+                    webhooks = await channel.webhooks()
+                    for wh in webhooks:
+                        if wh.user and wh.user.id == interaction.client.user.id:
+                            webhook = wh
+                            break
+                    if not webhook:
+                        webhook = await channel.create_webhook(name="Omni Restore")
+                except Exception:
+                    webhook = None
+                # Prepare content and avatar
+                content = deleted_info["content"]
+                username = deleted_info["author_name"]
+                avatar_url = deleted_info["author_avatar"]
+                files = []
+                # Only support image attachments for now
+                attachments = deleted_info.get("attachments", [])
+                # Send the message as the user via webhook
+                try:
+                    await webhook.send(
+                        content=content if content else None,
+                        username=username,
+                        avatar_url=avatar_url,
+                        files=None,
+                        embeds=None
+                    )
+                    # If there are image attachments, send them as separate messages
+                    for img_url in attachments:
+                        await webhook.send(
+                            content=None,
+                            username=username,
+                            avatar_url=avatar_url,
+                            embed=discord.Embed().set_image(url=img_url)
+                        )
+                    await interaction.response.send_message("Message restored in the original channel.", ephemeral=True)
+                except Exception as e:
+                    await interaction.response.send_message(f"Failed to restore message: {e}", ephemeral=True)
 
     async def _create_action_view(self, message, category_scores, timeout_issued=None):
         # Determine if a timeout was issued for this message
@@ -938,6 +1015,7 @@ class Omni(commands.Cog):
             self.memory_category_counter.clear()
             self._reminder_sent_at.clear()
             self._timeout_issued_for_message.clear()
+            self._deleted_messages.clear()
 
             # Confirmation message
             confirmation_embed = discord.Embed(
