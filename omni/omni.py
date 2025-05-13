@@ -622,51 +622,6 @@ class Omni(commands.Cog):
                     value=self.message.content or "*No content*",
                     inline=False
                 )
-                # --- Begin: Add message scores to warning DM ---
-                # Get the scores from the moderation event, if available
-                # Try to get the scores from the parent view if possible
-                category_scores = None
-                try:
-                    # The parent view is _ModerationActionView, which is instantiated with category_scores
-                    # We'll try to get it from self.view, which is the parent view
-                    if hasattr(self, "view") and hasattr(self.view, "cog") and hasattr(self.view, "message"):
-                        # Try to get the scores from the log embed, but fallback to None
-                        # Instead, let's try to get the scores from the log message if possible
-                        # But the best we can do is to get the scores from the log message, or from the cog's last moderation event
-                        # Instead, let's try to get the scores from the cog, if it has a mapping
-                        # But we can pass the scores as an attribute on the view
-                        if hasattr(self.view, "category_scores"):
-                            category_scores = self.view.category_scores
-                except Exception:
-                    category_scores = None
-                # Fallback: try to get from cog._last_category_scores if set
-                if not category_scores and hasattr(self.cog, "_last_category_scores"):
-                    category_scores = getattr(self.cog, "_last_category_scores", None)
-                # Fallback: try to get from the message object (if monkeypatched)
-                if not category_scores and hasattr(self.message, "category_scores"):
-                    category_scores = getattr(self.message, "category_scores", None)
-                # If not found, try to get from the log channel (not possible here)
-                # If not found, try to get from the cog's memory (not possible here)
-                # Instead, pass the scores as an argument when creating the view (see _create_action_view)
-                # For now, try to get from the parent view
-                # If not found, just skip
-                if not category_scores:
-                    # Try to get from the cog's last moderation event (not thread safe, but best effort)
-                    category_scores = getattr(self.cog, "_last_category_scores", None)
-                # If still not found, skip
-                if category_scores:
-                    # Sort and display the top 6 scores
-                    sorted_scores = sorted(category_scores.items(), key=lambda item: item[1], reverse=True)[:6]
-                    score_lines = []
-                    for category, score in sorted_scores:
-                        score_lines.append(f"**{category.capitalize()}**: {score*100:.0f}%")
-                    if score_lines:
-                        warning_embed.add_field(
-                            name="AI moderation scores",
-                            value="\n".join(score_lines),
-                            inline=False
-                        )
-                # --- End: Add message scores to warning DM ---
                 warning_embed.add_field(
                     name="Next steps",
                     value="Please review the server rules and Discord's [Terms of Service](https://discord.com/terms) and [Community Guidelines](https://discord.com/guidelines). Further violations of the server's rules may lead to additional punishments, like timeouts, documented warnings, kicks, and bans.",
