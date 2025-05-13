@@ -339,8 +339,6 @@ class AntiSpam(commands.Cog):
             if punishment == "timeout":
                 # Use Discord's timeout (communication disabled) if available
                 if hasattr(user, "timeout"):
-                    # discord.utils.utcnow() is a function, but discord.timedelta does not exist.
-                    # Should use datetime.timedelta
                     import datetime
                     until = discord.utils.utcnow() + datetime.timedelta(seconds=timeout_time)
                     await user.timeout(until, reason="AntiSpam: " + reason)
@@ -383,11 +381,22 @@ class AntiSpam(commands.Cog):
             log_channel_id = await conf.log_channel()
         except Exception:
             log_channel_id = None
+
         log_channel = None
+        # Fix: Use bot.get_channel if get_channel is not available on guild, and check permissions
         if log_channel_id:
+            # Try to get channel from guild first
             log_channel = guild.get_channel(log_channel_id)
-        if log_channel:
+            # If not found, fallback to bot.get_channel
+            if log_channel is None and hasattr(self.bot, "get_channel"):
+                log_channel = self.bot.get_channel(log_channel_id)
+        # Also check if log_channel is a TextChannel and bot can send messages
+        if log_channel and isinstance(log_channel, discord.TextChannel):
             try:
+                # Check if bot has permission to send messages and embeds
+                perms = log_channel.permissions_for(guild.me)
+                if not (perms.send_messages and perms.embed_links):
+                    return
                 embed = discord.Embed(
                     title="Potential spam detected",
                     description=f"User: {user.mention} (`{user.id}`)\nReason: {reason}",
@@ -402,12 +411,13 @@ class AntiSpam(commands.Cog):
                         evidence = evidence[:1000] + "\n...(truncated)"
                     embed.add_field(name="Evidence", value=evidence, inline=False)
                 await log_channel.send(embed=embed)
-            except Exception:
+            except Exception as e:
+                # For debugging, you may want to log this somewhere else
                 pass
 
-    @commands.command()
+    @antispam.command()
     @commands.guild_only()
-    async def antispaminfo(self, ctx):
+    async def settings(self, ctx):
         """Show current AntiSpam settings."""
         conf = self.config.guild(ctx.guild)
         try:
@@ -423,7 +433,12 @@ class AntiSpam(commands.Cog):
         except Exception:
             await ctx.send("Failed to fetch AntiSpam settings.")
             return
-        log_channel = ctx.guild.get_channel(log_channel_id) if log_channel_id else None
+        # Fix: Use bot.get_channel if get_channel is not available on guild
+        log_channel = None
+        if log_channel_id:
+            log_channel = ctx.guild.get_channel(log_channel_id)
+            if log_channel is None and hasattr(self.bot, "get_channel"):
+                log_channel = self.bot.get_channel(log_channel_id)
         embed = discord.Embed(title="AntiSpam Settings", color=discord.Color.blurple())
         embed.add_field(name="Enabled", value=str(enabled))
         embed.add_field(name="Message Limit", value=f"{message_limit} per {interval}s")
