@@ -322,9 +322,9 @@ class AntiSpam(commands.Cog):
             if log_channel:
                 try:
                     embed = discord.Embed(
-                        title="AntiSpam Action",
+                        title="Potential spam detected",
                         description=f"User: {user.mention} (`{user.id}`)\nReason: {reason}",
-                        color=discord.Color.red(),
+                        color=0xff4545,
                         timestamp=discord.utils.utcnow(),
                     )
                     embed.add_field(name="Punishment", value=punishment)
