@@ -734,7 +734,7 @@ class Omni(commands.Cog):
 
         class RestoreButton(discord.ui.Button):
             def __init__(self, cog, message, row=1, moderated_user_id=None):
-                super().__init__(label="Reshare", style=discord.ButtonStyle.grey, custom_id=f"restore_{message.author.id}_{message.id}", emoji="♻️", row=row)
+                super().__init__(label="Resend", style=discord.ButtonStyle.grey, custom_id=f"restore_{message.author.id}_{message.id}", emoji="♻️", row=row)
                 self.cog = cog
                 self.message = message
                 self.moderated_user_id = moderated_user_id
@@ -743,10 +743,6 @@ class Omni(commands.Cog):
                 # Prevent the moderated user from interacting with their own log
                 if interaction.user.id == self.moderated_user_id:
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
-                    return
-                # Only allow users with manage_guild or admin
-                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
-                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
                     return
                 msg_id = self.message.id
                 deleted_info = self.cog._deleted_messages.get(msg_id)
@@ -786,7 +782,7 @@ class Omni(commands.Cog):
                         timestamp_str = f"<t:{unix_ts}:R>"
                 # Compose the description with timestamp
                 if content and timestamp_str:
-                    description = f"{content}\n\n*Originally sent {timestamp_str}*"
+                    description = f"{content}\n*Originally sent {timestamp_str}*"
                 elif content:
                     description = content
                 elif timestamp_str:
@@ -820,7 +816,7 @@ class Omni(commands.Cog):
                         await interaction.message.edit(view=self.view)
                     except Exception:
                         pass
-                    await interaction.response.send_message("The message was re-shared. Thanks for reviewing this alert.", ephemeral=True)
+                    await interaction.defer()
                 except Exception as e:
                     await interaction.response.send_message(f"Failed to restore message: {e}", ephemeral=True)
 
