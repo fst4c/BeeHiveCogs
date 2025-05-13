@@ -28,6 +28,9 @@ class Omni(commands.Cog):
         # In-memory per-user violation tracking (guild_id -> user_id -> [violation dicts])
         self.memory_user_violations = defaultdict(lambda: defaultdict(list))
 
+        # In-memory per-user warning tracking (guild_id -> user_id -> int)
+        self.memory_user_warnings = defaultdict(lambda: defaultdict(int))
+
         # In-memory reminder tracking to prevent duplicate reminders
         self._reminder_sent_at = defaultdict(dict)  # {guild_id: {channel_id: datetime}}
 
@@ -77,6 +80,7 @@ class Omni(commands.Cog):
             bypass_nsfw=False,
             monitoring_warning_enabled=True,
             user_violations={},  # {user_id: [violation_dict, ...]}
+            user_warnings={},    # {user_id: int}
         )
         self.config.register_global(
             global_message_count=0,
@@ -685,6 +689,17 @@ class Omni(commands.Cog):
                 except Exception:
                     pass
 
+                # --- Log warning count for user in memory and config ---
+                guild_id = self.message.guild.id
+                user_id = self.message.author.id
+                # Increment in-memory warning count
+                self.cog.memory_user_warnings[guild_id][user_id] += 1
+                # Also increment persistent warning count
+                guild_conf = self.cog.config.guild(self.message.guild)
+                user_warnings = await guild_conf.user_warnings()
+                user_warnings[str(user_id)] = user_warnings.get(str(user_id), 0) + 1
+                await guild_conf.user_warnings.set(user_warnings)
+
         class KickButton(discord.ui.Button):
             def __init__(self, cog, message, row=1, moderated_user_id=None):
                 super().__init__(label="Kick", style=discord.ButtonStyle.grey, custom_id=f"kick_{message.author.id}_{message.id}", emoji="👢", row=row)
@@ -977,12 +992,21 @@ class Omni(commands.Cog):
                 current_violations[str(user_id)] = (current_violations[str(user_id)] + violations)[-50:]
             await guild_conf.user_violations.set(current_violations)
 
+        # Save per-user warning counts
+        for guild_id, user_warnings in self.memory_user_warnings.items():
+            guild_conf = self.config.guild_from_id(guild_id)
+            current_warnings = await guild_conf.user_warnings()
+            for user_id, count in user_warnings.items():
+                current_warnings[str(user_id)] = current_warnings.get(str(user_id), 0) + count
+            await guild_conf.user_warnings.set(current_warnings)
+
         # Clear in-memory statistics after saving
         self.memory_stats.clear()
         self.memory_user_message_counts.clear()
         self.memory_moderated_users.clear()
         self.memory_category_counter.clear()
         self.memory_user_violations.clear()
+        self.memory_user_warnings.clear()
         # Also clear flagged image tracking after save
         self._flagged_image_for_message.clear()
 
@@ -1012,6 +1036,7 @@ class Omni(commands.Cog):
             too_weak_votes = await self.config.guild(ctx.guild).too_weak_votes()
             too_tough_votes = await self.config.guild(ctx.guild).too_tough_votes()
             just_right_votes = await self.config.guild(ctx.guild).just_right_votes()
+            user_warnings = await self.config.guild(ctx.guild).user_warnings()
 
             member_count = ctx.guild.member_count
             moderated_message_percentage = (moderated_count / message_count * 100) if message_count > 0 else 0
@@ -1047,6 +1072,11 @@ class Omni(commands.Cog):
             top_categories = category_counter.most_common(5)
             top_categories_bullets = "\n".join([f"- **{cat.capitalize()}** x{count:,}" for cat, count in top_categories])
             
+            # Add warning stats
+            total_warnings = sum(user_warnings.values()) if user_warnings else 0
+            warned_users = len([uid for uid, count in (user_warnings or {}).items() if count > 0])
+            warning_stats = f"**{total_warnings}** warning{'s' if total_warnings != 1 else ''} issued to **{warned_users}** user{'s' if warned_users != 1 else ''}"
+
             embed = discord.Embed(title="✨ AI is hard at work for you, here's everything Omni knows...", color=0xfffffe)
             embed.add_field(name=f"In {ctx.guild.name}", value="", inline=False)
             embed.add_field(name="Messages processed", value=f"**{message_count:,}** message{'s' if message_count != 1 else ''}", inline=True)
@@ -1056,6 +1086,7 @@ class Omni(commands.Cog):
             embed.add_field(name="Images moderated", value=f"**{moderated_image_count:,}** image{'s' if moderated_image_count != 1 else ''} ({moderated_image_percentage:.2f}%)", inline=True)
             embed.add_field(name="Timeouts issued", value=f"**{timeout_count:,}** timeout{'s' if timeout_count != 1 else ''}", inline=True)
             embed.add_field(name="Total timeout duration", value=f"{timeout_duration_str}", inline=True)
+            embed.add_field(name="Warnings issued", value=warning_stats, inline=True)
             embed.add_field(name="Estimated minimum staff time saved", value=f"{time_saved_str} of **hands-on-keyboard** time to simply read and moderate automatically screened content.", inline=False)
             embed.add_field(name="Most frequent flags", value=top_categories_bullets, inline=False)
             embed.add_field(name="Feedback", value=f"**{too_weak_votes}** votes for too weak, **{too_tough_votes}** votes for too tough, **{just_right_votes}** votes for just right", inline=False)
@@ -1071,6 +1102,18 @@ class Omni(commands.Cog):
                 global_moderated_image_count = await self.config.global_moderated_image_count()
                 global_timeout_count = await self.config.global_timeout_count()
                 global_total_timeout_duration = await self.config.global_total_timeout_duration()
+
+                # Global warnings
+                global_total_warnings = 0
+                global_warned_users = 0
+                for guild in self.bot.guilds:
+                    try:
+                        user_warnings = await self.config.guild(guild).user_warnings()
+                        global_total_warnings += sum(user_warnings.values()) if user_warnings else 0
+                        global_warned_users += len([uid for uid, count in (user_warnings or {}).items() if count > 0])
+                    except Exception:
+                        continue
+                global_warning_stats = f"**{global_total_warnings}** warning{'s' if global_total_warnings != 1 else ''} issued to **{global_warned_users}** user{'s' if global_warned_users != 1 else ''}"
 
                 global_moderated_message_percentage = (global_moderated_count / global_message_count * 100) if global_message_count > 0 else 0
                 global_moderated_image_percentage = (global_moderated_image_count / global_image_count * 100) if global_image_count > 0 else 0
@@ -1111,6 +1154,7 @@ class Omni(commands.Cog):
                 embed.add_field(name="Images moderated", value=f"**{global_moderated_image_count:,}** image{'s' if global_moderated_image_count != 1 else ''} ({global_moderated_image_percentage:.2f}%)", inline=True)
                 embed.add_field(name="Timeouts issued", value=f"**{global_timeout_count:,}** timeout{'s' if global_timeout_count != 1 else ''}", inline=True)
                 embed.add_field(name="Total timeout duration", value=f"{global_timeout_duration_str}", inline=True)
+                embed.add_field(name="Warnings issued", value=global_warning_stats, inline=True)
                 embed.add_field(name="Estimated minimum staff time saved", value=f"{global_time_saved_str} of **hands-on-keyboard** time to simply read and moderate automatically screened content.", inline=False)
                 embed.add_field(name="Most frequent flags", value=global_top_categories_bullets, inline=False)
 
@@ -1144,8 +1188,14 @@ class Omni(commands.Cog):
             if mem_violations:
                 violations = (violations + mem_violations)[-50:]
 
-            if not violations:
-                await ctx.send(f"No violations found for {user.mention}.")
+            # Get warning count for this user
+            user_warnings = await guild_conf.user_warnings()
+            warning_count = user_warnings.get(str(user.id), 0)
+            mem_warning_count = self.memory_user_warnings[guild.id].get(user.id, 0)
+            total_warning_count = warning_count + mem_warning_count
+
+            if not violations and total_warning_count == 0:
+                await ctx.send(f"No violations or warnings found for {user.mention}.")
                 return
 
             # Show up to 5 most recent violations
@@ -1169,7 +1219,12 @@ class Omni(commands.Cog):
                     value=f"**Categories:** {cat_str}\n**Message:** {content[:300]}{'...' if len(content) > 300 else ''}",
                     inline=False
                 )
-            embed.set_footer(text="Only the last 50 violations are kept per user.")
+            embed.add_field(
+                name="Warnings issued",
+                value=f"{total_warning_count} warning{'s' if total_warning_count != 1 else ''} for this user.",
+                inline=False
+            )
+            embed.set_footer(text="Only the last 50 violations are kept per user. Warnings are cumulative.")
             await ctx.send(embed=embed)
         except Exception as e:
             raise RuntimeError(f"Failed to display violation history: {e}")
@@ -1192,6 +1247,8 @@ class Omni(commands.Cog):
             delete_violatory_messages = await self.config.guild(guild).delete_violatory_messages()
             bypass_nsfw = await self.config.guild(guild).bypass_nsfw()
             monitoring_warning_enabled = await self.config.guild(guild).monitoring_warning_enabled()
+            user_warnings = await self.config.guild(guild).user_warnings()
+            total_warnings = sum(user_warnings.values()) if user_warnings else 0
 
             log_channel = guild.get_channel(log_channel_id) if log_channel_id else None
             log_channel_name = log_channel.mention if log_channel else "Not set"
@@ -1214,6 +1271,7 @@ class Omni(commands.Cog):
             embed.add_field(name="Whitelisted categories", value=whitelisted_categories_names, inline=True)
             embed.add_field(name="Whitelisted NSFW", value="Enabled" if bypass_nsfw else "Disabled", inline=True)
             embed.add_field(name="Monitoring warning", value=monitoring_warning_status, inline=True)
+            embed.add_field(name="Total warnings issued", value=f"{total_warnings} warning{'s' if total_warnings != 1 else ''}", inline=True)
 
             await ctx.send(embed=embed)
         except Exception as e:
@@ -1258,6 +1316,7 @@ class Omni(commands.Cog):
                 await guild_conf.too_tough_votes.set(0)
                 await guild_conf.just_right_votes.set(0)
                 await guild_conf.user_violations.set({})
+                await guild_conf.user_warnings.set({})
 
             # Reset global statistics
             await self.config.global_message_count.set(0)
@@ -1275,6 +1334,7 @@ class Omni(commands.Cog):
             self.memory_moderated_users.clear()
             self.memory_category_counter.clear()
             self.memory_user_violations.clear()
+            self.memory_user_warnings.clear()
             self._reminder_sent_at.clear()
             self._timeout_issued_for_message.clear()
             self._deleted_messages.clear()
