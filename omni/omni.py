@@ -35,7 +35,11 @@ class Omni(commands.Cog):
         self._deleted_messages = {}  # {message_id: {"content": ..., "author_id": ..., "author_name": ..., "author_avatar": ..., "channel_id": ..., "attachments": [...] }}
 
         # Start periodic save task
-        self.bot.loop.create_task(self.periodic_save())
+        # Use asyncio.create_task for compatibility with modern Red/discord.py
+        try:
+            self.bot.loop.create_task(self.periodic_save())
+        except Exception:
+            asyncio.create_task(self.periodic_save())
 
     def _register_config(self):
         """Register configuration defaults."""
@@ -81,7 +85,7 @@ class Omni(commands.Cog):
     async def initialize(self):
         """Initialize the aiohttp session."""
         try:
-            if self.session is None or self.session.closed:
+            if self.session is None or getattr(self.session, "closed", True):
                 self.session = aiohttp.ClientSession()
         except Exception as e:
             raise RuntimeError(f"Failed to initialize Omni cog: {e}")
@@ -107,7 +111,7 @@ class Omni(commands.Cog):
 
     async def check_monitoring_reminder(self, message):
         """Check and send a monitoring reminder if needed."""
-        if message.author.bot or not message.guild:
+        if getattr(message.author, "bot", False) or not getattr(message, "guild", None):
             return
 
         guild = message.guild
@@ -126,20 +130,25 @@ class Omni(commands.Cog):
         bypass_nsfw = await self.config.guild(guild).bypass_nsfw()
 
         # Check if channel is whitelisted by channel ID
-        if channel.id in whitelisted_channels:
+        if getattr(channel, "id", None) in whitelisted_channels:
             return
         # Check if channel's category is whitelisted
         if getattr(channel, "category_id", None) in whitelisted_categories:
             return
         # Check if any of the author's roles are whitelisted
-        if hasattr(message.author, "roles") and any(role.id in whitelisted_roles for role in getattr(message.author, "roles", [])):
+        if hasattr(message.author, "roles") and any(getattr(role, "id", None) in whitelisted_roles for role in getattr(message.author, "roles", [])):
             return
         # Check if author is whitelisted
-        if message.author.id in whitelisted_users:
+        if getattr(message.author, "id", None) in whitelisted_users:
             return
         # Check if NSFW bypass is enabled and channel is NSFW
-        if hasattr(channel, "is_nsfw") and callable(getattr(channel, "is_nsfw", None)) and channel.is_nsfw() and bypass_nsfw:
-            return
+        if hasattr(channel, "is_nsfw") and callable(getattr(channel, "is_nsfw", None)):
+            try:
+                is_nsfw = channel.is_nsfw()
+            except Exception:
+                is_nsfw = False
+            if is_nsfw and bypass_nsfw:
+                return
 
         # Increment the message count for the channel
         self.memory_user_message_counts[guild.id][channel.id] += 1
@@ -185,14 +194,14 @@ class Omni(commands.Cog):
 
     async def process_message(self, message):
         try:
-            if message.author.bot or not message.guild:
+            if getattr(message.author, "bot", False) or not getattr(message, "guild", None):
                 return
 
             guild = message.guild
             if not await self.config.guild(guild).moderation_enabled():
                 return
 
-            if message.channel.id in await self.config.guild(guild).whitelisted_channels():
+            if getattr(message.channel, "id", None) in await self.config.guild(guild).whitelisted_channels():
                 return
 
             whitelisted_categories = await self.config.guild(guild).whitelisted_categories()
@@ -200,14 +209,19 @@ class Omni(commands.Cog):
                 return
 
             whitelisted_roles = await self.config.guild(guild).whitelisted_roles()
-            if hasattr(message.author, "roles") and any(role.id in whitelisted_roles for role in getattr(message.author, "roles", [])):
+            if hasattr(message.author, "roles") and any(getattr(role, "id", None) in whitelisted_roles for role in getattr(message.author, "roles", [])):
                 return
 
-            if message.author.id in await self.config.guild(guild).whitelisted_users():
+            if getattr(message.author, "id", None) in await self.config.guild(guild).whitelisted_users():
                 return
 
-            if hasattr(message.channel, "is_nsfw") and callable(getattr(message.channel, "is_nsfw", None)) and message.channel.is_nsfw() and await self.config.guild(guild).bypass_nsfw():
-                return
+            if hasattr(message.channel, "is_nsfw") and callable(getattr(message.channel, "is_nsfw", None)):
+                try:
+                    is_nsfw = message.channel.is_nsfw()
+                except Exception:
+                    is_nsfw = False
+                if is_nsfw and await self.config.guild(guild).bypass_nsfw():
+                    return
 
             self.increment_statistic(guild.id, 'message_count')
             self.increment_statistic('global', 'global_message_count')
@@ -217,7 +231,7 @@ class Omni(commands.Cog):
             if not api_key:
                 return
 
-            if self.session is None or self.session.closed:
+            if self.session is None or getattr(self.session, "closed", True):
                 self.session = aiohttp.ClientSession()
 
             normalized_content = self.normalize_text(message.content)
@@ -225,7 +239,7 @@ class Omni(commands.Cog):
 
             # Count and increment image stats for each image (not just once for the message)
             image_attachments = []
-            if message.attachments:
+            if getattr(message, "attachments", None):
                 for attachment in message.attachments:
                     if getattr(attachment, "content_type", None) and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif"):
                         image_attachments.append(attachment)
@@ -292,7 +306,7 @@ class Omni(commands.Cog):
         attempt = 0
         while attempt < max_attempts:
             try:
-                if self.session is None or self.session.closed:
+                if self.session is None or getattr(self.session, "closed", True):
                     self.session = aiohttp.ClientSession()
                 async with self.session.post(
                     "https://api.openai.com/v1/moderations",
@@ -343,7 +357,7 @@ class Omni(commands.Cog):
                         "content": message.content,
                         "author_id": message.author.id,
                         "author_name": message.author.display_name if hasattr(message.author, "display_name") else str(message.author),
-                        "author_avatar": str(message.author.display_avatar.url) if hasattr(message.author, "display_avatar") else str(message.author.avatar_url),
+                        "author_avatar": str(getattr(message.author, "display_avatar", getattr(message.author, "avatar_url", ""))),
                         "channel_id": message.channel.id,
                         "attachments": [a.url for a in getattr(message, "attachments", []) if getattr(a, "content_type", None) and a.content_type.startswith("image/") and not a.content_type.endswith("gif")]
                     }
@@ -407,7 +421,7 @@ class Omni(commands.Cog):
                     "x-omni": h
                 }
                 session = self.session
-                if session is None or session.closed:
+                if session is None or getattr(session, "closed", True):
                     session = aiohttp.ClientSession()
                 async with session.post(
                     "https://automator.beehive.systems/api/v1/webhooks/hj05HelXPKgXZQEAUWf7T",
@@ -464,8 +478,8 @@ class Omni(commands.Cog):
             self.timeout_issued = timeout_issued
             self.timeout_duration = timeout_duration
 
-            # Only show Timeout button if timeouts are not enabled (timeout_duration == 0)
-            if self.timeout_duration == 0:
+            # Only show Timeout button if timeouts are enabled (timeout_duration > 0)
+            if self.timeout_duration > 0:
                 self.add_item(self.TimeoutButton(cog, message, timeout_duration, row=1))
 
             # Add Untimeout button only if a timeout was issued
@@ -492,7 +506,7 @@ class Omni(commands.Cog):
 
             async def callback(self, interaction: discord.Interaction):
                 # Only allow users with manage_guild or admin
-                if not (interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_guild):
+                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
                     await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
                     return
                 try:
@@ -501,7 +515,7 @@ class Omni(commands.Cog):
                         await interaction.response.send_message("User not found in this server.", ephemeral=True)
                         return
                     # Check if already timed out
-                    if hasattr(member, "timed_out_until") and member.timed_out_until:
+                    if hasattr(member, "timed_out_until") and getattr(member, "timed_out_until", None):
                         await interaction.response.send_message("User is already timed out.", ephemeral=True)
                         return
                     reason = f"Manual timeout via Omni log button. Message: {self.message.content}"
@@ -520,7 +534,7 @@ class Omni(commands.Cog):
 
             async def callback(self, interaction: discord.Interaction):
                 # Only allow users with manage_guild or admin
-                if not (interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_guild):
+                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
                     await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
                     return
                 try:
@@ -569,7 +583,7 @@ class Omni(commands.Cog):
 
             async def callback(self, interaction: discord.Interaction):
                 # Only allow users with manage_guild or admin
-                if not (interaction.user.guild_permissions.administrator or interaction.user.guild_permissions.manage_guild):
+                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
                     await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
                     return
                 msg_id = self.message.id
