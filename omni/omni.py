@@ -479,7 +479,7 @@ class Omni(commands.Cog):
             self.timeout_duration = timeout_duration
 
             # Only show Timeout button if timeouts are enabled (timeout_duration > 0)
-            if self.timeout_duration > 0:
+            if self.timeout_duration == 0:
                 self.add_item(self.TimeoutButton(cog, message, timeout_duration, row=1))
 
             # Add Untimeout button only if a timeout was issued
