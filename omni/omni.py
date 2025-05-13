@@ -497,6 +497,9 @@ class Omni(commands.Cog):
             if message.id in cog._deleted_messages:
                 self.add_item(self.RestoreButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
 
+            # Add Dismiss button to delete the log message (row 2)
+            self.add_item(self.DismissButton(cog, message, row=2, moderated_user_id=self.moderated_user_id))
+
             # Add jump to conversation button LAST (so it appears underneath, on row 2)
             self.add_item(discord.ui.Button(label="See conversation", url=message.jump_url, row=2))
 
@@ -685,6 +688,27 @@ class Omni(commands.Cog):
                     await interaction.response.send_message("The message was re-shared. Thanks for reviewing this alert.", ephemeral=True)
                 except Exception as e:
                     await interaction.response.send_message(f"Failed to restore message: {e}", ephemeral=True)
+
+        class DismissButton(discord.ui.Button):
+            def __init__(self, cog, message, row=2, moderated_user_id=None):
+                super().__init__(label="Dismiss", style=discord.ButtonStyle.red, custom_id=f"dismiss_{message.id}", emoji="🗑️", row=row)
+                self.cog = cog
+                self.message = message
+                self.moderated_user_id = moderated_user_id
+
+            async def callback(self, interaction: discord.Interaction):
+                # Prevent the moderated user from interacting with their own log
+                if interaction.user.id == self.moderated_user_id:
+                    await interaction.response.send_message("You cannot dismiss moderation logs of your own actions.", ephemeral=True)
+                    return
+                # Only allow users with manage_guild or admin
+                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
+                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
+                    return
+                try:
+                    await interaction.message.delete()
+                except Exception as e:
+                    await interaction.response.send_message(f"Failed to delete log message: {e}", ephemeral=True)
 
     async def _create_action_view(self, message, category_scores, timeout_issued=None):
         # Determine if a timeout was issued for this message
