@@ -34,6 +34,9 @@ class Omni(commands.Cog):
         # Store deleted messages for possible restoration
         self._deleted_messages = {}  # {message_id: {"content": ..., "author_id": ..., "author_name": ..., "author_avatar": ..., "channel_id": ..., "attachments": [...] }}
 
+        # For logging: track which image was flagged if an image is moderated
+        self._flagged_image_for_message = {}  # {message_id: image_url}
+
         # Start periodic save task
         # Use asyncio.create_task for compatibility with modern Red/discord.py
         try:
@@ -259,14 +262,23 @@ class Omni(commands.Cog):
 
                 if image_flagged:
                     self.update_moderation_stats(guild.id, message, image_category_scores)
-                    await self.handle_moderation(message, image_category_scores)
+                    # Track which image was flagged for this message
+                    self._flagged_image_for_message[message.id] = attachment.url
+                    await self.handle_moderation(message, image_category_scores, flagged_image_url=attachment.url)
+                else:
+                    # If not flagged, ensure we don't leave a stale value
+                    if self._flagged_image_for_message.get(message.id) == attachment.url:
+                        del self._flagged_image_for_message[message.id]
 
                 # Space out requests
                 await asyncio.sleep(1)
 
             if text_flagged:
                 self.update_moderation_stats(guild.id, message, text_category_scores)
-                await self.handle_moderation(message, text_category_scores)
+                # For text moderation, clear any flagged image for this message
+                if message.id in self._flagged_image_for_message:
+                    del self._flagged_image_for_message[message.id]
+                await self.handle_moderation(message, text_category_scores, flagged_image_url=None)
 
             if await self.config.guild(guild).debug_mode():
                 await self.log_message(message, text_category_scores)
@@ -342,7 +354,7 @@ class Omni(commands.Cog):
         await self.log_message(message, {}, error_code="max_retries")
         return {}
 
-    async def handle_moderation(self, message, category_scores):
+    async def handle_moderation(self, message, category_scores, flagged_image_url=None):
         try:
             guild = message.guild
             timeout_duration = await self.config.guild(guild).timeout_duration()
@@ -438,13 +450,15 @@ class Omni(commands.Cog):
             if log_channel_id:
                 log_channel = guild.get_channel(log_channel_id)
                 if log_channel:
-                    embed = await self._create_moderation_embed(message, category_scores, "AI moderator detected potential misbehavior", action_taken)
+                    embed = await self._create_moderation_embed(
+                        message, category_scores, "AI moderator detected potential misbehavior", action_taken, flagged_image_url=flagged_image_url
+                    )
                     view = await self._create_action_view(message, category_scores, timeout_issued=timeout_issued)
                     await log_channel.send(embed=embed, view=view)
         except Exception as e:
             raise RuntimeError(f"Failed to handle moderation: {e}")
 
-    async def _create_moderation_embed(self, message, category_scores, title, action_taken):
+    async def _create_moderation_embed(self, message, category_scores, title, action_taken, flagged_image_url=None):
         embed = discord.Embed(
             title=title,
             description=f"The following message was flagged for potentially breaking server rules, Discord's **[Terms](<https://discord.com/terms>)**, or Discord's **[Community Guidelines](<https://discord.com/guidelines>)**.\n```{message.content}```",
@@ -463,11 +477,16 @@ class Omni(commands.Cog):
             score_display = f"**{score_percentage:.0f}%**" if score > moderation_threshold else f"{score_percentage:.0f}%"
             embed.add_field(name=category.capitalize(), value=score_display, inline=True)
 
-        if getattr(message, "attachments", None):
-            for attachment in message.attachments:
-                if getattr(attachment, "content_type", None) and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif"):
-                    embed.set_image(url=attachment.url)
-                    break
+        # If a flagged_image_url is provided, use it as the embed image
+        if flagged_image_url:
+            embed.set_image(url=flagged_image_url)
+        else:
+            # Fallback: if not provided, use the first image attachment (as before)
+            if getattr(message, "attachments", None):
+                for attachment in message.attachments:
+                    if getattr(attachment, "content_type", None) and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif"):
+                        embed.set_image(url=attachment.url)
+                        break
         return embed
 
     class _ModerationActionView(discord.ui.View):
@@ -864,7 +883,11 @@ class Omni(commands.Cog):
             if log_channel_id:
                 log_channel = guild.get_channel(log_channel_id)
                 if log_channel:
-                    embed = await self._create_moderation_embed(message, category_scores, "Message processed by Omni", "No action taken")
+                    # If an image was flagged for this message, use it in the embed
+                    flagged_image_url = self._flagged_image_for_message.get(message.id)
+                    embed = await self._create_moderation_embed(
+                        message, category_scores, "Message processed by Omni", "No action taken", flagged_image_url=flagged_image_url
+                    )
                     if error_code:
                         embed.add_field(name="Error", value=f":x: `{error_code}` Failed to send to moderation endpoint.", inline=False)
                     view = await self._create_action_view(message, category_scores)
@@ -931,6 +954,8 @@ class Omni(commands.Cog):
         self.memory_user_message_counts.clear()
         self.memory_moderated_users.clear()
         self.memory_category_counter.clear()
+        # Also clear flagged image tracking after save
+        self._flagged_image_for_message.clear()
 
     @commands.guild_only()
     @commands.group()
@@ -1168,6 +1193,7 @@ class Omni(commands.Cog):
             self._reminder_sent_at.clear()
             self._timeout_issued_for_message.clear()
             self._deleted_messages.clear()
+            self._flagged_image_for_message.clear()
 
             # Confirmation message
             confirmation_embed = discord.Embed(
