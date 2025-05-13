@@ -478,33 +478,41 @@ class Omni(commands.Cog):
             self.timeout_issued = timeout_issued
             self.timeout_duration = timeout_duration
 
+            # Store the ID of the user who was moderated (the message author)
+            self.moderated_user_id = message.author.id
+
             # Only show Timeout button if timeouts are enabled (timeout_duration > 0)
             if self.timeout_duration == 0:
-                self.add_item(self.TimeoutButton(cog, message, timeout_duration, row=1))
+                self.add_item(self.TimeoutButton(cog, message, timeout_duration, row=1, moderated_user_id=self.moderated_user_id))
 
             # Add Untimeout button only if a timeout was issued
             if timeout_issued:
-                self.add_item(self.UntimeoutButton(cog, message, row=1))
+                self.add_item(self.UntimeoutButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
 
             # Add kick and ban buttons (always on row 1)
-            self.add_item(self.KickButton(cog, message, row=1))
-            self.add_item(self.BanButton(cog, message, row=1))
+            self.add_item(self.KickButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
+            self.add_item(self.BanButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
 
             # Add Restore button if message was deleted and info is available
             if message.id in cog._deleted_messages:
-                self.add_item(self.RestoreButton(cog, message, row=1))
+                self.add_item(self.RestoreButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
 
             # Add jump to conversation button LAST (so it appears underneath, on row 2)
             self.add_item(discord.ui.Button(label="See conversation", url=message.jump_url, row=2))
 
         class TimeoutButton(discord.ui.Button):
-            def __init__(self, cog, message, timeout_duration, row=1):
+            def __init__(self, cog, message, timeout_duration, row=1, moderated_user_id=None):
                 super().__init__(label="Timeout", style=discord.ButtonStyle.grey, custom_id=f"timeout_{message.author.id}_{message.id}", emoji="⏳", row=row)
                 self.cog = cog
                 self.message = message
                 self.timeout_duration = timeout_duration
+                self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
+                # Prevent the moderated user from interacting with their own log
+                if interaction.user.id == self.moderated_user_id:
+                    await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
+                    return
                 # Only allow users with manage_guild or admin
                 if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
                     await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
@@ -527,12 +535,17 @@ class Omni(commands.Cog):
                     await interaction.response.send_message(f"Failed to timeout user: {e}", ephemeral=True)
 
         class UntimeoutButton(discord.ui.Button):
-            def __init__(self, cog, message, row=1):
+            def __init__(self, cog, message, row=1, moderated_user_id=None):
                 super().__init__(label="Untimeout", style=discord.ButtonStyle.grey, custom_id=f"untimeout_{message.author.id}_{message.id}", emoji="✅", row=row)
                 self.cog = cog
                 self.message = message
+                self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
+                # Prevent the moderated user from interacting with their own log
+                if interaction.user.id == self.moderated_user_id:
+                    await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
+                    return
                 # Only allow users with manage_guild or admin
                 if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
                     await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
@@ -558,30 +571,45 @@ class Omni(commands.Cog):
                     await interaction.response.send_message(f"Failed to untimeout user: {e}", ephemeral=True)
 
         class KickButton(discord.ui.Button):
-            def __init__(self, cog, message, row=1):
+            def __init__(self, cog, message, row=1, moderated_user_id=None):
                 super().__init__(label="Kick", style=discord.ButtonStyle.grey, custom_id=f"kick_{message.author.id}_{message.id}", emoji="👢", row=row)
                 self.cog = cog
                 self.message = message
+                self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
+                # Prevent the moderated user from interacting with their own log
+                if interaction.user.id == self.moderated_user_id:
+                    await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
+                    return
                 await self.cog.kick_user(interaction)
 
         class BanButton(discord.ui.Button):
-            def __init__(self, cog, message, row=1):
+            def __init__(self, cog, message, row=1, moderated_user_id=None):
                 super().__init__(label="Ban", style=discord.ButtonStyle.grey, custom_id=f"ban_{message.author.id}_{message.id}", emoji="🔨", row=row)
                 self.cog = cog
                 self.message = message
+                self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
+                # Prevent the moderated user from interacting with their own log
+                if interaction.user.id == self.moderated_user_id:
+                    await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
+                    return
                 await self.cog.ban_user(interaction)
 
         class RestoreButton(discord.ui.Button):
-            def __init__(self, cog, message, row=1):
+            def __init__(self, cog, message, row=1, moderated_user_id=None):
                 super().__init__(label="Reshare", style=discord.ButtonStyle.grey, custom_id=f"restore_{message.author.id}_{message.id}", emoji="♻️", row=row)
                 self.cog = cog
                 self.message = message
+                self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
+                # Prevent the moderated user from interacting with their own log
+                if interaction.user.id == self.moderated_user_id:
+                    await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
+                    return
                 # Only allow users with manage_guild or admin
                 if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
                     await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
