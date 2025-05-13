@@ -744,11 +744,11 @@ class Omni(commands.Cog):
                     if description.strip():
                         author = self.message.author
                         embed = discord.Embed(
-                            title="Message restored from moderation",
+                            title=f"{author.display_name} said",
                             description=description,
                             color=0xfffffe
                         )
-                        embed.set_footer(text=f"Sent by: {author.display_name} (ID: {author.id})")
+                        embed.set_footer(text=f"This message was flagged by the AI moderator, but a staff member subsequently approved it to be sent.")
                         await channel.send(embed=embed)
                     # If there are image attachments, send them as separate messages
                     for img_url in attachments:
