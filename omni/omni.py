@@ -48,7 +48,7 @@ class Omni(commands.Cog):
             whitelisted_channels=[],
             whitelisted_roles=[],
             whitelisted_users=[],
-            whitelisted_categories=[],  # Added for channel categories
+            whitelisted_categories=[],
             moderation_enabled=True,
             user_message_counts={},
             image_count=0,
@@ -60,9 +60,9 @@ class Omni(commands.Cog):
             just_right_votes=0,
             last_vote_time=None,
             delete_violatory_messages=True,
-            last_reminder_time=None,  # Added to track last reminder time
-            bypass_nsfw=False,  # Added for NSFW channel bypass
-            monitoring_warning_enabled=True  # NEW: Enable monitoring warning by default
+            last_reminder_time=None,
+            bypass_nsfw=False,
+            monitoring_warning_enabled=True
         )
         self.config.register_global(
             global_message_count=0,
