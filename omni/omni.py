@@ -647,6 +647,13 @@ class Omni(commands.Cog):
                         if img_url:
                             embed = discord.Embed().set_image(url=img_url)
                             await channel.send(embed=embed)
+                    # After restoring, disable the button and change the label
+                    self.label = "Message reshared"
+                    self.disabled = True
+                    try:
+                        await interaction.message.edit(view=self.view)
+                    except Exception:
+                        pass
                     await interaction.response.send_message("The message was re-shared. Thanks for reviewing this alert.", ephemeral=True)
                 except Exception as e:
                     await interaction.response.send_message(f"Failed to restore message: {e}", ephemeral=True)
