@@ -61,7 +61,8 @@ class Omni(commands.Cog):
             last_vote_time=None,
             delete_violatory_messages=True,
             last_reminder_time=None,  # Added to track last reminder time
-            bypass_nsfw=False  # Added for NSFW channel bypass
+            bypass_nsfw=False,  # Added for NSFW channel bypass
+            monitoring_warning_enabled=True  # NEW: Enable monitoring warning by default
         )
         self.config.register_global(
             global_message_count=0,
@@ -109,6 +110,11 @@ class Omni(commands.Cog):
         guild = message.guild
         channel = message.channel
 
+        # Check if monitoring warning is enabled
+        monitoring_warning_enabled = await self.config.guild(guild).monitoring_warning_enabled()
+        if not monitoring_warning_enabled:
+            return
+
         # Check all whitelist conditions before incrementing or sending reminder
         whitelisted_channels = await self.config.guild(guild).whitelisted_channels()
         whitelisted_categories = await self.config.guild(guild).whitelisted_categories()
@@ -150,6 +156,11 @@ class Omni(commands.Cog):
     async def send_monitoring_reminder(self, channel):
         """Send a monitoring reminder to the specified channel."""
         try:
+            # Check if monitoring warning is enabled for this guild
+            guild = channel.guild
+            monitoring_warning_enabled = await self.config.guild(guild).monitoring_warning_enabled()
+            if not monitoring_warning_enabled:
+                return
             command_prefixes = await self.bot.get_valid_prefixes()
             command_prefix = command_prefixes[0] if command_prefixes else "!"
             embed = discord.Embed(
@@ -844,6 +855,7 @@ class Omni(commands.Cog):
             delete_violatory_messages = await self.config.guild(guild).delete_violatory_messages()
             last_reminder_time = await self.config.guild(guild).last_reminder_time()
             bypass_nsfw = await self.config.guild(guild).bypass_nsfw()
+            monitoring_warning_enabled = await self.config.guild(guild).monitoring_warning_enabled()
 
             log_channel = guild.get_channel(log_channel_id) if log_channel_id else None
             log_channel_name = log_channel.mention if log_channel else "Not set"
@@ -853,6 +865,7 @@ class Omni(commands.Cog):
             # get_channel_category does not exist, so fix this:
             whitelisted_categories_names = ", ".join([cat.name for cat in guild.categories if cat.id in whitelisted_categories]) or "None"
             last_reminder_display = last_reminder_time if last_reminder_time else "Never"
+            monitoring_warning_status = "Enabled" if monitoring_warning_enabled else "Disabled"
 
             embed = discord.Embed(title="Omni settings", color=0xfffffe)
             embed.add_field(name="Moderative threshold", value=f"{moderation_threshold * 100:.2f}%", inline=True)
@@ -867,6 +880,7 @@ class Omni(commands.Cog):
             embed.add_field(name="Whitelisted categories", value=whitelisted_categories_names, inline=True)
             embed.add_field(name="Whitelisted NSFW", value="Enabled" if bypass_nsfw else "Disabled", inline=True)
             embed.add_field(name="Last disclosure notice", value=last_reminder_display, inline=True)
+            embed.add_field(name="Monitoring warning", value=monitoring_warning_status, inline=True)
 
             await ctx.send(embed=embed)
         except Exception as e:
@@ -1054,6 +1068,48 @@ class Omni(commands.Cog):
             await ctx.send(f"Automatic moderation {status}.")
         except Exception as e:
             raise RuntimeError(f"Failed to toggle automatic moderation: {e}")
+
+    @omni.command()
+    @commands.admin_or_permissions(manage_guild=True)
+    async def disclaimer(self, ctx):
+        """
+        Toggle the monitoring warning message that is periodically sent to channels.
+        Disabling this warning is not recommended and may have legal or compliance implications.
+        """
+        try:
+            guild = ctx.guild
+            current_status = await self.config.guild(guild).monitoring_warning_enabled()
+            if current_status:
+                # If currently enabled, require confirmation to disable
+                warning_embed = discord.Embed(
+                    title="Confirm acceptance of liability",
+                    description=(
+                        "You are about to **disable** the periodic monitoring privacy warning message.\n\n"
+                        "Disabling this warning may violate Discord's Terms of Service, privacy laws, or your own server's compliance requirements. "
+                        "It is your responsibility to ensure that your members are properly informed that their messages are subject to automated moderation, logging, and analysis.\n\n"
+                        "If you understand the risks and still wish to proceed, type `DISABLE` in this channel within 30 seconds."
+                    ),
+                    color=0xff4545
+                )
+                await ctx.send(embed=warning_embed)
+
+                def check(m):
+                    return m.author == ctx.author and m.content.strip().upper() == "DISABLE" and m.channel == ctx.channel
+
+                try:
+                    await self.bot.wait_for('message', check=check, timeout=30)
+                except asyncio.TimeoutError:
+                    await ctx.send("Operation cancelled. Monitoring warning remains enabled.")
+                    return
+
+                await self.config.guild(guild).monitoring_warning_enabled.set(False)
+                await ctx.send("Monitoring warning has been **disabled**. You are responsible for informing your members about moderation and logging.")
+            else:
+                # Enable without confirmation
+                await self.config.guild(guild).monitoring_warning_enabled.set(True)
+                await ctx.send("Monitoring warning has been **enabled**. Members will be periodically notified that conversations are subject to moderation.")
+        except Exception as e:
+            raise RuntimeError(f"Failed to toggle monitoring warning: {e}")
 
     @omni.command()
     async def reasons(self, ctx):
