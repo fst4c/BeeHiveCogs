@@ -853,7 +853,6 @@ class Omni(commands.Cog):
             whitelisted_categories = await self.config.guild(guild).whitelisted_categories()
             moderation_enabled = await self.config.guild(guild).moderation_enabled()
             delete_violatory_messages = await self.config.guild(guild).delete_violatory_messages()
-            last_reminder_time = await self.config.guild(guild).last_reminder_time()
             bypass_nsfw = await self.config.guild(guild).bypass_nsfw()
             monitoring_warning_enabled = await self.config.guild(guild).monitoring_warning_enabled()
 
@@ -862,9 +861,7 @@ class Omni(commands.Cog):
             whitelisted_channels_names = ", ".join([guild.get_channel(ch_id).mention for ch_id in whitelisted_channels if guild.get_channel(ch_id)]) or "None"
             whitelisted_roles_names = ", ".join([guild.get_role(role_id).mention for role_id in whitelisted_roles if guild.get_role(role_id)]) or "None"
             whitelisted_users_names = ", ".join([f"<@{user_id}>" for user_id in whitelisted_users]) or "None"
-            # get_channel_category does not exist, so fix this:
             whitelisted_categories_names = ", ".join([cat.name for cat in guild.categories if cat.id in whitelisted_categories]) or "None"
-            last_reminder_display = last_reminder_time if last_reminder_time else "Never"
             monitoring_warning_status = "Enabled" if monitoring_warning_enabled else "Disabled"
 
             embed = discord.Embed(title="Omni settings", color=0xfffffe)
@@ -879,7 +876,6 @@ class Omni(commands.Cog):
             embed.add_field(name="Whitelisted users", value=whitelisted_users_names, inline=True)
             embed.add_field(name="Whitelisted categories", value=whitelisted_categories_names, inline=True)
             embed.add_field(name="Whitelisted NSFW", value="Enabled" if bypass_nsfw else "Disabled", inline=True)
-            embed.add_field(name="Last disclosure notice", value=last_reminder_display, inline=True)
             embed.add_field(name="Monitoring warning", value=monitoring_warning_status, inline=True)
 
             await ctx.send(embed=embed)
@@ -953,6 +949,9 @@ class Omni(commands.Cog):
 
         except Exception as e:
             raise RuntimeError(f"Failed to reset statistics: {e}")
+
+
+# VALIDATED COMMANDS
 
     @commands.cooldown(1, 86400, commands.BucketType.user)
     @omni.command()
@@ -1052,8 +1051,6 @@ class Omni(commands.Cog):
 
         except Exception as e:
             raise RuntimeError(f"Failed to initiate vote: {e}")
-
-# Put commands that's already validated not broken down here
 
     @omni.command()
     @commands.admin_or_permissions(manage_guild=True)
