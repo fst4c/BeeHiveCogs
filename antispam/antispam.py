@@ -504,7 +504,7 @@ class AntiSpam(commands.Cog):
             log_channel = ctx.guild.get_channel(log_channel_id)
             if log_channel is None and hasattr(self.bot, "get_channel"):
                 log_channel = self.bot.get_channel(log_channel_id)
-        embed = discord.Embed(title="AntiSpam Settings", color=discord.Color.blurple())
+        embed = discord.Embed(title="AntiSpam settings", color=0xfffffe)
         embed.add_field(name="Enabled", value=str(enabled))
         embed.add_field(name="Message Limit", value=f"{message_limit} per {interval}s")
         embed.add_field(name="Punishment", value=punishment)
