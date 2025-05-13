@@ -648,13 +648,13 @@ class Omni(commands.Cog):
                 warning_embed = discord.Embed(
                     title="Conduct warning",
                     description=(
-                        f"Your message was flagged by the AI moderator in **{self.message.guild.name}**. A server moderator later reviewed this alert and has issued you a conduct warning as a result."
+                        f"Your message was flagged by the AI moderator in **{self.message.guild.name}**. A human moderator later reviewed this alert, agreed the AI's decision, and has issued you a conduct warning as a result."
                     ),
                     color=0xff4545
                 )
                 warning_embed.add_field(
                     name="Your message",
-                    value=self.message.content or "*No content*",
+                    value=f"`{self.message.content}`" or "*No content*",
                     inline=False
                 )
                 warning_embed.add_field(
