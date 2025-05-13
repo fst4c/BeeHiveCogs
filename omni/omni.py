@@ -495,7 +495,7 @@ class Omni(commands.Cog):
                 self.add_item(self.RestoreButton(cog, message, row=1))
 
             # Add jump to conversation button LAST (so it appears underneath, on row 2)
-            self.add_item(discord.ui.Button(label="Jump to place in conversation", url=message.jump_url, row=2))
+            self.add_item(discord.ui.Button(label="See conversation", url=message.jump_url, row=2))
 
         class TimeoutButton(discord.ui.Button):
             def __init__(self, cog, message, timeout_duration, row=1):
