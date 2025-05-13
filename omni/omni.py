@@ -691,7 +691,7 @@ class Omni(commands.Cog):
 
         class DismissButton(discord.ui.Button):
             def __init__(self, cog, message, row=2, moderated_user_id=None):
-                super().__init__(label="Dismiss", style=discord.ButtonStyle.red, custom_id=f"dismiss_{message.id}", emoji="🗑️", row=row)
+                super().__init__(label="Dismiss", style=discord.ButtonStyle.grey, custom_id=f"dismiss_{message.id}", emoji="🗑️", row=row)
                 self.cog = cog
                 self.message = message
                 self.moderated_user_id = moderated_user_id
