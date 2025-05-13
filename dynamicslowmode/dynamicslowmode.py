@@ -180,13 +180,13 @@ class DynamicSlowmode(commands.Cog):
             )
             await ctx.send(embed=embed)
 
-    async def _send_log(self, guild: discord.Guild, embed: discord.Embed):
+    async def _send_log(self, guild: discord.Guild, embed: discord.Embed, view: discord.ui.View = None):
         log_channel_id = await self.config.guild(guild).log_channel()
         if log_channel_id:
             log_channel = guild.get_channel(log_channel_id)
             if log_channel and log_channel.permissions_for(guild.me).send_messages:
                 try:
-                    await log_channel.send(embed=embed)
+                    await log_channel.send(embed=embed, view=view)
                 except discord.Forbidden:
                     print(f"Permission error: Cannot send log message to {log_channel.mention}.")
                 except discord.HTTPException as e:
@@ -282,6 +282,79 @@ class DynamicSlowmode(commands.Cog):
             await self.slowmode_task()
             await asyncio.sleep(60)
 
+    class SlowmodeLogView(discord.ui.View):
+        def __init__(self, cog, channel: discord.TextChannel, current: int, min_slow: int, max_slow: int):
+            super().__init__(timeout=300)
+            self.cog = cog
+            self.channel = channel
+            self.current = current
+            self.min_slow = min_slow
+            self.max_slow = max_slow
+
+            # Add buttons
+            self.add_item(DynamicSlowmode.IncreaseSlowmodeButton(cog, channel, current, max_slow))
+            self.add_item(DynamicSlowmode.DecreaseSlowmodeButton(cog, channel, current, min_slow))
+
+    class IncreaseSlowmodeButton(discord.ui.Button):
+        def __init__(self, cog, channel: discord.TextChannel, current: int, max_slow: int):
+            super().__init__(
+                label="Increase slowmode",
+                style=discord.ButtonStyle.blurple,
+                emoji="⏫",
+                custom_id=f"increase_slowmode_{channel.id}",
+                row=0,
+                disabled=current >= max_slow
+            )
+            self.cog = cog
+            self.channel = channel
+            self.current = current
+            self.max_slow = max_slow
+
+        async def callback(self, interaction: discord.Interaction):
+            if not interaction.user.guild_permissions.manage_channels:
+                await interaction.response.send_message("You don't have permission to adjust slowmode.", ephemeral=True)
+                return
+            new_slowmode = min(self.current + 1, self.max_slow)
+            try:
+                await self.channel.edit(slowmode_delay=new_slowmode, reason="Manual increase via log button")
+                await interaction.response.send_message(
+                    f"Slowmode for {self.channel.mention} increased to {new_slowmode}s.", ephemeral=True
+                )
+            except discord.Forbidden:
+                await interaction.response.send_message("I don't have permission to edit this channel.", ephemeral=True)
+            except Exception as e:
+                await interaction.response.send_message(f"Failed to increase slowmode: {e}", ephemeral=True)
+
+    class DecreaseSlowmodeButton(discord.ui.Button):
+        def __init__(self, cog, channel: discord.TextChannel, current: int, min_slow: int):
+            super().__init__(
+                label="Decrease slowmode",
+                style=discord.ButtonStyle.green,
+                emoji="⏬",
+                custom_id=f"decrease_slowmode_{channel.id}",
+                row=0,
+                disabled=current <= min_slow
+            )
+            self.cog = cog
+            self.channel = channel
+            self.current = current
+            self.min_slow = min_slow
+
+        async def callback(self, interaction: discord.Interaction):
+            if not interaction.user.guild_permissions.manage_channels:
+                await interaction.response.send_message("You don't have permission to adjust slowmode.", ephemeral=True)
+                return
+            new_slowmode = max(self.current - 1, self.min_slow)
+            try:
+                await self.channel.edit(slowmode_delay=new_slowmode, reason="Manual decrease via log button")
+                await interaction.response.send_message(
+                    f"Slowmode for {self.channel.mention} decreased to {new_slowmode}s.", ephemeral=True
+                )
+            except discord.Forbidden:
+                await interaction.response.send_message("I don't have permission to edit this channel.", ephemeral=True)
+            except Exception as e:
+                await interaction.response.send_message(f"Failed to decrease slowmode: {e}", ephemeral=True)
+
     async def slowmode_task(self):
         for guild in self.bot.guilds:
             conf = await self.config.guild(guild).all()
@@ -318,6 +391,7 @@ class DynamicSlowmode(commands.Cog):
                     color=0xfffffe
                 )
 
+                view = None
                 if new_slowmode != current:
                     try:
                         await channel.edit(slowmode_delay=new_slowmode, reason="Adjusting slowmode based on current channel activity")
@@ -342,6 +416,8 @@ class DynamicSlowmode(commands.Cog):
                             value=f"{target_mpm} messages/60s",
                             inline=True
                         )
+                        # Add view with buttons for manual adjustment
+                        view = self.SlowmodeLogView(self, channel, new_slowmode, min_slow, max_slow)
                     except discord.Forbidden:
                         print(f"Permission error: Cannot adjust slowmode for {channel.mention}.")
                     except discord.HTTPException as e:
@@ -365,5 +441,7 @@ class DynamicSlowmode(commands.Cog):
                         value=f"{target_mpm} messages/60s",
                         inline=True
                     )
-                await self._send_log(guild, embed)
+                    # Add view with buttons for manual adjustment (using current slowmode)
+                    view = self.SlowmodeLogView(self, channel, current, min_slow, max_slow)
+                await self._send_log(guild, embed, view=view)
 
