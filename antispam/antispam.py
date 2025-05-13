@@ -200,7 +200,7 @@ class AntiSpam(commands.Cog):
                 evidence = (
                     f"Latest message:\n{last[:400]}\n\n"
                     f"Previous similar messages:\n" +
-                    "\n\n".join(f"[{i+1}] {msg[:400]}" for i, msg in enumerate(similar_msgs))
+                    "\n".join(f"[{i+1}] {msg[:400]}" for i, msg in enumerate(similar_msgs))
                 )
                 await self._punish(message, reason, evidence=evidence)
                 return
