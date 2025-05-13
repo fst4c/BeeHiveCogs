@@ -810,7 +810,7 @@ class Omni(commands.Cog):
                             embed = discord.Embed().set_image(url=img_url)
                             await channel.send(embed=embed)
                     # After restoring, disable the button and change the label
-                    self.label = "Message reshared"
+                    self.label = "Message re-sent"
                     self.disabled = True
                     try:
                         await interaction.message.edit(view=self.view)
