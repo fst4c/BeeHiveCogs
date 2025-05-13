@@ -251,7 +251,7 @@ class AntiSpam(commands.Cog):
             ascii_art_min_lines = 6
         if self._is_ascii_art(message.content, ascii_art_threshold, ascii_art_min_lines):
             reason = "Sent ASCII art or large block message."
-            evidence = f"Message content (first 600 chars):\n{message.content[:600]}"
+            evidence = f"Message content (first 600 chars):\n`{message.content[:600]}`"
             await self._punish(message, reason, evidence=evidence)
             return
 
