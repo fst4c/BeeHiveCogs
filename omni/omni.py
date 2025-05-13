@@ -577,7 +577,7 @@ class Omni(commands.Cog):
 
         class RestoreButton(discord.ui.Button):
             def __init__(self, cog, message, row=1):
-                super().__init__(label="Restore", style=discord.ButtonStyle.blurple, custom_id=f"restore_{message.author.id}_{message.id}", emoji="♻️", row=row)
+                super().__init__(label="Resend", style=discord.ButtonStyle.blurple, custom_id=f"restore_{message.author.id}_{message.id}", emoji="♻️", row=row)
                 self.cog = cog
                 self.message = message
 
