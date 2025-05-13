@@ -796,31 +796,6 @@ class Omni(commands.Cog):
         """
         pass
 
-    @omni.command()
-    @commands.admin_or_permissions(manage_guild=True)
-    async def threshold(self, ctx, threshold: float):
-        """
-        Set the moderation threshold for message sensitivity.
-
-        The threshold value should be between 0 and 1, where:
-        - 0.00 represents a very sensitive setting, capturing more messages for moderation.
-        - 1.00 represents a barely sensitive setting, allowing most messages to pass through without moderation.
-
-        Adjust this setting based on your community's needs for moderation sensitivity.
-
-        **Recommendations**
-        - For general communities, a threshold of `0.50` is often effective.
-        - For professional communities (or if stricter moderation is preferred), consider a threshold below `0.40`.
-        - For more lenient settings, a threshold above `0.70` might be suitable.
-        """
-        try:
-            if 0 <= threshold <= 1:
-                await self.config.guild(ctx.guild).moderation_threshold.set(threshold)
-                await ctx.send(f"Moderation threshold set to {threshold}.")
-            else:
-                await ctx.send("Threshold must be between 0 and 1.")
-        except Exception as e:
-            raise RuntimeError(f"Failed to set threshold: {e}")
 
     @omni.command()
     async def stats(self, ctx):
@@ -1061,6 +1036,32 @@ class Omni(commands.Cog):
 
 
 # VALIDATED COMMANDS
+
+    @omni.command()
+    @commands.admin_or_permissions(manage_guild=True)
+    async def threshold(self, ctx, threshold: float):
+        """
+        Set the moderation threshold for message sensitivity.
+
+        The threshold value should be between 0 and 1, where:
+        - 0.00 represents a very sensitive setting, capturing more messages for moderation.
+        - 1.00 represents a barely sensitive setting, allowing most messages to pass through without moderation.
+
+        Adjust this setting based on your community's needs for moderation sensitivity.
+
+        **Recommendations**
+        - For general communities, a threshold of `0.50` is often effective.
+        - For professional communities (or if stricter moderation is preferred), consider a threshold below `0.40`.
+        - For more lenient settings, a threshold above `0.70` might be suitable.
+        """
+        try:
+            if 0 <= threshold <= 1:
+                await self.config.guild(ctx.guild).moderation_threshold.set(threshold)
+                await ctx.send(f"Moderation threshold set to {threshold}.")
+            else:
+                await ctx.send("Threshold must be between 0 and 1.")
+        except Exception as e:
+            raise RuntimeError(f"Failed to set threshold: {e}") 
 
     @commands.cooldown(1, 86400, commands.BucketType.user)
     @omni.command()
