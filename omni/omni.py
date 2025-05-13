@@ -262,7 +262,8 @@ class Omni(commands.Cog):
 
                 if image_flagged:
                     self.update_moderation_stats(guild.id, message, image_category_scores)
-                    await self.handle_moderation(message, image_category_scores)
+                    # Pass the attachment to handle_moderation so the embed can show the correct image
+                    await self.handle_moderation(message, image_category_scores, moderated_image=attachment)
 
                 # Space out requests
                 await asyncio.sleep(1)
@@ -345,7 +346,7 @@ class Omni(commands.Cog):
         await self.log_message(message, {}, error_code="max_retries")
         return {}
 
-    async def handle_moderation(self, message, category_scores):
+    async def handle_moderation(self, message, category_scores, moderated_image=None):
         try:
             guild = message.guild
             timeout_duration = await self.config.guild(guild).timeout_duration()
@@ -441,7 +442,9 @@ class Omni(commands.Cog):
             if log_channel_id:
                 log_channel = guild.get_channel(log_channel_id)
                 if log_channel:
-                    embed = await self._create_moderation_embed(message, category_scores, "AI moderator detected potential misbehavior", action_taken)
+                    embed = await self._create_moderation_embed(
+                        message, category_scores, "AI moderator detected potential misbehavior", action_taken, moderated_image=moderated_image
+                    )
                     view = await self._create_action_view(message, category_scores, timeout_issued=timeout_issued)
                     # If a timeout was issued, schedule disabling the Untimeout button after the timeout duration
                     if timeout_issued and timeout_duration > 0:
@@ -480,7 +483,7 @@ class Omni(commands.Cog):
             # Remove the task from tracking after it's done
             self._untimeout_tasks.pop(message_id, None)
 
-    async def _create_moderation_embed(self, message, category_scores, title, action_taken):
+    async def _create_moderation_embed(self, message, category_scores, title, action_taken, moderated_image=None):
         embed = discord.Embed(
             title=title,
             description=f"The following message was flagged for potentially breaking server rules, Discord's **[Terms](<https://discord.com/terms>)**, or Discord's **[Community Guidelines](<https://discord.com/guidelines>)**.\n```{message.content}```",
@@ -499,11 +502,15 @@ class Omni(commands.Cog):
             score_display = f"**{score_percentage:.0f}%**" if score > moderation_threshold else f"{score_percentage:.0f}%"
             embed.add_field(name=category.capitalize(), value=score_display, inline=True)
 
-        if getattr(message, "attachments", None):
-            for attachment in message.attachments:
-                if getattr(attachment, "content_type", None) and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif"):
-                    embed.set_image(url=attachment.url)
-                    break
+        # If this is an image moderation event, show the correct image in the embed
+        if moderated_image is not None and hasattr(moderated_image, "url"):
+            embed.set_image(url=moderated_image.url)
+        else:
+            if getattr(message, "attachments", None):
+                for attachment in message.attachments:
+                    if getattr(attachment, "content_type", None) and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif"):
+                        embed.set_image(url=attachment.url)
+                        break
         # Attach the scores to the embed for parsing in the WarnButton
         embed._omni_category_scores = category_scores
         return embed
