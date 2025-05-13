@@ -532,9 +532,10 @@ class Omni(commands.Cog):
                     await member.timeout(None, reason="Staff member removed a timeout issued by Omni")
                     self.cog._timeout_issued_for_message[self.message.id] = False
                     await interaction.response.send_message(f"User {member.mention} has been un-timed out.", ephemeral=True)
-                    # Disable the button after successful untimeout
+                    # Update the button: change label and disable it
+                    self.label = "Timeout lifted"
                     self.disabled = True
-                    # Try to update the view to reflect the disabled state
+                    # Try to update the view to reflect the new label and disabled state
                     try:
                         await interaction.message.edit(view=self.view)
                     except Exception:
