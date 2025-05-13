@@ -62,6 +62,9 @@ class AntiSpam(commands.Cog):
     @antispam.command()
     async def setlimit(self, ctx, messages: int, seconds: int):
         """Set message limit and interval (messages, seconds)."""
+        if messages < 1 or seconds < 1:
+            await ctx.send("Both messages and seconds must be greater than 0.")
+            return
         await self.config.guild(ctx.guild).message_limit.set(messages)
         await self.config.guild(ctx.guild).interval.set(seconds)
         await ctx.send(f"Set to {messages} messages per {seconds} seconds.")
@@ -79,6 +82,9 @@ class AntiSpam(commands.Cog):
     @antispam.command()
     async def settimeouttime(self, ctx, seconds: int):
         """Set timeout duration in seconds."""
+        if seconds < 1:
+            await ctx.send("Timeout time must be greater than 0 seconds.")
+            return
         await self.config.guild(ctx.guild).timeout_time.set(seconds)
         await ctx.send(f"Timeout time set to {seconds} seconds.")
 
@@ -151,20 +157,33 @@ class AntiSpam(commands.Cog):
         if not message.guild or message.author.bot:
             return
 
+        # Prevent responding to self-bot or webhook messages
+        if getattr(message, "webhook_id", None) is not None:
+            return
+
         guild = message.guild
         conf = self.config.guild(guild)
-        enabled = await conf.enabled()
+        try:
+            enabled = await conf.enabled()
+        except Exception:
+            return
+
         if not enabled:
             return
 
         # Ignore if in ignored channel/role/user
-        ignored_channels = await conf.ignored_channels()
-        ignored_roles = await conf.ignored_roles()
-        ignored_users = await conf.ignored_users()
+        try:
+            ignored_channels = await conf.ignored_channels()
+            ignored_roles = await conf.ignored_roles()
+            ignored_users = await conf.ignored_users()
+        except Exception:
+            return
+
         if message.channel.id in ignored_channels:
             return
-        if any(role.id in ignored_roles for role in getattr(message.author, "roles", [])):
-            return
+        if hasattr(message.author, "roles"):
+            if any(role.id in ignored_roles for role in getattr(message.author, "roles", [])):
+                return
         if message.author.id in ignored_users:
             return
 
@@ -174,8 +193,11 @@ class AntiSpam(commands.Cog):
         cache.append((now, message.content))
 
         # Heuristic 1: Message Frequency (Flooding)
-        message_limit = await conf.message_limit()
-        interval = await conf.interval()
+        try:
+            message_limit = await conf.message_limit()
+            interval = await conf.interval()
+        except Exception:
+            return
         recent_msgs = [t for t, _ in cache if now - t < interval]
         if len(recent_msgs) >= message_limit:
             reason = f"Sent {len(recent_msgs)} messages in {interval} seconds."
@@ -186,7 +208,10 @@ class AntiSpam(commands.Cog):
             return
 
         # Heuristic 2: Message Similarity (Copypasta/Repeat)
-        similarity_threshold = await conf.similarity_threshold()
+        try:
+            similarity_threshold = await conf.similarity_threshold()
+        except Exception:
+            similarity_threshold = 0.85
         if len(cache) >= 3:
             last = cache[-1][1]
             similar_count = 0
@@ -206,8 +231,12 @@ class AntiSpam(commands.Cog):
                 return
 
         # Heuristic 3: ASCII Art / Large Block Messages
-        ascii_art_threshold = await conf.ascii_art_threshold()
-        ascii_art_min_lines = await conf.ascii_art_min_lines()
+        try:
+            ascii_art_threshold = await conf.ascii_art_threshold()
+            ascii_art_min_lines = await conf.ascii_art_min_lines()
+        except Exception:
+            ascii_art_threshold = 12
+            ascii_art_min_lines = 6
         if self._is_ascii_art(message.content, ascii_art_threshold, ascii_art_min_lines):
             reason = "Sent ASCII art or large block message."
             evidence = f"Message content (first 600 chars):\n{message.content[:600]}"
@@ -241,7 +270,10 @@ class AntiSpam(commands.Cog):
     def _similar(self, a, b, threshold):
         if not a or not b:
             return False
-        ratio = SequenceMatcher(None, a, b).ratio()
+        try:
+            ratio = SequenceMatcher(None, a, b).ratio()
+        except Exception:
+            return False
         return ratio > threshold
 
     def _is_ascii_art(self, content, threshold, min_lines):
@@ -251,6 +283,7 @@ class AntiSpam(commands.Cog):
             return False
         ascii_lines = 0
         for line in lines:
+            # Only count lines with at least one non-whitespace character
             if len(line) > threshold and all(ord(c) < 128 for c in line if c.strip()):
                 ascii_lines += 1
         return ascii_lines >= min_lines
@@ -258,11 +291,14 @@ class AntiSpam(commands.Cog):
     def _is_zalgo(self, content):
         # Zalgo = excessive combining unicode marks
         zalgo_re = re.compile(r'[\u0300-\u036F\u0489]')
-        return len(zalgo_re.findall(content)) > 15
+        try:
+            return len(zalgo_re.findall(content)) > 15
+        except Exception:
+            return False
 
     def _is_mass_mention(self, message):
         # 5+ mentions in a message
-        if len(message.mentions) >= 5:
+        if hasattr(message, "mentions") and len(message.mentions) >= 5:
             return True
         # @everyone or @here
         if "@everyone" in message.content or "@here" in message.content:
@@ -272,8 +308,14 @@ class AntiSpam(commands.Cog):
     async def _punish(self, message, reason, evidence=None):
         guild = message.guild
         conf = self.config.guild(guild)
-        punishment = await conf.punishment()
-        timeout_time = await conf.timeout_time()
+        try:
+            punishment = await conf.punishment()
+        except Exception:
+            punishment = "timeout"
+        try:
+            timeout_time = await conf.timeout_time()
+        except Exception:
+            timeout_time = 60
         user = message.author
 
         # Prevent repeated actions in a short time
@@ -283,8 +325,13 @@ class AntiSpam(commands.Cog):
             return
         self.user_last_action[user.id] = now
 
+        # Try to delete the message, but ignore if already deleted or missing permissions
         try:
             await message.delete()
+        except discord.NotFound:
+            pass
+        except discord.Forbidden:
+            pass
         except Exception:
             pass
 
@@ -292,66 +339,90 @@ class AntiSpam(commands.Cog):
             if punishment == "timeout":
                 # Use Discord's timeout (communication disabled) if available
                 if hasattr(user, "timeout"):
-                    until = discord.utils.utcnow() + discord.timedelta(seconds=timeout_time)
+                    # discord.utils.utcnow() is a function, but discord.timedelta does not exist.
+                    # Should use datetime.timedelta
+                    import datetime
+                    until = discord.utils.utcnow() + datetime.timedelta(seconds=timeout_time)
                     await user.timeout(until, reason="AntiSpam: " + reason)
                 else:
                     # Fallback: try to find a Muted role (legacy, not recommended)
                     muted = discord.utils.get(guild.roles, name="Muted")
                     if not muted:
-                        muted = await guild.create_role(name="Muted", reason="AntiSpam timeout fallback role")
+                        try:
+                            muted = await guild.create_role(name="Muted", reason="AntiSpam timeout fallback role")
+                        except Exception:
+                            muted = None
+                    if muted:
                         for channel in guild.channels:
                             try:
                                 await channel.set_permissions(muted, send_messages=False, add_reactions=False)
                             except Exception:
                                 continue
-                    await user.add_roles(muted, reason="AntiSpam: " + reason)
-                    await asyncio.sleep(timeout_time)
-                    await user.remove_roles(muted, reason="AntiSpam: timeout expired")
+                        try:
+                            await user.add_roles(muted, reason="AntiSpam: " + reason)
+                            await asyncio.sleep(timeout_time)
+                            await user.remove_roles(muted, reason="AntiSpam: timeout expired")
+                        except Exception:
+                            pass
             elif punishment == "kick":
-                await user.kick(reason="AntiSpam: " + reason)
+                try:
+                    await user.kick(reason="AntiSpam: " + reason)
+                except Exception:
+                    pass
             elif punishment == "ban":
-                await user.ban(reason="AntiSpam: " + reason, delete_message_days=1)
+                try:
+                    await user.ban(reason="AntiSpam: " + reason, delete_message_days=1)
+                except Exception:
+                    pass
             # else: none
         except Exception:
             pass
 
         # Log to the configured log channel, if set
-        log_channel_id = await conf.log_channel()
+        try:
+            log_channel_id = await conf.log_channel()
+        except Exception:
+            log_channel_id = None
+        log_channel = None
         if log_channel_id:
             log_channel = guild.get_channel(log_channel_id)
-            if log_channel:
-                try:
-                    embed = discord.Embed(
-                        title="Potential spam detected",
-                        description=f"User: {user.mention} (`{user.id}`)\nReason: {reason}",
-                        color=0xff4545,
-                        timestamp=discord.utils.utcnow(),
-                    )
-                    embed.add_field(name="Punishment", value=punishment)
-                    embed.add_field(name="Channel", value=message.channel.mention)
-                    if evidence:
-                        # Truncate evidence if too long for Discord
-                        if len(evidence) > 1000:
-                            evidence = evidence[:1000] + "\n...(truncated)"
-                        embed.add_field(name="Evidence", value=evidence, inline=False)
-                    await log_channel.send(embed=embed)
-                except Exception:
-                    pass
+        if log_channel:
+            try:
+                embed = discord.Embed(
+                    title="Potential spam detected",
+                    description=f"User: {user.mention} (`{user.id}`)\nReason: {reason}",
+                    color=0xff4545,
+                    timestamp=discord.utils.utcnow(),
+                )
+                embed.add_field(name="Punishment", value=punishment)
+                embed.add_field(name="Channel", value=message.channel.mention)
+                if evidence:
+                    # Truncate evidence if too long for Discord
+                    if len(evidence) > 1000:
+                        evidence = evidence[:1000] + "\n...(truncated)"
+                    embed.add_field(name="Evidence", value=evidence, inline=False)
+                await log_channel.send(embed=embed)
+            except Exception:
+                pass
 
     @commands.command()
     @commands.guild_only()
     async def antispaminfo(self, ctx):
         """Show current AntiSpam settings."""
         conf = self.config.guild(ctx.guild)
-        enabled = await conf.enabled()
-        message_limit = await conf.message_limit()
-        interval = await conf.interval()
-        punishment = await conf.punishment()
-        timeout_time = await conf.timeout_time()
-        ignored_channels = await conf.ignored_channels()
-        ignored_roles = await conf.ignored_roles()
-        ignored_users = await conf.ignored_users()
-        log_channel_id = await conf.log_channel()
+        try:
+            enabled = await conf.enabled()
+            message_limit = await conf.message_limit()
+            interval = await conf.interval()
+            punishment = await conf.punishment()
+            timeout_time = await conf.timeout_time()
+            ignored_channels = await conf.ignored_channels()
+            ignored_roles = await conf.ignored_roles()
+            ignored_users = await conf.ignored_users()
+            log_channel_id = await conf.log_channel()
+        except Exception:
+            await ctx.send("Failed to fetch AntiSpam settings.")
+            return
         log_channel = ctx.guild.get_channel(log_channel_id) if log_channel_id else None
         embed = discord.Embed(title="AntiSpam Settings", color=discord.Color.blurple())
         embed.add_field(name="Enabled", value=str(enabled))
