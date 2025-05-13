@@ -572,10 +572,6 @@ class Omni(commands.Cog):
                 if interaction.user.id == self.moderated_user_id:
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
                     return
-                # Only allow users with manage_guild or admin
-                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
-                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
-                    return
                 try:
                     member = self.message.guild.get_member(self.message.author.id)
                     if not member:
@@ -584,7 +580,6 @@ class Omni(commands.Cog):
                     # Remove timeout by setting duration to None
                     await member.timeout(None, reason="Staff member removed a timeout issued by Omni")
                     self.cog._timeout_issued_for_message[self.message.id] = False
-                    await interaction.response.send_message(f"User {member.mention} has been un-timed out.", ephemeral=True)
                     # Update the button: change label and disable it
                     self.label = "Timeout lifted"
                     self.disabled = True
