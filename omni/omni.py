@@ -1,5 +1,6 @@
 import discord
 from redbot.core import commands, Config
+import math
 import aiohttp
 from datetime import timedelta, datetime
 from collections import Counter, defaultdict
@@ -1172,8 +1173,11 @@ class Omni(commands.Cog):
         """
         Show the violation history for a user in this server.
         If no user is provided, shows your own history (if you are not a bot).
+        Shows 9 violations per page, with buttons to scroll if there are more.
         """
         try:
+            import math
+
             guild = ctx.guild
             if user is None:
                 user = ctx.author
@@ -1190,6 +1194,8 @@ class Omni(commands.Cog):
             mem_violations = self.memory_user_violations[guild.id].get(user.id, [])
             if mem_violations:
                 violations = (violations + mem_violations)[-50:]
+            else:
+                violations = violations[-50:]
 
             # Get warning count for this user
             user_warnings = await guild_conf.user_warnings()
@@ -1201,34 +1207,104 @@ class Omni(commands.Cog):
                 await ctx.send(f"No violations or warnings found for {user.mention}.")
                 return
 
-            # Show up to 5 most recent violations
-            violations_to_show = violations[-5:]
-            embed = discord.Embed(
-                title=f"Violation history for {user.display_name}",
-                color=0xff4545,
-                description=f"Showing the {len(violations_to_show)} most recent violation(s) for {user.mention}."
-            )
-            for v in violations_to_show:
-                ts = v.get("timestamp")
-                dt = datetime.utcfromtimestamp(ts) if ts else None
-                time_str = f"<t:{int(ts)}:R>" if ts else "Unknown time"
-                content = v.get("content", "*No content*")
-                categories = v.get("categories", {})
-                cat_str = ", ".join(f"{cat}: {score*100:.0f}%" for cat, score in categories.items())
-                channel_id = v.get("channel_id")
-                channel_mention = f"<#{channel_id}>" if channel_id else "Unknown"
+            # Pagination setup
+            VIOLATIONS_PER_PAGE = 9
+            total_violations = len(violations)
+            total_pages = max(1, math.ceil(total_violations / VIOLATIONS_PER_PAGE))
+
+            def make_embed(page: int):
+                start = page * VIOLATIONS_PER_PAGE
+                end = start + VIOLATIONS_PER_PAGE
+                violations_to_show = violations[start:end]
+                embed = discord.Embed(
+                    title=f"Violation history for {user.display_name}",
+                    color=0xff4545,
+                    description=f"Showing violations {start+1}-{min(end, total_violations)} of {total_violations} for {user.mention}."
+                )
+                for v in violations_to_show:
+                    ts = v.get("timestamp")
+                    time_str = f"<t:{int(ts)}:R>" if ts else "Unknown time"
+                    content = v.get("content", "*No content*")
+                    categories = v.get("categories", {})
+                    cat_str = ", ".join(f"{cat}: {score*100:.0f}%" for cat, score in categories.items())
+                    channel_id = v.get("channel_id")
+                    channel_mention = f"<#{channel_id}>" if channel_id else "Unknown"
+                    embed.add_field(
+                        name=f"{time_str} in {channel_mention}",
+                        value=f"**Categories:** {cat_str}\n**Message:** {content[:300]}{'...' if len(content) > 300 else ''}",
+                        inline=False
+                    )
                 embed.add_field(
-                    name=f"{time_str} in {channel_mention}",
-                    value=f"**Categories:** {cat_str}\n**Message:** {content[:300]}{'...' if len(content) > 300 else ''}",
+                    name="Warnings issued",
+                    value=f"{total_warning_count} warning{'s' if total_warning_count != 1 else ''} for this user.",
                     inline=False
                 )
-            embed.add_field(
-                name="Warnings issued",
-                value=f"{total_warning_count} warning{'s' if total_warning_count != 1 else ''} for this user.",
-                inline=False
-            )
-            embed.set_footer(text="Only the last 50 violations are kept per user. Warnings are cumulative.")
-            await ctx.send(embed=embed)
+                embed.set_footer(text=f"Page {page+1}/{total_pages} • Only the last 50 violations are kept per user. Warnings are cumulative.")
+                return embed
+
+            # If only one page, just send the embed
+            if total_pages == 1:
+                embed = make_embed(0)
+                await ctx.send(embed=embed)
+                return
+
+            class ViolationHistoryView(View):
+                def __init__(self, author: discord.User, timeout=120):
+                    super().__init__(timeout=timeout)
+                    self.page = 0
+                    self.author = author
+
+                async def update_message(self, interaction):
+                    embed = make_embed(self.page)
+                    await interaction.response.edit_message(embed=embed, view=self)
+
+                @discord.ui.button(label="⏮️", style=discord.ButtonStyle.secondary, custom_id="first_page")
+                async def first_page(self, interaction: discord.Interaction, button: Button):
+                    if interaction.user != self.author:
+                        await interaction.response.send_message("You can't control this menu.", ephemeral=True)
+                        return
+                    if self.page != 0:
+                        self.page = 0
+                        await self.update_message(interaction)
+                    else:
+                        await interaction.response.defer()
+
+                @discord.ui.button(label="⬅️", style=discord.ButtonStyle.secondary, custom_id="prev_page")
+                async def prev_page(self, interaction: discord.Interaction, button: Button):
+                    if interaction.user != self.author:
+                        await interaction.response.send_message("You can't control this menu.", ephemeral=True)
+                        return
+                    if self.page > 0:
+                        self.page -= 1
+                        await self.update_message(interaction)
+                    else:
+                        await interaction.response.defer()
+
+                @discord.ui.button(label="➡️", style=discord.ButtonStyle.secondary, custom_id="next_page")
+                async def next_page(self, interaction: discord.Interaction, button: Button):
+                    if interaction.user != self.author:
+                        await interaction.response.send_message("You can't control this menu.", ephemeral=True)
+                        return
+                    if self.page < total_pages - 1:
+                        self.page += 1
+                        await self.update_message(interaction)
+                    else:
+                        await interaction.response.defer()
+
+                @discord.ui.button(label="⏭️", style=discord.ButtonStyle.secondary, custom_id="last_page")
+                async def last_page(self, interaction: discord.Interaction, button: Button):
+                    if interaction.user != self.author:
+                        await interaction.response.send_message("You can't control this menu.", ephemeral=True)
+                        return
+                    if self.page != total_pages - 1:
+                        self.page = total_pages - 1
+                        await self.update_message(interaction)
+                    else:
+                        await interaction.response.defer()
+
+            view = ViolationHistoryView(ctx.author)
+            embed = make_embed(0)
+            await ctx.send(embed=embed, view=view)
         except Exception as e:
             raise RuntimeError(f"Failed to display violation history: {e}")
 
