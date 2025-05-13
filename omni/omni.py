@@ -602,12 +602,15 @@ class Omni(commands.Cog):
                     if not member:
                         await interaction.response.send_message("User not found in this server.", ephemeral=True)
                         return
+
                     # Remove timeout by setting duration to None
                     await member.timeout(None, reason="Staff member removed a timeout issued by Omni")
                     self.cog._timeout_issued_for_message[self.message.id] = False
                     # Update the button: change label and disable it
                     self.label = "Timeout lifted"
                     self.disabled = True
+                    # Defer the interaction before editing the message to avoid errors
+                    await interaction.response.defer()
                     # Try to update the view to reflect the new label and disabled state
                     try:
                         await interaction.message.edit(view=self.view)
