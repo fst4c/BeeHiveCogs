@@ -7,6 +7,10 @@ from collections import Counter, defaultdict
 import unicodedata
 import re
 import asyncio
+import tempfile
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from datetime import timezone
 
 class Omni(commands.Cog):
     """AI-powered automatic text moderation provided by frontier moderation models"""
@@ -1153,10 +1157,9 @@ class Omni(commands.Cog):
         Show the violation history for a user in this server.
         If no user is provided, shows your own history (if you are not a bot).
         Shows 9 violations per page, with buttons to scroll if there are more.
+        Also includes a graph of abuse trends over time.
         """
         try:
-            import math
-
             guild = ctx.guild
             if user is None:
                 user = ctx.author
@@ -1185,6 +1188,77 @@ class Omni(commands.Cog):
             if not violations and total_warning_count == 0:
                 await ctx.send(f"No violations or warnings found for {user.mention}.")
                 return
+
+            # --- Generate abuse trend graph ---
+            # We'll plot the number of violations per week (or per day if < 21 days)
+            timestamps = [v.get("timestamp") for v in violations if v.get("timestamp")]
+            file = None
+            image_url = None
+            temp_file = None
+            if timestamps:
+                # Convert to datetime objects
+                datetimes = [datetime.fromtimestamp(ts, tz=timezone.utc) for ts in timestamps]
+                datetimes.sort()
+                if len(datetimes) > 0:
+                    first = datetimes[0]
+                    last = datetimes[-1]
+                    days_span = (last - first).days + 1
+                    if days_span <= 21:
+                        # Per day
+                        group_fmt = "%Y-%m-%d"
+                        label_fmt = "%b %d"
+                        date_list = [(first + mdates.timedelta(days=i)).date() for i in range(days_span)]
+                        group_by = lambda dt: dt.strftime(group_fmt)
+                    else:
+                        # Per week
+                        group_fmt = "%Y-W%W"
+                        label_fmt = "W%W\n%Y"
+                        # Find all week starts in range
+                        week_starts = []
+                        current = first - mdates.timedelta(days=first.weekday())
+                        while current <= last:
+                            week_starts.append(current.date())
+                            current += mdates.timedelta(days=7)
+                        date_list = week_starts
+                        group_by = lambda dt: dt.strftime(group_fmt)
+                    # Count violations per group
+                    from collections import Counter
+                    grouped = Counter(group_by(dt) for dt in datetimes)
+                    # Prepare x/y for plot
+                    x_labels = []
+                    y_counts = []
+                    for d in date_list:
+                        if days_span <= 21:
+                            key = d.strftime(group_fmt)
+                            label = d.strftime(label_fmt)
+                        else:
+                            key = d.strftime(group_fmt)
+                            label = d.strftime(label_fmt)
+                        x_labels.append(label)
+                        y_counts.append(grouped.get(key, 0))
+                    # Plot
+                    plt.style.use("seaborn-v0_8-darkgrid")
+                    fig, ax = plt.subplots(figsize=(7, 3))
+                    ax.plot(x_labels, y_counts, marker="o", color="#ff4545", linewidth=2)
+                    ax.set_title(f"Abuse trend for {user.display_name}", fontsize=13)
+                    ax.set_xlabel("Date" if days_span <= 21 else "Week")
+                    ax.set_ylabel("Violations")
+                    ax.set_ylim(bottom=0)
+                    plt.xticks(rotation=45, ha="right", fontsize=8)
+                    plt.tight_layout()
+                    # Save to tempfile
+                    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                        plt.savefig(tmp, format="png", bbox_inches="tight", dpi=120)
+                        temp_file = tmp.name
+                    plt.close(fig)
+                    file = discord.File(temp_file, filename="abuse_trend.png")
+                    image_url = "attachment://abuse_trend.png"
+                else:
+                    file = None
+                    image_url = None
+            else:
+                file = None
+                image_url = None
 
             # Pagination setup
             VIOLATIONS_PER_PAGE = 9
@@ -1219,12 +1293,23 @@ class Omni(commands.Cog):
                     inline=False
                 )
                 embed.set_footer(text=f"Page {page+1}/{total_pages} • Only the last 50 violations are kept per user. Warnings are cumulative.")
+                if image_url:
+                    embed.set_image(url=image_url)
                 return embed
 
             # If only one page, just send the embed
             if total_pages == 1:
                 embed = make_embed(0)
-                await ctx.send(embed=embed)
+                if file:
+                    await ctx.send(embed=embed, file=file)
+                else:
+                    await ctx.send(embed=embed)
+                if temp_file:
+                    import os
+                    try:
+                        os.remove(temp_file)
+                    except Exception:
+                        pass
                 return
 
             class ViolationHistoryView(View):
@@ -1235,7 +1320,10 @@ class Omni(commands.Cog):
 
                 async def update_message(self, interaction):
                     embed = make_embed(self.page)
-                    await interaction.response.edit_message(embed=embed, view=self)
+                    if file:
+                        await interaction.response.edit_message(embed=embed, view=self, attachments=[file])
+                    else:
+                        await interaction.response.edit_message(embed=embed, view=self)
 
                 @discord.ui.button(label="⏮️", style=discord.ButtonStyle.secondary, custom_id="first_page")
                 async def first_page(self, interaction: discord.Interaction, button: Button):
@@ -1283,7 +1371,16 @@ class Omni(commands.Cog):
 
             view = ViolationHistoryView(ctx.author)
             embed = make_embed(0)
-            await ctx.send(embed=embed, view=view)
+            if file:
+                await ctx.send(embed=embed, view=view, file=file)
+            else:
+                await ctx.send(embed=embed, view=view)
+            if temp_file:
+                import os
+                try:
+                    os.remove(temp_file)
+                except Exception:
+                    pass
         except Exception as e:
             raise RuntimeError(f"Failed to display violation history: {e}")
 
