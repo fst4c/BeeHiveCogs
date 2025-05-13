@@ -577,7 +577,7 @@ class Omni(commands.Cog):
 
         class RestoreButton(discord.ui.Button):
             def __init__(self, cog, message, row=1):
-                super().__init__(label="Resend", style=discord.ButtonStyle.blurple, custom_id=f"restore_{message.author.id}_{message.id}", emoji="♻️", row=row)
+                super().__init__(label="Reshare", style=discord.ButtonStyle.grey, custom_id=f"restore_{message.author.id}_{message.id}", emoji="♻️", row=row)
                 self.cog = cog
                 self.message = message
 
@@ -621,14 +621,14 @@ class Omni(commands.Cog):
                         except Exception:
                             unix_ts = None
                     if unix_ts:
-                        timestamp_str = f"<t:{unix_ts}:F>"
+                        timestamp_str = f"<t:{unix_ts}:R>"
                 # Compose the description with timestamp
                 if content and timestamp_str:
-                    description = f"{content}\n\n**Original message sent:** {timestamp_str}"
+                    description = f"{content}\n\n*Originally sent {timestamp_str}*"
                 elif content:
                     description = content
                 elif timestamp_str:
-                    description = f"**Original message sent:** {timestamp_str}"
+                    description = f"*Originally sent {timestamp_str}*"
                 else:
                     description = ""
 
@@ -638,7 +638,7 @@ class Omni(commands.Cog):
                         embed = discord.Embed(
                             title="Message restored from moderation",
                             description=description,
-                            color=discord.Color.blurple()
+                            color=0xfffffe
                         )
                         embed.set_footer(text=f"Sent by: {author.display_name} (ID: {author.id})")
                         await channel.send(embed=embed)
@@ -647,7 +647,7 @@ class Omni(commands.Cog):
                         if img_url:
                             embed = discord.Embed().set_image(url=img_url)
                             await channel.send(embed=embed)
-                    await interaction.response.send_message("Message restored in the original channel.", ephemeral=True)
+                    await interaction.response.send_message("The message was re-shared. Thanks for reviewing this alert.", ephemeral=True)
                 except Exception as e:
                     await interaction.response.send_message(f"Failed to restore message: {e}", ephemeral=True)
 
