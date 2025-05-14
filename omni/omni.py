@@ -429,6 +429,79 @@ class Omni(commands.Cog):
         except Exception:
             return None
 
+    async def explain_moderation(self, message_content, category_scores=None):
+        """
+        Send the message content to the OpenAI Moderations endpoint to get scores,
+        then use GPT-4o to explain why the message matches those moderation scores.
+        """
+        try:
+            api_key = (await self.bot.get_shared_api_tokens("openai")).get("api_key")
+            if not api_key:
+                return None
+            if self.session is None or getattr(self.session, "closed", True):
+                self.session = aiohttp.ClientSession()
+
+            # Step 1: Get moderation scores from OpenAI Moderations endpoint
+            moderation_scores = None
+            async with self.session.post(
+                "https://api.openai.com/v1/moderations",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}"
+                },
+                json={"input": message_content},
+                timeout=15
+            ) as mod_resp:
+                if mod_resp.status == 200:
+                    mod_data = await mod_resp.json()
+                    results = mod_data.get("results", [])
+                    if results:
+                        moderation_scores = results[0].get("category_scores", {})
+                if not moderation_scores:
+                    return None
+
+            # Step 2: Prepare the prompt for GPT-4o using the moderation scores
+            sorted_scores = sorted(moderation_scores.items(), key=lambda item: item[1], reverse=True)
+            top_scores = sorted_scores[:6]
+            score_lines = "\n".join(f"- {cat}: {score*100:.1f}%" for cat, score in top_scores)
+            prompt = (
+                "You are an expert in content moderation and AI safety. "
+                "Given the following message and the AI moderation scores for various abuse categories, "
+                "explain in clear, concise terms why the message may have matched these categories. "
+                "If a score is high, explain what in the message could have triggered it. "
+                "If all scores are low, explain that the message is likely safe. "
+                "Do not add extra commentary or disclaimers. "
+                "Format your answer as a short paragraph for staff review.\n\n"
+                f"Message:\n{message_content}\n\n"
+                f"AI moderation scores:\n{score_lines}"
+            )
+            payload = {
+                "model": "gpt-4o",
+                "messages": [
+                    {"role": "system", "content": "You are an expert in content moderation and AI safety."},
+                    {"role": "user", "content": prompt}
+                ],
+                "max_tokens": 350,
+                "temperature": 0.2,
+            }
+            async with self.session.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}"
+                },
+                json=payload,
+                timeout=30
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    choices = data.get("choices", [])
+                    if choices and "message" in choices[0]:
+                        return choices[0]["message"]["content"].strip()
+                return None
+        except Exception:
+            return None
+
     async def handle_moderation(self, message, category_scores, flagged_image_url=None):
         try:
             guild = message.guild
@@ -599,6 +672,9 @@ class Omni(commands.Cog):
 
             # Add Translate button (always on row 1)
             self.add_item(self.TranslateButton(cog, message, row=2, moderated_user_id=self.moderated_user_id))
+
+            # Add Explain button (always on row 2)
+            self.add_item(self.ExplainButton(cog, message, row=2, moderated_user_id=self.moderated_user_id))
 
             # Add jump to conversation button LAST (so it appears underneath, on row 2)
             self.add_item(discord.ui.Button(label="See conversation", url=message.jump_url, row=2))
@@ -781,6 +857,95 @@ class Omni(commands.Cog):
                 else:
                     await interaction.followup.send(
                         "Failed to translate the message or no translation available.",
+                        ephemeral=True
+                    )
+
+                self.disabled = True
+                try:
+                    await interaction.message.edit(view=self.view)
+                except Exception:
+                    pass
+
+        class ExplainButton(discord.ui.Button):
+            def __init__(self, cog, message, row=2, moderated_user_id=None):
+                super().__init__(label="Explain", style=discord.ButtonStyle.grey, custom_id=f"explain_{message.author.id}_{message.id}", emoji="💡", row=row)
+                self.cog = cog
+                self.message = message
+                self.moderated_user_id = moderated_user_id
+
+            async def callback(self, interaction: discord.Interaction):
+                # Prevent the moderated user from interacting with their own log
+                if interaction.user.id == self.moderated_user_id:
+                    await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
+                    return
+                # Only allow users with manage_guild or admin
+                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
+                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
+                    return
+                # Disable the button while processing
+                self.disabled = True
+                self.label = "AI working..."
+                await interaction.response.defer()
+                try:
+                    await interaction.message.edit(view=self.view)
+                except Exception:
+                    pass
+
+                # Re-run the moderation endpoint for the message content
+                try:
+                    api_key = (await self.cog.bot.get_shared_api_tokens("openai")).get("api_key")
+                    if not api_key:
+                        await interaction.followup.send("No OpenAI API key configured.", ephemeral=True)
+                        self.disabled = False
+                        self.label = "Explain"
+                        try:
+                            await interaction.message.edit(view=self.view)
+                        except Exception:
+                            pass
+                        return
+                    normalized_content = self.cog.normalize_text(self.message.content)
+                    input_data = [{"type": "text", "text": normalized_content}]
+                    scores = await self.cog.analyze_content(input_data, api_key, self.message)
+                    if not scores:
+                        await interaction.followup.send("Failed to get moderation scores for this message.", ephemeral=True)
+                        self.disabled = False
+                        self.label = "Explain"
+                        try:
+                            await interaction.message.edit(view=self.view)
+                        except Exception:
+                            pass
+                        return
+                except Exception as e:
+                    await interaction.followup.send(f"Failed to get moderation scores: {e}", ephemeral=True)
+                    self.disabled = False
+                    self.label = "Explain"
+                    try:
+                        await interaction.message.edit(view=self.view)
+                    except Exception:
+                        pass
+                    return
+
+                # Call the explanation function
+                explanation = await self.cog.explain_moderation(self.message.content, scores)
+
+                # Restore the button state
+                self.disabled = False
+                self.label = "Explain"
+
+                if explanation:
+                    embed = discord.Embed(
+                        title="Why was this message flagged?",
+                        description=explanation,
+                        color=0x45ABF5
+                    )
+                    # Show the top 6 scores in the embed for reference
+                    sorted_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)[:6]
+                    for cat, score in sorted_scores:
+                        embed.add_field(name=cat.capitalize(), value=f"{score*100:.1f}%", inline=True)
+                    await interaction.followup.send(embed=embed, ephemeral=False)
+                else:
+                    await interaction.followup.send(
+                        "Failed to generate an explanation for this message.",
                         ephemeral=True
                     )
 
