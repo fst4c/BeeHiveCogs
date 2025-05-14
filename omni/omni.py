@@ -1508,7 +1508,7 @@ class Omni(commands.Cog):
             whitelisted_roles_names = ", ".join([guild.get_role(role_id).mention for role_id in whitelisted_roles if guild.get_role(role_id)]) or "None"
             whitelisted_users_names = ", ".join([f"<@{user_id}>" for user_id in whitelisted_users]) or "None"
             whitelisted_categories_names = ", ".join([cat.name for cat in guild.categories if cat.id in whitelisted_categories]) or "None"
-            monitoring_warning_status = "Enabled" if monitoring_warning_enabled else "Disabled"
+            monitoring_warning_status = "Active" if monitoring_warning_enabled else "Disabled with additional liability"
 
             embed = discord.Embed(title="Omni settings", color=0xfffffe)
             embed.add_field(name="Whitelisted channels", value=whitelisted_channels_names, inline=True)
@@ -1521,8 +1521,8 @@ class Omni(commands.Cog):
             embed.add_field(name="Whitelisted users", value=whitelisted_users_names, inline=True)
             embed.add_field(name="Debug mode", value=":cog: Enabled" if debug_mode else ":white_check_mark: **Disabled**", inline=True)
             embed.add_field(name="Whitelisted categories", value=whitelisted_categories_names, inline=True)
-            embed.add_field(name="Auto whitelist NSFW channels", value=":warning: Enabled" if bypass_nsfw else ":white_check_mark: **Disabled**", inline=True)
             embed.add_field(name="Privacy reminder", value=monitoring_warning_status, inline=True)
+            embed.add_field(name="Auto whitelist NSFW", value=":warning: Enabled" if bypass_nsfw else ":white_check_mark: **Disabled**", inline=True)
 
             await ctx.send(embed=embed)
         except Exception as e:
