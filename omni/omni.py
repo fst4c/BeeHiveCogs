@@ -1501,8 +1501,6 @@ class Omni(commands.Cog):
             delete_violatory_messages = await self.config.guild(guild).delete_violatory_messages()
             bypass_nsfw = await self.config.guild(guild).bypass_nsfw()
             monitoring_warning_enabled = await self.config.guild(guild).monitoring_warning_enabled()
-            user_warnings = await self.config.guild(guild).user_warnings()
-            total_warnings = sum(user_warnings.values()) if user_warnings else 0
 
             log_channel = guild.get_channel(log_channel_id) if log_channel_id else None
             log_channel_name = log_channel.mention if log_channel else "Not set"
@@ -1525,7 +1523,6 @@ class Omni(commands.Cog):
             embed.add_field(name="Whitelisted categories", value=whitelisted_categories_names, inline=True)
             embed.add_field(name="Whitelisted NSFW", value="Enabled" if bypass_nsfw else "Disabled", inline=True)
             embed.add_field(name="Monitoring warning", value=monitoring_warning_status, inline=True)
-            embed.add_field(name="Total warnings issued", value=f"{total_warnings} warning{'s' if total_warnings != 1 else ''}", inline=True)
 
             await ctx.send(embed=embed)
         except Exception as e:
