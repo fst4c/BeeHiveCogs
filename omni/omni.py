@@ -832,9 +832,9 @@ class Omni(commands.Cog):
                     return
 
                 # Open a modal to ask for the target language
-                class LanguageModal(discord.ui.Modal, title="Translate Message"):
+                class LanguageModal(discord.ui.Modal, title="Translating moderated content"):
                     language = discord.ui.TextInput(
-                        label="Target Language",
+                        label="Language to translate to",
                         placeholder="e.g. French, Spanish, Japanese, etc.",
                         required=True,
                         max_length=50,
