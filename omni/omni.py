@@ -590,15 +590,15 @@ class Omni(commands.Cog):
             if self.timeout_duration == 0:
                 self.add_item(self.TimeoutButton(cog, message, timeout_duration, row=1, moderated_user_id=self.moderated_user_id))
 
-            # Add Translate button (always on row 1)
-            self.add_item(self.TranslateButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
-
             # Add kick and ban buttons (always on row 1)
             self.add_item(self.KickButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
             self.add_item(self.BanButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
 
             # Add Dismiss button to delete the log message (row 2)
             self.add_item(self.DismissButton(cog, message, row=2, moderated_user_id=self.moderated_user_id))
+
+            # Add Translate button (always on row 1)
+            self.add_item(self.TranslateButton(cog, message, row=2, moderated_user_id=self.moderated_user_id))
 
             # Add jump to conversation button LAST (so it appears underneath, on row 2)
             self.add_item(discord.ui.Button(label="See conversation", url=message.jump_url, row=2))
@@ -740,7 +740,7 @@ class Omni(commands.Cog):
 
         class TranslateButton(discord.ui.Button):
             def __init__(self, cog, message, row=2, moderated_user_id=None):
-                super().__init__(label="Translate", style=discord.ButtonStyle.blurple, custom_id=f"translate_{message.author.id}_{message.id}", emoji="🇺🇸", row=row)
+                super().__init__(label="Translate", style=discord.ButtonStyle.grey, custom_id=f"translate_{message.author.id}_{message.id}", emoji="🇺🇸", row=row)
                 self.cog = cog
                 self.message = message
                 self.moderated_user_id = moderated_user_id
@@ -908,7 +908,7 @@ class Omni(commands.Cog):
 
         class DismissButton(discord.ui.Button):
             def __init__(self, cog, message, row=2, moderated_user_id=None):
-                super().__init__(label="Dismiss", style=discord.ButtonStyle.grey, custom_id=f"dismiss_{message.id}", emoji="🗑️", row=row)
+                super().__init__(label="Dismiss alert", style=discord.ButtonStyle.grey, custom_id=f"dismiss_{message.id}", emoji="🗑️", row=row)
                 self.cog = cog
                 self.message = message
                 self.moderated_user_id = moderated_user_id
