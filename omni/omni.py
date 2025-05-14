@@ -812,7 +812,7 @@ class Omni(commands.Cog):
 
         class TranslateButton(discord.ui.Button):
             def __init__(self, cog, message, row=2, moderated_user_id=None):
-                super().__init__(label="Translate", style=discord.ButtonStyle.grey, custom_id=f"translate_{message.author.id}_{message.id}", emoji="🔡", row=row)
+                super().__init__(label="Translate content", style=discord.ButtonStyle.grey, custom_id=f"translate_{message.author.id}_{message.id}", emoji="🔡", row=row)
                 self.cog = cog
                 self.message = message
                 self.moderated_user_id = moderated_user_id
@@ -866,7 +866,7 @@ class Omni(commands.Cog):
 
         class ExplainButton(discord.ui.Button):
             def __init__(self, cog, message, row=2, moderated_user_id=None):
-                super().__init__(label="Explain", style=discord.ButtonStyle.grey, custom_id=f"explain_{message.author.id}_{message.id}", emoji="💡", row=row)
+                super().__init__(label="Explain decision", style=discord.ButtonStyle.grey, custom_id=f"explain_{message.author.id}_{message.id}", emoji="💡", row=row)
                 self.cog = cog
                 self.message = message
                 self.moderated_user_id = moderated_user_id
