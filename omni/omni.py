@@ -756,7 +756,7 @@ class Omni(commands.Cog):
                     return
                 # Disable the button while processing
                 self.disabled = True
-                self.label = "Translating..."
+                self.label = "AI working..."
                 await interaction.response.defer()
                 try:
                     await interaction.message.edit(view=self.view)
