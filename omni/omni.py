@@ -604,7 +604,7 @@ class Omni(commands.Cog):
                                 "Authorization": f"Bearer {api_key}"
                             }
                             json_data = {
-                                "model": "gpt-4o,
+                                "model": "gpt-4o",
                                 "messages": [
                                     {"role": "system", "content": "You are a helpful translation assistant."},
                                     {"role": "user", "content": prompt}
