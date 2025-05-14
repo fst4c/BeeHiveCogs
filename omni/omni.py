@@ -739,7 +739,7 @@ class Omni(commands.Cog):
                 await guild_conf.user_warnings.set(user_warnings)
 
         class TranslateButton(discord.ui.Button):
-            def __init__(self, cog, message, row=1, moderated_user_id=None):
+            def __init__(self, cog, message, row=2, moderated_user_id=None):
                 super().__init__(label="Translate", style=discord.ButtonStyle.blurple, custom_id=f"translate_{message.author.id}_{message.id}", emoji="🌐", row=row)
                 self.cog = cog
                 self.message = message
