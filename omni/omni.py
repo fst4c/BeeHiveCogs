@@ -478,10 +478,10 @@ class Omni(commands.Cog):
             payload = {
                 "model": "gpt-4o",
                 "messages": [
-                    {"role": "system", "content": "You are an expert in content moderation and AI safety."},
+                    {"role": "system", "content": "You are an expert content moderation analyst"},
                     {"role": "user", "content": prompt}
                 ],
-                "max_tokens": 350,
+                "max_tokens": 500,
                 "temperature": 0.2,
             }
             async with self.session.post(
