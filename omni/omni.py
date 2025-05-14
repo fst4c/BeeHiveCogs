@@ -1510,7 +1510,7 @@ class Omni(commands.Cog):
             whitelisted_categories_names = ", ".join([cat.name for cat in guild.categories if cat.id in whitelisted_categories]) or "None"
             monitoring_warning_status = "Active" if monitoring_warning_enabled else "Disabled with additional liability"
 
-            embed = discord.Embed(title="Omni settings", color=0xfffffe)
+            embed = discord.Embed(title="Omni settings", description="Here is your server's current AI content moderation settings.\n\nCurious what Omni has done in your server?\n`omni stats`", color=0xfffffe)
             embed.add_field(name="Whitelisted channels", value=whitelisted_channels_names, inline=True)
             embed.add_field(name="Moderative threshold", value=f"{moderation_threshold * 100:.2f}%", inline=True)
             embed.add_field(name="Content scanning", value=":white_check_mark: **Enabled**" if moderation_enabled else ":x: Disabled", inline=True)
