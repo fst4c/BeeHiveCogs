@@ -775,7 +775,7 @@ class Omni(commands.Cog):
                     embed = discord.Embed(
                         title="Translated to English",
                         description=translated,
-                        color=discord.Color.blurple()
+                        color=0xfffffe
                     )
                     await interaction.followup.send(embed=embed, ephemeral=True)
                 else:
