@@ -1515,7 +1515,7 @@ class Omni(commands.Cog):
             embed.add_field(name="Moderative threshold", value=f"{moderation_threshold * 100:.2f}%", inline=True)
             embed.add_field(name="Timeout duration", value=f"{timeout_duration} minutes", inline=True)
             embed.add_field(name="Whitelisted roles", value=whitelisted_roles_names, inline=True)
-            embed.add_field(name="Log channel", value=log_channel_name, inline=True)
+            embed.add_field(name="Sending alerts to", value=log_channel_name, inline=True)
             embed.add_field(name="Content scanning", value=":white_check_mark: Enabled" if moderation_enabled else ":x: Disabled", inline=True)
             embed.add_field(name="Whitelisted users", value=whitelisted_users_names, inline=True)
             embed.add_field(name="Delete flagged content", value=":white_check_mark: Yes" if delete_violatory_messages else ":x: No", inline=True)
