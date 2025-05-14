@@ -1519,8 +1519,8 @@ class Omni(commands.Cog):
             embed.add_field(name="Automatic deletion", value=":white_check_mark: **Enabled**" if delete_violatory_messages else ":warning: Disabled", inline=True)
             embed.add_field(name="Whitelisted roles", value=whitelisted_roles_names, inline=True)
             embed.add_field(name="Sending alerts to", value=log_channel_name, inline=True)
-            embed.add_field(name="Whitelisted users", value=whitelisted_users_names, inline=True)
             embed.add_field(name="Debug mode", value=":cog: Enabled" if debug_mode else ":white_check_mark: **Disabled**", inline=True)
+            embed.add_field(name="Whitelisted users", value=whitelisted_users_names, inline=True)
             embed.add_field(name="Privacy reminder", value=monitoring_warning_status, inline=True)
             embed.add_field(name="Auto whitelist NSFW", value=":warning: Enabled" if bypass_nsfw else ":white_check_mark: **Disabled**", inline=True)
 
