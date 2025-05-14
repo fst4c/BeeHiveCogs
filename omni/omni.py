@@ -113,7 +113,7 @@ class Omni(commands.Cog):
                 c if unicodedata.category(c).startswith(('L', 'N')) else ' '
                 for c in unicodedata.normalize('NFKD', text)
             )
-            replacements = {'nègre': 'negro', 'reggin': 'nigger'}
+            replacements = {'nègre': 'negro', 'reggin': 'nigger', 'gooning': 'masturbaiting'}
             for word, replacement in replacements.items():
                 text = text.replace(word, replacement)
             return re.sub(r'\s+', ' ', text).strip()
