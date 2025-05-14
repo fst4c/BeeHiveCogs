@@ -961,13 +961,31 @@ class Omni(commands.Cog):
                 self.cog = cog
                 self.message = message
                 self.moderated_user_id = moderated_user_id
+                self.awaiting_confirmation = False
 
             async def callback(self, interaction: discord.Interaction):
                 # Prevent the moderated user from interacting with their own log
                 if interaction.user.id == self.moderated_user_id:
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
                     return
-                await self.cog.kick_user(interaction)
+
+                # Double-tap confirmation logic, no followup message
+                if not self.awaiting_confirmation:
+                    self.awaiting_confirmation = True
+                    self.label = "Confirm"
+                    self.style = discord.ButtonStyle.danger
+                    try:
+                        await interaction.response.edit_message(view=self.view)
+                    except Exception:
+                        pass
+                    return
+                else:
+                    self.disabled = True
+                    try:
+                        await interaction.response.edit_message(view=self.view)
+                    except Exception:
+                        pass
+                    await self.cog.kick_user(interaction)
 
         class BanButton(discord.ui.Button):
             def __init__(self, cog, message, row=1, moderated_user_id=None):
@@ -975,13 +993,31 @@ class Omni(commands.Cog):
                 self.cog = cog
                 self.message = message
                 self.moderated_user_id = moderated_user_id
+                self.awaiting_confirmation = False
 
             async def callback(self, interaction: discord.Interaction):
                 # Prevent the moderated user from interacting with their own log
                 if interaction.user.id == self.moderated_user_id:
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
                     return
-                await self.cog.ban_user(interaction)
+
+                # Double-tap confirmation logic, no followup message
+                if not self.awaiting_confirmation:
+                    self.awaiting_confirmation = True
+                    self.label = "Confirm"
+                    self.style = discord.ButtonStyle.danger
+                    try:
+                        await interaction.response.edit_message(view=self.view)
+                    except Exception:
+                        pass
+                    return
+                else:
+                    self.disabled = True
+                    try:
+                        await interaction.response.edit_message(view=self.view)
+                    except Exception:
+                        pass
+                    await self.cog.ban_user(interaction)
 
         class RestoreButton(discord.ui.Button):
             def __init__(self, cog, message, row=1, moderated_user_id=None):
