@@ -545,6 +545,8 @@ class Omni(commands.Cog):
             if self.timeout_duration == 0:
                 self.add_item(self.TimeoutButton(cog, message, timeout_duration, row=1, moderated_user_id=self.moderated_user_id))
 
+            # Add Translate button (always on row 1)
+            self.add_item(self.TranslateButton(cog, message, row=1))
 
             # Add kick and ban buttons (always on row 1)
             self.add_item(self.KickButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
@@ -555,6 +557,95 @@ class Omni(commands.Cog):
 
             # Add jump to conversation button LAST (so it appears underneath, on row 2)
             self.add_item(discord.ui.Button(label="See conversation", url=message.jump_url, row=2))
+
+        class TranslateButton(discord.ui.Button):
+            def __init__(self, cog, message, row=1):
+                super().__init__(label="Translate", style=discord.ButtonStyle.blurple, custom_id=f"translate_{message.id}", emoji="🌐", row=row)
+                self.cog = cog
+                self.message = message
+
+            async def callback(self, interaction: discord.Interaction):
+                # Only allow staff to use the translate button
+                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
+                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
+                    return
+
+                class TranslateModal(discord.ui.Modal, title="Translate Message"):
+                    language = discord.ui.TextInput(
+                        label="Target Language (e.g. French, Spanish, zh, etc.)",
+                        placeholder="Enter the language to translate to",
+                        required=True,
+                        max_length=32,
+                    )
+
+                    async def on_submit(self, modal_interaction: discord.Interaction):
+                        await modal_interaction.response.defer(thinking=True, ephemeral=True)
+                        target_language = self.language.value.strip()
+                        original_content = self.message.content
+                        if not original_content:
+                            await modal_interaction.followup.send("No message content to translate.", ephemeral=True)
+                            return
+                        # Call OpenAI API for translation
+                        try:
+                            api_key = (await self.cog.bot.get_shared_api_tokens("openai")).get("api_key")
+                            if not api_key:
+                                await modal_interaction.followup.send("OpenAI API key not set.", ephemeral=True)
+                                return
+                            if self.cog.session is None or getattr(self.cog.session, "closed", True):
+                                self.cog.session = aiohttp.ClientSession()
+                            # Use GPT-3.5/4 for translation
+                            prompt = (
+                                f"Translate the following message to {target_language}. "
+                                f"Return only the translated text, no commentary or explanation.\n\n"
+                                f"Message:\n{original_content}"
+                            )
+                            headers = {
+                                "Content-Type": "application/json",
+                                "Authorization": f"Bearer {api_key}"
+                            }
+                            json_data = {
+                                "model": "gpt-4o,
+                                "messages": [
+                                    {"role": "system", "content": "You are a helpful translation assistant."},
+                                    {"role": "user", "content": prompt}
+                                ],
+                                "max_tokens": 1024,
+                                "temperature": 0.2,
+                            }
+                            async with self.cog.session.post(
+                                "https://api.openai.com/v1/chat/completions",
+                                headers=headers,
+                                json=json_data,
+                                timeout=30
+                            ) as resp:
+                                if resp.status == 200:
+                                    data = await resp.json()
+                                    choices = data.get("choices", [])
+                                    if choices and "message" in choices[0]:
+                                        translated = choices[0]["message"]["content"].strip()
+                                    else:
+                                        translated = None
+                                else:
+                                    translated = None
+                            if not translated:
+                                await modal_interaction.followup.send("Failed to translate the message.", ephemeral=True)
+                                return
+                            embed = discord.Embed(
+                                title=f"Translated to {target_language}",
+                                description=translated,
+                                color=discord.Color.blurple()
+                            )
+                            embed.add_field(name="Original", value=original_content[:1024], inline=False)
+                            embed.set_footer(text="Translated by AI, accuracy and response may vary")
+                            await modal_interaction.followup.send(embed=embed, ephemeral=True)
+                        except Exception as e:
+                            await modal_interaction.followup.send(f"Translation failed: {e}", ephemeral=True)
+
+                # Attach the message and cog to the modal instance
+                modal = TranslateModal()
+                modal.message = self.message
+                modal.cog = self.cog
+                await interaction.response.send_modal(modal)
 
         class TimeoutButton(discord.ui.Button):
             def __init__(self, cog, message, timeout_duration, row=1, moderated_user_id=None):
