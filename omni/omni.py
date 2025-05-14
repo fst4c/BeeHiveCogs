@@ -384,9 +384,9 @@ class Omni(commands.Cog):
         await self.log_message(message, {}, error_code="max_retries")
         return {}
 
-    async def translate_to_english(self, text):
+    async def translate_to_language(self, text, language):
         """
-        Translate the given text to English using OpenAI's GPT-3.5/4 API.
+        Translate the given text to the specified language using OpenAI's GPT-3.5/4 API.
         Returns the translated text, or None if translation fails.
         """
         try:
@@ -397,8 +397,8 @@ class Omni(commands.Cog):
                 self.session = aiohttp.ClientSession()
             # Use the chat/completions endpoint for translation
             prompt = (
-                "Translate the following message to English. "
-                "If the message is already in English, return it unchanged. "
+                f"Translate the following message to {language}. "
+                f"If the message is already in {language}, return it unchanged. "
                 "Only return the translated message, no extra commentary.\n\n"
                 f"Message:\n{text}"
             )
@@ -830,41 +830,47 @@ class Omni(commands.Cog):
                 if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
                     await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
                     return
-                # Disable the button while processing
-                self.disabled = True
-                self.label = "AI working..."
-                await interaction.response.defer()
-                try:
-                    await interaction.message.edit(view=self.view)
-                except Exception:
-                    pass
 
-                # Call the translation function
-                translated = await self.cog.translate_to_english(self.message.content)
-
-                # Restore the button state
-                self.disabled = False
-                self.label = "Translation below"
-
-                if translated:
-                    # Send the translation as an ephemeral message
-                    embed = discord.Embed(
-                        title="Moderated content translated to English",
-                        description=translated,
-                        color=0xfffffe
-                    )
-                    await interaction.followup.send(embed=embed, ephemeral=False)
-                else:
-                    await interaction.followup.send(
-                        "Failed to translate the message or no translation available.",
-                        ephemeral=True
+                # Open a modal to ask for the target language
+                class LanguageModal(discord.ui.Modal, title="Translate Message"):
+                    language = discord.ui.TextInput(
+                        label="Target Language",
+                        placeholder="e.g. French, Spanish, Japanese, etc.",
+                        required=True,
+                        max_length=50,
                     )
 
-                self.disabled = True
-                try:
-                    await interaction.message.edit(view=self.view)
-                except Exception:
-                    pass
+                    async def on_submit(self, modal_interaction: discord.Interaction):
+                        # Disable the button while processing
+                        self_view = self.cog._ModerationActionView.TranslateButton
+                        # Actually, we can't access the button instance here, so we just proceed
+                        await modal_interaction.response.defer(thinking=True)
+                        language_value = self.language.value.strip()
+                        if not language_value:
+                            await modal_interaction.followup.send("No language provided.", ephemeral=True)
+                            return
+                        # Call the translation function
+                        translated = await self.cog.translate_to_language(self.message.content, language_value)
+                        if translated:
+                            embed = discord.Embed(
+                                title=f"Moderated content translated to {language_value}",
+                                description=translated,
+                                color=0xfffffe
+                            )
+                            await modal_interaction.followup.send(embed=embed, ephemeral=False)
+                        else:
+                            await modal_interaction.followup.send(
+                                f"Failed to translate the message or no translation available.",
+                                ephemeral=True
+                            )
+
+                    def __init__(self, cog, message):
+                        super().__init__()
+                        self.cog = cog
+                        self.message = message
+
+                # Show the modal
+                await interaction.response.send_modal(LanguageModal(self.cog, self.message))
 
         class ExplainButton(discord.ui.Button):
             def __init__(self, cog, message, row=2, moderated_user_id=None):
