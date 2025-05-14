@@ -768,16 +768,16 @@ class Omni(commands.Cog):
 
                 # Restore the button state
                 self.disabled = False
-                self.label = "Translate"
+                self.label = "Translated"
 
                 if translated:
                     # Send the translation as an ephemeral message
                     embed = discord.Embed(
-                        title="Translated to English",
+                        title="Moderated content translated to English",
                         description=translated,
                         color=0xfffffe
                     )
-                    await interaction.followup.send(embed=embed, ephemeral=True)
+                    await interaction.followup.send(embed=embed, ephemeral=False)
                 else:
                     await interaction.followup.send(
                         "Failed to translate the message or no translation available.",
