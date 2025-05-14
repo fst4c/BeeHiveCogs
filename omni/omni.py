@@ -1522,7 +1522,7 @@ class Omni(commands.Cog):
             embed.add_field(name="Debug mode", value=":cog: Enabled" if debug_mode else ":white_check_mark: Disabled", inline=True)
             embed.add_field(name="Whitelisted categories", value=whitelisted_categories_names, inline=True)
             embed.add_field(name="Auto whitelist NSFW channels", value=":white_check_mark: Enabled" if bypass_nsfw else ":x: Disabled", inline=True)
-            embed.add_field(name="Monitoring warning", value=monitoring_warning_status, inline=True)
+            embed.add_field(name="Privacy reminder", value=monitoring_warning_status, inline=True)
 
             await ctx.send(embed=embed)
         except Exception as e:
