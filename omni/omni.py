@@ -1521,7 +1521,7 @@ class Omni(commands.Cog):
             embed.add_field(name="Whitelisted roles", value=whitelisted_roles_names, inline=True)
             embed.add_field(name="Whitelisted users", value=whitelisted_users_names, inline=True)
             embed.add_field(name="Whitelisted categories", value=whitelisted_categories_names, inline=True)
-            embed.add_field(name="Whitelisted NSFW", value="Enabled" if bypass_nsfw else "Disabled", inline=True)
+            embed.add_field(name="Auto-whitelist channels marked NSFW", value="Enabled" if bypass_nsfw else "Disabled", inline=True)
             embed.add_field(name="Monitoring warning", value=monitoring_warning_status, inline=True)
 
             await ctx.send(embed=embed)
