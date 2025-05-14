@@ -692,10 +692,6 @@ class Omni(commands.Cog):
                 if interaction.user.id == self.moderated_user_id:
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
                     return
-                # Only allow users with manage_guild or admin
-                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
-                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
-                    return
                 try:
                     member = self.message.guild.get_member(self.message.author.id)
                     if not member:
@@ -825,10 +821,6 @@ class Omni(commands.Cog):
                 # Prevent the moderated user from interacting with their own log
                 if interaction.user.id == self.moderated_user_id:
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
-                    return
-                # Only allow users with manage_guild or admin
-                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
-                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
                     return
 
                 # Open a modal to ask for the target language
