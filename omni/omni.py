@@ -768,7 +768,7 @@ class Omni(commands.Cog):
 
                 # Restore the button state
                 self.disabled = False
-                self.label = "Translated"
+                self.label = "Translation below"
 
                 if translated:
                     # Send the translation as an ephemeral message
