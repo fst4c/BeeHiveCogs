@@ -1458,6 +1458,15 @@ class Omni(commands.Cog):
         Also includes a graph of abuse trends over time.
         """
         try:
+            # Ensure required imports for View and Button
+            import math
+            import tempfile
+            from datetime import datetime, timezone, timedelta
+            import matplotlib.pyplot as plt
+            from collections import Counter
+            import discord
+            from discord.ui import View, Button
+
             guild = ctx.guild
             if user is None:
                 user = ctx.author
@@ -1520,18 +1529,13 @@ class Omni(commands.Cog):
                         date_list = week_starts
                         group_by = lambda dt: dt.strftime(group_fmt)
                     # Count violations per group
-                    from collections import Counter
                     grouped = Counter(group_by(dt) for dt in datetimes)
                     # Prepare x/y for plot
                     x_labels = []
                     y_counts = []
                     for d in date_list:
-                        if days_span <= 21:
-                            key = d.strftime(group_fmt)
-                            label = d.strftime(label_fmt)
-                        else:
-                            key = d.strftime(group_fmt)
-                            label = d.strftime(label_fmt)
+                        key = d.strftime(group_fmt)
+                        label = d.strftime(label_fmt)
                         x_labels.append(label)
                         y_counts.append(grouped.get(key, 0))
                     # Plot
