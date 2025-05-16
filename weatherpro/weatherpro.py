@@ -454,6 +454,7 @@ class Weather(commands.Cog):
                 
                 # Fetch severe and extreme weather alerts
                 alerts_url = f"https://api.weather.gov/alerts/active?point={latitude.strip()},{longitude.strip()}"
+                active_alerts_list = []
                 async with self.session.get(alerts_url) as alerts_response:
                     try:
                         alerts_response.raise_for_status()
@@ -522,6 +523,12 @@ class Weather(commands.Cog):
                                     alert_titles.append(f"{emoji} **{event}** expiring **{expires_timestamp}**")
                                 else:
                                     alert_titles.append(f"{emoji} **{event}**")
+                                # For AI summary, collect alert event and description
+                                alert_desc = alert['properties'].get('description', '')
+                                if alert_desc:
+                                    active_alerts_list.append(f"{event}: {alert_desc}")
+                                else:
+                                    active_alerts_list.append(f"{event}")
                             alert_status = "\n".join(alert_titles)
                         else:
                             alert_status = "None right now - **#It'sAmazingOutThere**"
@@ -539,14 +546,19 @@ class Weather(commands.Cog):
                         "Authorization": f"Bearer {openai_key}",
                         "Content-Type": "application/json"
                     }
+                    # Compose a summary of active alerts for the AI prompt
+                    if active_alerts_list:
+                        alerts_summary = "Active alerts: " + "; ".join(active_alerts_list)
+                    else:
+                        alerts_summary = "There are no active weather alerts at this time."
                     messages = [
                         {"role": "system", "content": "You are a virtual meteorologist built into an app. Never talk about the location the data comes from or the time. Always respond in conversational text, giving recommendations based on conditions where appropriate."},
-                        {"role": "user", "content": f"Generate a summary of the current weather conditions based on the following data: {data}"}
+                        {"role": "user", "content": f"Generate a summary of the current weather conditions based on the following data: {data}\n\n{alerts_summary}"}
                     ]
                     openai_payload = {
-                        "model": "gpt-4o-mini",
+                        "model": "gpt-4.1-nano",
                         "messages": messages,
-                        "max_tokens": 250,
+                        "max_tokens": 500,
                         "temperature": 1.0
                     }
                     async with self.session.post(openai_url, headers=headers, json=openai_payload) as openai_response:
