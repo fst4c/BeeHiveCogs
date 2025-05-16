@@ -233,19 +233,25 @@ class AntiSpam(commands.Cog):
             last = cache[-1][1]
             similar_count = 0
             similar_msgs = []
-            for idx, (_, prev) in enumerate(list(cache)[-4:-1]):
+            similar_msgs_timestamps = []
+            for idx, (ts, prev) in enumerate(list(cache)[-4:-1]):
                 if self._similar(last, prev, similarity_threshold):
                     similar_count += 1
                     similar_msgs.append(prev)
+                    similar_msgs_timestamps.append(ts)
             if similar_count >= 2:
                 reason = (
                     f"Failed antispam check 2 for copypasta/repeat: "
                     f"Sent {similar_count+1} highly similar messages."
                 )
+                # Show previous similar messages with their timestamps, not [1], [2], etc.
                 evidence = (
                     f"Latest message:\n{last[:400]}\n\n"
                     f"Previous similar messages:\n" +
-                    "\n".join(f"[{i+1}] {msg[:400]}" for i, msg in enumerate(similar_msgs))
+                    "\n".join(
+                        f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ts))}: {msg[:400]}"
+                        for ts, msg in zip(similar_msgs_timestamps, similar_msgs)
+                    )
                 )
                 await self._punish(message, reason, evidence=evidence)
                 return
