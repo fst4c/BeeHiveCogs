@@ -216,8 +216,10 @@ class AntiSpam(commands.Cog):
                 f"Failed antispam check 1 for message flooding: "
                 f"Sent {len(recent_msgs)} messages in {interval} seconds."
             )
+            # Show each message with its timestamp (formatted), no [1], [2], etc.
             evidence = "\n".join(
-                f"[{i+1}] {content[:200]}" for i, (_, content) in enumerate(list(cache)[-len(recent_msgs):])
+                f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ts))}: {content[:200]}"
+                for ts, content in list(cache)[-len(recent_msgs):]
             )
             await self._punish(message, reason, evidence=evidence)
             return
