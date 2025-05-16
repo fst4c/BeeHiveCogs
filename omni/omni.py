@@ -688,8 +688,11 @@ class Omni(commands.Cog):
                 self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
-                if interaction.user.id == self.moderated_user_id:
+                # Prevent the moderated user from interacting with their own log unless they are an administrator
+                if (
+                    interaction.user.id == self.moderated_user_id
+                    and not getattr(interaction.user.guild_permissions, "administrator", False)
+                ):
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
                     return
                 try:
@@ -717,8 +720,11 @@ class Omni(commands.Cog):
                 self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
-                if interaction.user.id == self.moderated_user_id:
+                # Prevent the moderated user from interacting with their own log unless they are an administrator
+                if (
+                    interaction.user.id == self.moderated_user_id
+                    and not getattr(interaction.user.guild_permissions, "administrator", False)
+                ):
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
                     return
                 try:
@@ -751,8 +757,11 @@ class Omni(commands.Cog):
                 self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
-                if interaction.user.id == self.moderated_user_id:
+                # Prevent the moderated user from interacting with their own log unless they are an administrator
+                if (
+                    interaction.user.id == self.moderated_user_id
+                    and not getattr(interaction.user.guild_permissions, "administrator", False)
+                ):
                     embed = discord.Embed(
                         description="You cannot interact with moderation logs of your own actions.",
                         color=discord.Color.orange()
@@ -818,8 +827,11 @@ class Omni(commands.Cog):
                 self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
-                if interaction.user.id == self.moderated_user_id:
+                # Prevent the moderated user from interacting with their own log unless they are an administrator
+                if (
+                    interaction.user.id == self.moderated_user_id
+                    and not getattr(interaction.user.guild_permissions, "administrator", False)
+                ):
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
                     return
 
@@ -872,8 +884,11 @@ class Omni(commands.Cog):
                 self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
-                if interaction.user.id == self.moderated_user_id:
+                # Prevent the moderated user from interacting with their own log unless they are an administrator
+                if (
+                    interaction.user.id == self.moderated_user_id
+                    and not getattr(interaction.user.guild_permissions, "administrator", False)
+                ):
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
                     return
                 # Only allow users with manage_guild or admin
@@ -962,8 +977,11 @@ class Omni(commands.Cog):
                 self.awaiting_confirmation = False
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
-                if interaction.user.id == self.moderated_user_id:
+                # Prevent the moderated user from interacting with their own log unless they are an administrator
+                if (
+                    interaction.user.id == self.moderated_user_id
+                    and not getattr(interaction.user.guild_permissions, "administrator", False)
+                ):
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
                     return
 
@@ -994,8 +1012,11 @@ class Omni(commands.Cog):
                 self.awaiting_confirmation = False
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
-                if interaction.user.id == self.moderated_user_id:
+                # Prevent the moderated user from interacting with their own log unless they are an administrator
+                if (
+                    interaction.user.id == self.moderated_user_id
+                    and not getattr(interaction.user.guild_permissions, "administrator", False)
+                ):
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
                     return
 
@@ -1025,8 +1046,11 @@ class Omni(commands.Cog):
                 self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
-                if interaction.user.id == self.moderated_user_id:
+                # Prevent the moderated user from interacting with their own log unless they are an administrator
+                if (
+                    interaction.user.id == self.moderated_user_id
+                    and not getattr(interaction.user.guild_permissions, "administrator", False)
+                ):
                     await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
                     return
                 msg_id = self.message.id
@@ -1113,8 +1137,11 @@ class Omni(commands.Cog):
                 self.moderated_user_id = moderated_user_id
 
             async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log
-                if interaction.user.id == self.moderated_user_id:
+                # Prevent the moderated user from interacting with their own log unless they are an administrator
+                if (
+                    interaction.user.id == self.moderated_user_id
+                    and not getattr(interaction.user.guild_permissions, "administrator", False)
+                ):
                     await interaction.response.send_message("You cannot dismiss moderation logs of your own actions.", ephemeral=True)
                     return
                 # Only allow users with manage_guild or admin
