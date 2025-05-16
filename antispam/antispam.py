@@ -250,6 +250,37 @@ class AntiSpam(commands.Cog):
                 await self._punish(message, reason, evidence=evidence)
                 return
 
+        # Heuristic 2b: Similar message content in last 5 minutes
+        # This is the new check for similar messages over the last 5 minutes
+        five_minutes = 5 * 60
+        similar_count_5min = 0
+        similar_msgs_5min = []
+        if len(cache) >= 2:
+            last_content = cache[-1][1]
+            # Only consider messages in the last 5 minutes, excluding the current one
+            for ts, prev_content in list(cache)[:-1]:
+                if now - ts > five_minutes:
+                    continue
+                if self._similar(last_content, prev_content, similarity_threshold):
+                    similar_count_5min += 1
+                    similar_msgs_5min.append((ts, prev_content))
+            # If 3 or more similar messages in last 5 minutes (including the current one)
+            if similar_count_5min >= 2:
+                reason = (
+                    f"Failed antispam check 2b for repeated similar messages in last 5 minutes: "
+                    f"Sent {similar_count_5min+1} highly similar messages in 5 minutes."
+                )
+                evidence = (
+                    f"Latest message:\n{last_content[:400]}\n\n"
+                    f"Previous similar messages in last 5 minutes:\n" +
+                    "\n".join(
+                        f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ts))}: {msg[:400]}"
+                        for ts, msg in similar_msgs_5min
+                    )
+                )
+                await self._punish(message, reason, evidence=evidence)
+                return
+
         # Heuristic 3: ASCII Art / Large Block Messages
         try:
             ascii_art_threshold = await conf.ascii_art_threshold()
