@@ -988,7 +988,7 @@ class Omni(commands.Cog):
                 # Double-tap confirmation logic, no followup message
                 if not self.awaiting_confirmation:
                     self.awaiting_confirmation = True
-                    self.label = "Confirm"
+                    self.label = "Confirm kick"
                     self.style = discord.ButtonStyle.danger
                     try:
                         await interaction.response.edit_message(view=self.view)
@@ -1023,7 +1023,7 @@ class Omni(commands.Cog):
                 # Double-tap confirmation logic, no followup message
                 if not self.awaiting_confirmation:
                     self.awaiting_confirmation = True
-                    self.label = "Confirm"
+                    self.label = "Confirm ban"
                     self.style = discord.ButtonStyle.danger
                     try:
                         await interaction.response.edit_message(view=self.view)
