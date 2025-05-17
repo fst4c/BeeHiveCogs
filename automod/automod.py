@@ -14,7 +14,7 @@ import asyncio
 
 from . import views
 
-class Omni(commands.Cog):
+class AutoMod(commands.Cog):
     """AI-powered automatic text moderation provided by frontier moderation models"""
 
     def __init__(self, bot):
@@ -762,15 +762,13 @@ class Omni(commands.Cog):
 
     @commands.guild_only()
     @commands.group()
-    async def omni(self, ctx):
+    async def automod(self, ctx):
         """
-        Automated AI moderation for chats, images, and emotes powered by the latest OpenAI moderation models.
-        
-        Read more about **[omni-moderation-latest](<https://platform.openai.com/docs/models/omni-moderation-latest>)** or [visit OpenAI's website](<https://openai.com>) to learn more.
+        [Automated AI moderation for chats, images, and emotes powered by the latest frontier moderation models.](<https://sentri.beehive.systems/features/agentic-moderator>)
         """
         pass
 
-    @omni.command()
+    @automod.command()
     async def stats(self, ctx):
         """Show statistics of the moderation activity."""
         try:
@@ -827,7 +825,7 @@ class Omni(commands.Cog):
             warned_users = len([uid for uid, count in (user_warnings or {}).items() if count > 0])
             warning_stats = f"**{total_warnings}** warning{'s' if total_warnings != 1 else ''} issued to **{warned_users}** user{'s' if warned_users != 1 else ''}"
 
-            embed = discord.Embed(title="✨ AI is hard at work for you, here's everything Omni knows...", color=0xfffffe)
+            embed = discord.Embed(title="Agentic moderator statistics", color=0xfffffe)
             embed.add_field(name=f"In {ctx.guild.name}", value="", inline=False)
             embed.add_field(name="Messages processed", value=f"**{message_count:,}** message{'s' if message_count != 1 else ''}", inline=True)
             embed.add_field(name="Messages moderated", value=f"**{moderated_count:,}** message{'s' if moderated_count != 1 else ''} ({moderated_message_percentage:.2f}%)", inline=True)
@@ -913,7 +911,7 @@ class Omni(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to display stats: {e}")
 
-    @omni.command()
+    @automod.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def history(self, ctx, user: discord.Member = None):
         """
@@ -1153,7 +1151,7 @@ class Omni(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to display violation history: {e}")
 
-    @omni.command()
+    @automod.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def settings(self, ctx):
         """Show the current settings of the cog."""
@@ -1198,7 +1196,7 @@ class Omni(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to display settings: {e}")
 
-    @omni.command()
+    @automod.command()
     @commands.is_owner()
     async def cleanup(self, ctx):
         """Reset all server and global statistics and counters."""
@@ -1269,7 +1267,7 @@ class Omni(commands.Cog):
 
 # VALIDATED COMMANDS
 
-    @omni.command()
+    @automod.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def threshold(self, ctx, threshold: float):
         """
@@ -1296,7 +1294,7 @@ class Omni(commands.Cog):
             raise RuntimeError(f"Failed to set threshold: {e}") 
 
     @commands.cooldown(1, 86400, commands.BucketType.user)
-    @omni.command()
+    @automod.command()
     async def vote(self, ctx):
         """Give feedback on the server's agentic moderation"""
         try:
@@ -1394,7 +1392,7 @@ class Omni(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to initiate vote: {e}")
 
-    @omni.command()
+    @automod.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def toggle(self, ctx):
         """Toggle automatic moderation on or off."""
@@ -1408,7 +1406,7 @@ class Omni(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to toggle automatic moderation: {e}")
 
-    @omni.command()
+    @automod.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def disclaimer(self, ctx):
         """
@@ -1450,7 +1448,7 @@ class Omni(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to toggle monitoring warning: {e}")
 
-    @omni.command()
+    @automod.command()
     async def reasons(self, ctx):
         """Explains how the AI moderator labels and categorizes content"""
         try:
@@ -1478,7 +1476,7 @@ class Omni(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to display reasons: {e}")
 
-    @omni.command()
+    @automod.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def delete(self, ctx):
         """Toggle whether violatory messages are deleted or not."""
@@ -1492,7 +1490,7 @@ class Omni(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to toggle message deletion: {e}")
 
-    @omni.command()
+    @automod.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def timeout(self, ctx, duration: int):
         """Set the timeout duration in minutes (0 for no timeout)."""
@@ -1505,7 +1503,7 @@ class Omni(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to set timeout duration: {e}")
 
-    @omni.command()
+    @automod.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def logs(self, ctx, channel: discord.TextChannel):
         """Set the channel to log moderated messages."""
@@ -1637,7 +1635,7 @@ class Omni(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to toggle NSFW bypass: {e}")
 
-    @omni.command(hidden=True)
+    @automod.command(hidden=True)
     @commands.is_owner()
     async def debug(self, ctx):
         """Toggle debug mode to log all messages and their scores."""
