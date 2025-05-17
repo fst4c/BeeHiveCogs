@@ -1,5 +1,5 @@
 # Welcome to BeeHive-Cogs
-![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/BeeHiveSafety/BeeHive-Cogs)
+![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/BeeHiveSafety/BeeHiveCogs)
 
 > Enjoy these cogs? Please consider [supporting them financially](https://donate.stripe.com/5kAeVYenp9Yh9GgcMP) with a donation of any amount to help keep them maintained.
 
@@ -12,7 +12,7 @@ This repository contains cogs that can help equip your Red instance with advance
 Before you can install our cogs, you need to add our repo to your instance so it can find, our cogs by name. To do so, run the following command.
 
 ```
-[p]repo add BeeHiveSafety https://github.com/BeeHiveSafety/BeeHive-Cogs
+[p]repo add BeeHiveSafety https://github.com/BeeHiveSafety/BeeHiveCogs
 ```
 
 When you run this command, Red may give you a warning about installing third party cogs. If you're presented with this, you'll need to respond in chat with "I agree". 
@@ -28,7 +28,7 @@ We'll provide a, relatively same-in-spirit disclaimer below.
 ## Public cogs
 Our public cogs are the cogs we make that do, assorted things. Maybe you'll find them useful - or maybe not. 
 
-### [weatherpro](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/weatherpro)
+### [weatherpro](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/weatherpro)
 
 Access detailed weather information, forecasts, and historical data for any location in the United States using ZIP codes. Perfect for planning events, travel, or just staying informed about the weather in your area. `[p]weather`, `[p]weatherset`.
 
@@ -41,7 +41,7 @@ Access detailed weather information, forecasts, and historical data for any loca
 ```
 
 
-### [ping](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/ping)
+### [ping](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/ping)
 
 A nice, functional ping-and-speedtest cog that shows your host latency, transit latency, download speed, and upload speed in a neat, orderly, no-frills embed. If your bot is hosted on a poor quality connection, includes a special offer when detected. `[p]ping`.
 
@@ -52,7 +52,7 @@ A nice, functional ping-and-speedtest cog that shows your host latency, transit 
 [p]load ping
 ```
 
-### [names](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/names)
+### [names](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/names)
 
 Help manage unruly, unsightly, and otherwise annoying nicknames/screennames in your server. Purify and normalize visually obnoxious names manually, or enable automatic cleanups to keep your server tidy. `[p]nickname`.
 
@@ -63,7 +63,7 @@ Help manage unruly, unsightly, and otherwise annoying nicknames/screennames in y
 [p]load names
 ```
 
-### [linksafety](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/linksafety)
+### [linksafety](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/linksafety)
 
 Passively detect and remove known malicious websites sent in your server's chats. `[p]linksafety`.
 
@@ -74,7 +74,7 @@ Passively detect and remove known malicious websites sent in your server's chats
 [p]load linksafety
 ```
 
-### [skysearch](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/skysearch)
+### [skysearch](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/skysearch)
 
 Interactive features to let you explore and search for aircraft by their registrations, squawks, ICAO 24-bit addresses, and more, as well as fetch information about airports like locations, photos, forecasts, and more. `[p]aircraft`, `[p]airport`.
 
@@ -85,7 +85,7 @@ Interactive features to let you explore and search for aircraft by their registr
 [p]load skysearch
 ```
 
-### [disclaimers](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/disclaimers)
+### [disclaimers](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/disclaimers)
 
 Set up and manage pre-defined disclaimers that attach to users of particular significance, like lawyers, financial advisors, or other professions where a disclaimer may be warranted as a responsible disclosure. `[p]disclaimers`.
 
@@ -96,7 +96,7 @@ Set up and manage pre-defined disclaimers that attach to users of particular sig
 [p]load disclaimers
 ```
 
-### [serverinfo](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/serverinfo)
+### [serverinfo](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/serverinfo)
 
 Provides detailed information about your Discord server, including member statistics, channel counts, role information, and more. Useful to keep track of various server metrics and check if the server is configured, relatively, correctly. `[p]serverinfo`.
 
@@ -107,7 +107,7 @@ Provides detailed information about your Discord server, including member statis
 [p]load serverinfo
 ```
 
-### [invites](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/invites)
+### [invites](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/invites)
 
 Manage and track invite links for your Discord server. This cog allows you to see who invited whom, track the number of uses for each invite link, and generate new invite links with specific settings. Useful for community growth and moderation. `[p]invites`.
 
@@ -126,7 +126,7 @@ Brand cogs are cogs we make that are intended to integrate other third party ser
 >These are made open-effort and open-source to extend the functionality of Red-DiscordBot, not to imbibe an endorsement of any one specific brand.
 >If you choose to use these in potentially sensitive environments, this is the disclaimer that indicates you do so at your own risk and liability.
 
-### [abuseipdb](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/abuseipdb)
+### [abuseipdb](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/abuseipdb)
 
 Integrate the AbuseIPDB API with your Red-DiscordBot to check and report IP addresses for abusive activity. This cog allows you to query the reputation of an IP address and report malicious IPs directly from your Discord server. `[p]abuseipdb`.
 
@@ -137,7 +137,7 @@ Integrate the AbuseIPDB API with your Red-DiscordBot to check and report IP addr
 [p]load abuseipdb
 ```
 
-### [cloudflare](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/cloudflare)
+### [cloudflare](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/cloudflare)
 
 Utilize Cloudflare's URL scanner and Cloudflare Intel via Discord.
 
@@ -148,7 +148,7 @@ Utilize Cloudflare's URL scanner and Cloudflare Intel via Discord.
 [p]load cloudflare
 ```
 
-### [virustotal](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/virustotal)
+### [virustotal](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/virustotal)
 
 Utilize the VirusTotal API with a free API key to scan and analyze files for potential threats and malicious content. `[p]virustotal`.
 
@@ -159,7 +159,7 @@ Utilize the VirusTotal API with a free API key to scan and analyze files for pot
 [p]load virustotal
 ```
 
-### [urlscan](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/urlscan)
+### [urlscan](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/urlscan)
 
 Use the URLScan.io API with a `free` URLScan API Key to evaluate URLs for safety and security. Enable `[p]urlscan autoscan` to automatically monitor and protect your chat from potentially harmful links. `[p]urlscan`.
 
@@ -173,7 +173,7 @@ Use the URLScan.io API with a `free` URLScan API Key to evaluate URLs for safety
 [p]set api urlscan api_key YOURAPIKEYHERE
 ```
 
-### [ransomwaredotlive](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/ransomwaredotlive)
+### [ransomwaredotlive](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/ransomwaredotlive)
 
 Integrate the Ransomware.live API with your Red-DiscordBot to monitor and receive updates on the latest ransomware activities as well as query information about recent and historical ransomware attacks.`[p]ransomware`.
 
@@ -184,7 +184,7 @@ Integrate the Ransomware.live API with your Red-DiscordBot to monitor and receiv
 [p]load ransomwaredotlive
 ```
 
-### [automod](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/automod)
+### [automod](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/automod)
 
 Utilize OpenAI's frontier moderation models to keep chat clean in your server for free. `[p]automod`
 
@@ -198,7 +198,7 @@ Utilize OpenAI's frontier moderation models to keep chat clean in your server fo
 [p]set api openai api_key YOURAPIKEYHERE
 ```
 
-### [shazam](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/shazam)
+### [shazam](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/shazam)
 
 Automatically identify songs shared in chat as files.
 
@@ -209,7 +209,7 @@ Automatically identify songs shared in chat as files.
 [p]load shazam
 ```
 
-### [transcriber](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/transcriber)
+### [transcriber](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/transcriber)
 
 Automatically transcribe and moderate voice notes and other audio sent in your server using frontier AI models. `[p]transcriber`
 
