@@ -418,7 +418,7 @@ class ModerationActionView(discord.ui.View):
                 if unix_ts:
                     timestamp_str = f"<t:{unix_ts}:R>"
             if content and timestamp_str:
-                description = f"{content}\n*Originally sent {timestamp_str}*"
+                description = f"### {content}\n- *Originally sent {timestamp_str}*"
             elif content:
                 description = content
             elif timestamp_str:
