@@ -1513,7 +1513,7 @@ class AutoMod(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to set log channel: {e}")
 
-    @omni.group()
+    @automod.group()
     @commands.admin_or_permissions(manage_guild=True)
     async def whitelist(self, ctx):
         """
