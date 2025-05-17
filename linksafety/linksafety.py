@@ -14,7 +14,7 @@ URL_REGEX_PATTERN = re.compile(
     r"(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’]))"
 )
 
-class AntiPhishing(commands.Cog):
+class LinkSafety(commands.Cog):
     """
     Guard users from malicious links and phishing attempts with customizable protection options.
     """
@@ -77,13 +77,13 @@ class AntiPhishing(commands.Cog):
 
     @commands.group()
     @commands.guild_only()
-    async def antiphishing(self, ctx: Context):
+    async def linksafety(self, ctx: Context):
         """
         Configurable options to help keep known malicious links out of your community's conversations.
         """
 
     @commands.admin_or_permissions()
-    @antiphishing.command()
+    @linksafety.command()
     async def vendor(self, ctx: Context, server_id: int):
         """
         Specify the ID of a server to send phishing alerts to if the bot is in more than one server.
@@ -107,7 +107,7 @@ class AntiPhishing(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.admin_or_permissions()    
-    @antiphishing.command()
+    @linksafety.command()
     async def settings(self, ctx: Context):
         """
         Show the current antiphishing settings.
@@ -132,7 +132,7 @@ class AntiPhishing(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.admin_or_permissions()
-    @antiphishing.command()
+    @linksafety.command()
     async def action(self, ctx: Context, action: str):
         """
         Choose the action that occurs when a user sends a phishing scam.
@@ -188,7 +188,7 @@ class AntiPhishing(commands.Cog):
         embed = discord.Embed(title='Settings changed', description=description, colour=colour)
         await ctx.send(embed=embed)
 
-    @antiphishing.command()
+    @linksafety.command()
     async def stats(self, ctx: Context):
         """
         Check protection statistics for this server
@@ -266,7 +266,7 @@ class AntiPhishing(commands.Cog):
         await ctx.send(embed=embed, view=view)
 
     @commands.admin_or_permissions()
-    @antiphishing.command()
+    @linksafety.command()
     async def logs(self, ctx: Context, channel: discord.TextChannel):
         """
         Set a logging channel
