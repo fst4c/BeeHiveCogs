@@ -198,6 +198,17 @@ Utilize OpenAI's frontier moderation models to keep chat clean in your server fo
 [p]set api openai api_key YOURAPIKEYHERE
 ```
 
+### [shazam](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/shazam)
+
+Automatically identify songs shared in chat as files.
+
+```
+[p]cog install BeeHiveSafety shazam
+```
+```
+[p]load shazam
+```
+
 ### [transcriber](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/transcriber)
 
 Automatically transcribe and moderate voice notes and other audio sent in your server using frontier AI models. `[p]transcriber`
