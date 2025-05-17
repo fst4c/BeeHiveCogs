@@ -247,6 +247,8 @@ class ReviewsCog(commands.Cog):
 
         try:
             if file_format.lower() == "csv":
+                if "../" in file_name or "..\\" in file_name:
+                    raise Exception("Invalid file path")
                 with open(file_path, "w", newline='', encoding='utf-8') as file:
                     writer = csv.writer(file)
                     writer.writerow(["ID", "Author ID", "Content", "Status", "Rating"])

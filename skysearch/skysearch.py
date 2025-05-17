@@ -648,6 +648,8 @@ class Skysearch(commands.Cog):
                             aircraft_values = list(map(str, aircraft.values()))
                             file.write(' '.join(aircraft_values) + '\n')
                 elif file_format.lower() == "html":
+                    if "../" in file_path or "..\\" in file_path:
+                        raise Exception("Invalid file path")
                     with open(file_path, "w", newline='', encoding='utf-8') as file:
                         aircraft_keys = list(response['ac'][0].keys())
                         file.write('<table>\n')
@@ -668,6 +670,8 @@ class Skysearch(commands.Cog):
                 if os.path.exists(file_path):
                     os.remove(file_path)
 
+            if "../" in file_path or "..\\" in file_path:
+                raise Exception("Invalid file path")
             with open(file_path, 'rb') as fp:
                 await ctx.send(file=discord.File(fp, filename=os.path.basename(file_path)))
         else:
