@@ -59,7 +59,7 @@ def wrapped_additional_help():
 class Logging(EventMixin, commands.Cog):
     """
     Extended modlogs
-    Works with core modlogset channel
+    Works with core logging channel
     """
 
     __author__ = ["RePulsar", "TrustyJAID"]
@@ -196,7 +196,7 @@ class Logging(EventMixin, commands.Cog):
         """
         Toggle various extended modlog notifications
 
-        Requires the channel to be setup with `[p]modlogset modlog #channel`
+        Requires the channel to be setup with `[p]logging modlog #channel`
         Or can be sent to separate channels with `[p]modlog channel #channel event_name`
         """
         pass

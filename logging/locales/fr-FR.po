@@ -691,7 +691,7 @@ msgstr ""
 #, docstring
 msgid "\n"
 "    Extended modlogs\n"
-"    Works with core modlogset channel\n"
+"    Works with core logging channel\n"
 "    "
 msgstr ""
 
@@ -800,7 +800,7 @@ msgstr ""
 #, docstring
 msgid "\n"
 "        Toggle various extended modlog notifications\n\n"
-"        Requires the channel to be setup with `[p]modlogset modlog #channel`\n"
+"        Requires the channel to be setup with `[p]logging modlog #channel`\n"
 "        Or can be sent to separate channels with `[p]modlog channel #channel event_name`\n"
 "        "
 msgstr ""

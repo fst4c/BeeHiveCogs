@@ -475,7 +475,7 @@ msgstr ""
 msgid ""
 "\n"
 "        Extended modlogs\n"
-"        Works with core modlogset channel\n"
+"        Works with core logging channel\n"
 "    "
 msgstr ""
 
@@ -485,12 +485,12 @@ msgid ""
 "\n"
 "            Toggle various extended modlog notifications\n"
 "\n"
-"            Requires the channel to be setup with `[p]modlogset modlog #channel` first\n"
+"            Requires the channel to be setup with `[p]logging modlog #channel` first\n"
 "        "
 msgstr ""
 
 #: extendedmodlog/extendedmodlog.py:58
-msgid "You need to setup a channel with `[p]modlogset modlog #channel` first."
+msgid "You need to setup a channel with `[p]logging modlog #channel` first."
 msgstr ""
 
 #: extendedmodlog/extendedmodlog.py:60
