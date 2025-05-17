@@ -972,7 +972,7 @@ class Omni(commands.Cog):
         """
         Show the violation history for a user in this server.
         If no user is provided, shows your own history (if you are not a bot).
-        Shows 9 violations per page, with emoji reactions to scroll if there are more.
+        Shows 5 violations per page, with emoji reactions to scroll if there are more.
         Also includes a graph of abuse trends over time.
         """
         temp_file = None
@@ -996,6 +996,13 @@ class Omni(commands.Cog):
                 violations = (violations + mem_violations)[-50:]
             else:
                 violations = violations[-50:]
+
+            # Sort violations most recent first by timestamp (descending)
+            violations = sorted(
+                violations,
+                key=lambda v: v.get("timestamp", 0),
+                reverse=True
+            )
 
             # Get warning count for this user
             user_warnings = await guild_conf.user_warnings()
@@ -1072,7 +1079,7 @@ class Omni(commands.Cog):
                 image_url = None
 
             # Pagination setup
-            VIOLATIONS_PER_PAGE = 9
+            VIOLATIONS_PER_PAGE = 5
             total_violations = len(violations)
             total_pages = max(1, math.ceil(total_violations / VIOLATIONS_PER_PAGE))
 
