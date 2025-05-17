@@ -58,12 +58,7 @@ class VirusTotal(commands.Cog):
             await ctx.send("Auto scan log channel cleared.")
 
     @checks.admin_or_permissions(manage_guild=True)
-    @virustotal.group(name="malwareaction", invoke_without_command=True)
-    async def malwareaction(self, ctx):
-        """Configure the action to take if a user sends a file commonly rated as malware."""
-        await ctx.send_help(ctx.command)
-
-    @malwareaction.command(name="set")
+    @virustotal.group(name="action", invoke_without_command=True)
     async def set_malware_action(self, ctx, action: str):
         """
         Set the action to take if a user sends a file commonly rated as malware.
@@ -76,7 +71,8 @@ class VirusTotal(commands.Cog):
         await self.config.guild(ctx.guild).malware_action.set(action)
         await ctx.send(f"Malware action set to `{action}`.")
 
-    @malwareaction.command(name="threshold")
+    @checks.admin_or_permissions(manage_guild=True)
+    @virustotal.command(name="threshold")
     async def set_malware_action_threshold(self, ctx, threshold: int):
         """
         Set the minimum number of 'malicious' detections required to trigger the action.
@@ -87,7 +83,8 @@ class VirusTotal(commands.Cog):
         await self.config.guild(ctx.guild).malware_action_threshold.set(threshold)
         await ctx.send(f"Malware action threshold set to `{threshold}` malicious detections.")
 
-    @malwareaction.command(name="timeout")
+    @checks.admin_or_permissions(manage_guild=True)
+    @virustotal.command(name="duration")
     async def set_malware_action_timeout(self, ctx, seconds: int):
         """
         Set the timeout duration (in seconds) if the action is 'timeout'.
@@ -98,6 +95,7 @@ class VirusTotal(commands.Cog):
         await self.config.guild(ctx.guild).malware_action_timeout.set(seconds)
         await ctx.send(f"Malware action timeout set to `{seconds}` seconds.")
 
+    @checks.admin_or_permissions(manage_guild=True)
     @virustotal.command(name="settings")
     async def settings(self, ctx):
         """Show current settings for VirusTotal"""
