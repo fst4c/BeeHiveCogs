@@ -15,7 +15,7 @@
         7,
         2
     ],
-    "name": "ExtendedModLog",
+    "name": "logging",
     "permissions": [
         "embed_links"
     ],
@@ -26,6 +26,5 @@
         "mod",
         "logs",
         "modlogs"
-    ],
-    "type": "COG"
+    ]
 }
