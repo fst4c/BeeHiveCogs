@@ -10,8 +10,8 @@ from redbot.core.utils.chat_formatting import humanize_list
 from .eventmixin import CommandPrivs, EventChooser, EventMixin, MemberUpdateEnum
 from .settings import inv_settings
 
-_ = Translator("ExtendedModLog", __file__)
-logger = getLogger("red.beehive-cogs.ExtendedModLog")
+_ = Translator("Logging", __file__)
+logger = getLogger("red.beehive-cogs.Logging")
 
 
 def wrapped_additional_help():
@@ -56,7 +56,7 @@ def wrapped_additional_help():
 
 
 @cog_i18n(_)
-class ExtendedModLog(EventMixin, commands.Cog):
+class Logging(EventMixin, commands.Cog):
     """
     Extended modlogs
     Works with core modlogset channel

@@ -20,8 +20,8 @@ from redbot.core.utils.chat_formatting import (
     pagify,
 )
 
-_ = i18n.Translator("ExtendedModLog", __file__)
-logger = getLogger("red.trusty-cogs.ExtendedModLog")
+_ = i18n.Translator("Logging", __file__)
+logger = getLogger("red.beehive-cogs.Logging")
 
 
 class MemberUpdateEnum(Enum):
