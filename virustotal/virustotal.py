@@ -7,6 +7,17 @@ from redbot.core import commands, Config, checks # type: ignore
 class VirusTotal(commands.Cog):
     """VirusTotal file upload and analysis via Discord"""
 
+    # File extensions that could reasonably contain malware
+    MALWARE_FILE_EXTENSIONS = {
+        ".exe", ".dll", ".scr", ".bat", ".cmd", ".com", ".msi", ".vbs", ".js", ".jar", ".ps1", ".psm1", ".cmd", ".cpl",
+        ".sys", ".drv", ".ocx", ".pif", ".gadget", ".msu", ".msp", ".hta", ".wsf", ".ws", ".sh", ".apk", ".bin", ".elf",
+        ".deb", ".rpm", ".dmg", ".pkg", ".app", ".iso", ".img", ".vbe", ".vb", ".reg", ".lnk", ".msc", ".scf", ".scr",
+        ".adp", ".bas", ".chm", ".cpl", ".crt", ".hta", ".inf", ".ins", ".isp", ".jse", ".ksh", ".lnk", ".mde", ".msc",
+        ".mst", ".pif", ".prg", ".rar", ".sct", ".shb", ".shs", ".url", ".vb", ".vbe", ".vbs", ".ws", ".wsc", ".wsf",
+        ".wsh", ".xll", ".xlam", ".xlm", ".xlsm", ".xlsb", ".docm", ".dotm", ".pptm", ".ppam", ".potm", ".ppsm", ".sldm",
+        ".msp", ".scr", ".tmp", ".ace", ".arj", ".cab", ".gz", ".tar", ".zip", ".7z", ".xz", ".bz2", ".z", ".tgz", ".tbz2"
+    }
+
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1234567890)
@@ -141,9 +152,15 @@ class VirusTotal(commands.Cog):
 
         auto_scan_enabled = await self.config.guild(guild).auto_scan_enabled()
         if auto_scan_enabled and message.attachments:
-            ctx = await self.bot.get_context(message)
-            if ctx.valid:
-                await self.silent_scan(ctx, message.attachments, message=message)
+            # Only scan attachments with extensions that could reasonably contain malware
+            filtered_attachments = [
+                a for a in message.attachments
+                if a.filename and any(a.filename.lower().endswith(ext) for ext in self.MALWARE_FILE_EXTENSIONS)
+            ]
+            if filtered_attachments:
+                ctx = await self.bot.get_context(message)
+                if ctx.valid:
+                    await self.silent_scan(ctx, filtered_attachments, message=message)
 
     def extract_hashes(self, text):
         """Extract potential file hashes from the text"""
@@ -183,6 +200,10 @@ class VirusTotal(commands.Cog):
 
         async with aiohttp.ClientSession() as session:
             for attachment in attachments:
+                # Only scan files with extensions that could reasonably contain malware
+                if not (attachment.filename and any(attachment.filename.lower().endswith(ext) for ext in self.MALWARE_FILE_EXTENSIONS)):
+                    continue
+
                 if attachment.size > 30 * 1024 * 1024:  # 30 MB limit
                     continue  # Skip files that are too large
 
@@ -368,6 +389,10 @@ class VirusTotal(commands.Cog):
     async def submit_attachment_for_analysis(self, ctx, session, vt_key, attachment):
         if attachment.size > 30 * 1024 * 1024:  # 30 MB limit
             await self.send_error(ctx, "File too large", "The file you provided exceeds the 30MB size limit for analysis.")
+            return
+        # Only allow manual scan for files that could reasonably contain malware
+        if not (attachment.filename and any(attachment.filename.lower().endswith(ext) for ext in self.MALWARE_FILE_EXTENSIONS)):
+            await self.send_error(ctx, "File type not supported", "This file type is not typically associated with malware and will not be scanned automatically. If you believe this is an error, please contact the bot administrator.")
             return
         async with session.get(attachment.url) as response:
             if response.status != 200:
