@@ -1,6 +1,6 @@
 import discord
 from redbot.core import commands, Config, checks
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import asyncio
 from collections import deque, defaultdict
 
@@ -34,9 +34,11 @@ class DynamicSlowmode(commands.Cog):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=0xBEEBEE01, force_registration=True)
         self.config.register_guild(**self.DEFAULTS)
-        self._message_cache = defaultdict(lambda: deque(maxlen=100))
+        self._message_cache = defaultdict(lambda: deque(maxlen=500))
         self._lock = asyncio.Lock()
         self._slowmode_task = self.bot.loop.create_task(self._run_slowmode_task())
+        self._minute_stats = defaultdict(lambda: deque(maxlen=5))  # channel_id: deque of last 5 minute counts
+        self._minute_tick = 0  # Used to track when to send the 5-min report
 
     def cog_unload(self):
         if hasattr(self, "_slowmode_task"):
@@ -280,7 +282,7 @@ class DynamicSlowmode(commands.Cog):
         await self.bot.wait_until_ready()
         while True:
             await self.slowmode_task()
-            await asyncio.sleep(60)
+            await asyncio.sleep(60)  # Run every minute
 
     class SlowmodeLogView(discord.ui.View):
         def __init__(self, cog, channel: discord.TextChannel, current: int, min_slow: int, max_slow: int):
@@ -356,6 +358,11 @@ class DynamicSlowmode(commands.Cog):
                 await interaction.response.send_message(f"Failed to decrease slowmode: {e}", ephemeral=True)
 
     async def slowmode_task(self):
+        # This runs every minute
+        now = datetime.now(timezone.utc)
+        window_seconds = 60
+        report_every = 5  # minutes
+
         for guild in self.bot.guilds:
             conf = await self.config.guild(guild).all()
             if not conf["enabled"]:
@@ -368,80 +375,84 @@ class DynamicSlowmode(commands.Cog):
                 if not channel or not isinstance(channel, discord.TextChannel):
                     continue
                 async with self._lock:
-                    now = datetime.now(timezone.utc)
-                    # Remove messages older than 60 seconds
+                    # Remove messages older than 5 minutes for stats, but only count last minute for slowmode
                     cache = self._message_cache[cid]
-                    while cache and (now - cache[0]).total_seconds() > 60:
+                    while cache and (now - cache[0]).total_seconds() > 300:
                         cache.popleft()
-                    msg_count = len(cache)
+                    # Count messages in the last minute
+                    minute_ago = now - timedelta(seconds=window_seconds)
+                    msg_count_minute = sum(1 for t in cache if t > minute_ago)
+                    # Track per-minute stats for reporting
+                    self._minute_stats[cid].append(msg_count_minute)
                 # Calculate new slowmode in 1-second increments
                 current = channel.slowmode_delay
-                if msg_count > target_mpm:
+                if msg_count_minute > target_mpm:
                     # Too fast, increase slowmode by 1 second
                     new_slowmode = min(current + 1, max_slow)
-                elif msg_count < target_mpm // 2:
+                elif msg_count_minute < (target_mpm // 2):
                     # Too slow, decrease slowmode by 1 second
                     new_slowmode = max(current - 1, min_slow)
                 else:
                     # Within target, keep current
                     new_slowmode = current
 
-                embed = discord.Embed(
-                    title="Dynamic slowmode",
-                    color=0xfffffe
-                )
-
-                view = None
                 if new_slowmode != current:
                     try:
                         await channel.edit(slowmode_delay=new_slowmode, reason="Adjusting slowmode based on current channel activity")
-                        # Log the slowmode adjustment
-                        embed.add_field(
-                            name="Channel",
-                            value=channel.mention,
-                            inline=True
-                        )
-                        embed.add_field(
-                            name="Adjustment",
-                            value=f"{current}s → {new_slowmode}s",
-                            inline=True
-                        )
-                        embed.add_field(
-                            name="Message count",
-                            value=f"{msg_count} messages/60s",
-                            inline=True
-                        )
-                        embed.add_field(
-                            name="Target",
-                            value=f"{target_mpm} messages/60s",
-                            inline=True
-                        )
-                        # Add view with buttons for manual adjustment
-                        view = self.SlowmodeLogView(self, channel, new_slowmode, min_slow, max_slow)
                     except discord.Forbidden:
                         print(f"Permission error: Cannot adjust slowmode for {channel.mention}.")
                     except discord.HTTPException as e:
                         print(f"HTTP error: Failed to adjust slowmode for {channel.mention}: {e}")
                     except Exception as e:
                         print(f"Unexpected error: Failed to adjust slowmode for {channel.mention}: {e}")
-                else:
-                    # Log the current message rate vs slowmode trigger rate
+
+        # Only send the log every 5 minutes
+        self._minute_tick = getattr(self, "_minute_tick", 0) + 1
+        if self._minute_tick >= report_every:
+            self._minute_tick = 0
+            for guild in self.bot.guilds:
+                conf = await self.config.guild(guild).all()
+                if not conf["enabled"]:
+                    continue
+                target_mpm = conf["target_msgs_per_min"]
+                min_slow = conf["min_slowmode"]
+                max_slow = conf["max_slowmode"]
+                for cid in conf["channels"]:
+                    channel = guild.get_channel(cid)
+                    if not channel or not isinstance(channel, discord.TextChannel):
+                        continue
+                    # Prepare stats for the last 5 minutes
+                    stats = list(self._minute_stats[cid])
+                    # Pad with zeros if less than 5
+                    stats = [0] * (5 - len(stats)) + stats
+                    current = channel.slowmode_delay
+                    embed = discord.Embed(
+                        title="Dynamic slowmode (5-minute report)",
+                        color=0xfffffe
+                    )
                     embed.add_field(
                         name="Channel",
                         value=channel.mention,
                         inline=True
                     )
                     embed.add_field(
-                        name="Current message rate",
-                        value=f"{msg_count} messages/60s",
+                        name="Current slowmode",
+                        value=f"{current}s",
                         inline=True
                     )
                     embed.add_field(
-                        name="Target message rate",
-                        value=f"{target_mpm} messages/60s",
+                        name="Target per minute",
+                        value=f"{target_mpm} messages/min",
                         inline=True
+                    )
+                    embed.add_field(
+                        name="Last 5 minutes",
+                        value="\n".join(
+                            f"Minute -{i}: {n} msg(s)" for i, n in zip(range(4, -1, -1), stats)
+                        ),
+                        inline=False
                     )
                     # Add view with buttons for manual adjustment (using current slowmode)
                     view = self.SlowmodeLogView(self, channel, current, min_slow, max_slow)
-                await self._send_log(guild, embed, view=view)
+                    await self._send_log(guild, embed, view=view)
 
