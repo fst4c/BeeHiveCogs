@@ -4,7 +4,7 @@ from collections import deque
 from enum import Enum
 from typing import Any, Deque, Dict, List, Optional, Sequence, Tuple, Union, cast
 
-import discord
+import discord # type: ignore
 from discord.ext import tasks
 from discord.ext.commands.converter import Converter
 from discord.ext.commands.errors import BadArgument

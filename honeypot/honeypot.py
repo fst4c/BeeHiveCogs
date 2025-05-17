@@ -1,5 +1,5 @@
-import discord
-from redbot.core import commands, Config
+import discord # type: ignore
+from redbot.core import commands, Config # type: ignore
 import typing
 import os
 from datetime import timedelta

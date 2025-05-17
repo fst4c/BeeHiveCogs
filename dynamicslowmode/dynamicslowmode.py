@@ -1,5 +1,5 @@
-import discord
-from redbot.core import commands, Config, checks
+import discord # type: ignore
+from redbot.core import commands, Config, checks # type: ignore
 from datetime import datetime, timezone, timedelta
 import asyncio
 from collections import deque, defaultdict

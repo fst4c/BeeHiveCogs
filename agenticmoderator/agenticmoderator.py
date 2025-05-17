@@ -762,15 +762,15 @@ class AutoMod(commands.Cog):
 
     @commands.guild_only()
     @commands.group()
-    async def automod(self, ctx):
+    async def omni(self, ctx):
         """
-        Automated AI moderation for chats, images, and emotes powered by the latest frontier moderation models.
+        Automated AI moderation for chats, images, and emotes powered by the latest OpenAI moderation models.
         
-        [Check the documentation to learn more](<https://sentri.beehive.systems/features/agentic-moderator>)
+        Read more about **[omni-moderation-latest](<https://platform.openai.com/docs/models/omni-moderation-latest>)** or [visit OpenAI's website](<https://openai.com>) to learn more.
         """
         pass
 
-    @automod.command()
+    @omni.command()
     async def stats(self, ctx):
         """Show statistics of the moderation activity."""
         try:
@@ -827,7 +827,7 @@ class AutoMod(commands.Cog):
             warned_users = len([uid for uid, count in (user_warnings or {}).items() if count > 0])
             warning_stats = f"**{total_warnings}** warning{'s' if total_warnings != 1 else ''} issued to **{warned_users}** user{'s' if warned_users != 1 else ''}"
 
-            embed = discord.Embed(title="Agentic moderator statistics", color=0xfffffe)
+            embed = discord.Embed(title="✨ AI is hard at work for you, here's everything Omni knows...", color=0xfffffe)
             embed.add_field(name=f"In {ctx.guild.name}", value="", inline=False)
             embed.add_field(name="Messages processed", value=f"**{message_count:,}** message{'s' if message_count != 1 else ''}", inline=True)
             embed.add_field(name="Messages moderated", value=f"**{moderated_count:,}** message{'s' if moderated_count != 1 else ''} ({moderated_message_percentage:.2f}%)", inline=True)
@@ -913,7 +913,7 @@ class AutoMod(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to display stats: {e}")
 
-    @automod.command()
+    @omni.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def history(self, ctx, user: discord.Member = None):
         """
@@ -1153,7 +1153,7 @@ class AutoMod(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to display violation history: {e}")
 
-    @automod.command()
+    @omni.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def settings(self, ctx):
         """Show the current settings of the cog."""
@@ -1198,7 +1198,7 @@ class AutoMod(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to display settings: {e}")
 
-    @automod.command()
+    @omni.command()
     @commands.is_owner()
     async def cleanup(self, ctx):
         """Reset all server and global statistics and counters."""
@@ -1269,7 +1269,7 @@ class AutoMod(commands.Cog):
 
 # VALIDATED COMMANDS
 
-    @automod.command()
+    @omni.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def threshold(self, ctx, threshold: float):
         """
@@ -1296,7 +1296,7 @@ class AutoMod(commands.Cog):
             raise RuntimeError(f"Failed to set threshold: {e}") 
 
     @commands.cooldown(1, 86400, commands.BucketType.user)
-    @automod.command()
+    @omni.command()
     async def vote(self, ctx):
         """Give feedback on the server's agentic moderation"""
         try:
@@ -1394,7 +1394,7 @@ class AutoMod(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to initiate vote: {e}")
 
-    @automod.command()
+    @omni.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def toggle(self, ctx):
         """Toggle automatic moderation on or off."""
@@ -1408,7 +1408,7 @@ class AutoMod(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to toggle automatic moderation: {e}")
 
-    @automod.command()
+    @omni.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def disclaimer(self, ctx):
         """
@@ -1450,7 +1450,7 @@ class AutoMod(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to toggle monitoring warning: {e}")
 
-    @automod.command()
+    @omni.command()
     async def reasons(self, ctx):
         """Explains how the AI moderator labels and categorizes content"""
         try:
@@ -1478,7 +1478,7 @@ class AutoMod(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to display reasons: {e}")
 
-    @automod.command()
+    @omni.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def delete(self, ctx):
         """Toggle whether violatory messages are deleted or not."""
@@ -1492,7 +1492,7 @@ class AutoMod(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to toggle message deletion: {e}")
 
-    @automod.command()
+    @omni.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def timeout(self, ctx, duration: int):
         """Set the timeout duration in minutes (0 for no timeout)."""
@@ -1505,7 +1505,7 @@ class AutoMod(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to set timeout duration: {e}")
 
-    @automod.command()
+    @omni.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def logs(self, ctx, channel: discord.TextChannel):
         """Set the channel to log moderated messages."""
@@ -1515,7 +1515,7 @@ class AutoMod(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to set log channel: {e}")
 
-    @automod.group()
+    @omni.group()
     @commands.admin_or_permissions(manage_guild=True)
     async def whitelist(self, ctx):
         """
@@ -1637,7 +1637,7 @@ class AutoMod(commands.Cog):
         except Exception as e:
             raise RuntimeError(f"Failed to toggle NSFW bypass: {e}")
 
-    @automod.command(hidden=True)
+    @omni.command(hidden=True)
     @commands.is_owner()
     async def debug(self, ctx):
         """Toggle debug mode to log all messages and their scores."""
