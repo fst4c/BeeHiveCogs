@@ -103,9 +103,6 @@ class VirusTotal(commands.Cog):
         auto_scan_enabled = await self.config.guild(guild).auto_scan_enabled()
         auto_scan_status = "Enabled" if auto_scan_enabled else "Disabled"
         
-        vt_key = await self.bot.get_shared_api_tokens("virustotal")
-        api_key_status = ":white_check_mark: Set" if vt_key.get("api_key") else ":x: Missing"
-        
         version = "1.3.0"
         last_update = "May 17th, 2025"
 
@@ -123,10 +120,9 @@ class VirusTotal(commands.Cog):
         
         embed = discord.Embed(title="VirusTotal settings", colour=discord.Colour(0x394eff))
         embed.add_field(name="Overview", value="", inline=False)
-        embed.add_field(name="Automatic uploads", value=auto_scan_status, inline=True)
-        embed.add_field(name="API key", value=api_key_status, inline=True)
-        embed.add_field(name="Log Channel", value=log_channel_status, inline=True)
-        embed.add_field(name="Malware Action", value=action_desc, inline=False)
+        embed.add_field(name="Automatic scanning", value=auto_scan_status, inline=True)
+        embed.add_field(name="Log channel", value=log_channel_status, inline=True)
+        embed.add_field(name="Detection action", value=action_desc, inline=False)
         embed.add_field(name="About this cog", value="", inline=False)
         embed.add_field(name="Version", value=version, inline=True)
         embed.add_field(name="Last updated", value=last_update, inline=True)
