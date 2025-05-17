@@ -10,7 +10,14 @@ class VirusTotal(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1234567890)
-        self.config.register_guild(auto_scan_enabled=True, submission_history={})
+        self.config.register_guild(
+            auto_scan_enabled=True,
+            submission_history={},
+            log_channel=None,
+            malware_action="none",  # none, kick, ban, timeout
+            malware_action_threshold=11,  # Default threshold for action
+            malware_action_timeout=600,   # Default timeout in seconds (if timeout is chosen)
+        )
         self.submission_history = {}
 
     async def initialize(self):
@@ -18,6 +25,10 @@ class VirusTotal(commands.Cog):
             guild_data = await self.config.guild(guild).all()
             await self.config.guild(guild).auto_scan_enabled.set(guild_data["auto_scan_enabled"])
             await self.config.guild(guild).submission_history.set(guild_data["submission_history"])
+            await self.config.guild(guild).log_channel.set(guild_data.get("log_channel", None))
+            await self.config.guild(guild).malware_action.set(guild_data.get("malware_action", "none"))
+            await self.config.guild(guild).malware_action_threshold.set(guild_data.get("malware_action_threshold", 11))
+            await self.config.guild(guild).malware_action_timeout.set(guild_data.get("malware_action_timeout", 600))
 
     @commands.group(name="virustotal", invoke_without_command=True)
     async def virustotal(self, ctx):
@@ -35,6 +46,58 @@ class VirusTotal(commands.Cog):
         status = "enabled" if new_status else "disabled"
         await ctx.send(f"Automatic file scanning has been {status}.")
 
+    @checks.admin_or_permissions(manage_guild=True)
+    @virustotal.command(name="setlog")
+    async def set_log_channel(self, ctx, channel: discord.TextChannel = None):
+        """Set the channel where auto scan logs are sent. Use without argument to clear."""
+        if channel is not None:
+            await self.config.guild(ctx.guild).log_channel.set(channel.id)
+            await ctx.send(f"Auto scan log channel set to {channel.mention}.")
+        else:
+            await self.config.guild(ctx.guild).log_channel.set(None)
+            await ctx.send("Auto scan log channel cleared.")
+
+    @checks.admin_or_permissions(manage_guild=True)
+    @virustotal.group(name="malwareaction", invoke_without_command=True)
+    async def malwareaction(self, ctx):
+        """Configure the action to take if a user sends a file commonly rated as malware."""
+        await ctx.send_help(ctx.command)
+
+    @malwareaction.command(name="set")
+    async def set_malware_action(self, ctx, action: str):
+        """
+        Set the action to take if a user sends a file commonly rated as malware.
+        Valid actions: none, kick, ban, timeout
+        """
+        action = action.lower()
+        if action not in ("none", "kick", "ban", "timeout"):
+            await ctx.send("Invalid action. Valid actions: `none`, `kick`, `ban`, `timeout`.")
+            return
+        await self.config.guild(ctx.guild).malware_action.set(action)
+        await ctx.send(f"Malware action set to `{action}`.")
+
+    @malwareaction.command(name="threshold")
+    async def set_malware_action_threshold(self, ctx, threshold: int):
+        """
+        Set the minimum number of 'malicious' detections required to trigger the action.
+        """
+        if threshold < 1:
+            await ctx.send("Threshold must be at least 1.")
+            return
+        await self.config.guild(ctx.guild).malware_action_threshold.set(threshold)
+        await ctx.send(f"Malware action threshold set to `{threshold}` malicious detections.")
+
+    @malwareaction.command(name="timeout")
+    async def set_malware_action_timeout(self, ctx, seconds: int):
+        """
+        Set the timeout duration (in seconds) if the action is 'timeout'.
+        """
+        if seconds < 1:
+            await ctx.send("Timeout must be at least 1 second.")
+            return
+        await self.config.guild(ctx.guild).malware_action_timeout.set(seconds)
+        await ctx.send(f"Malware action timeout set to `{seconds}` seconds.")
+
     @virustotal.command(name="settings")
     async def settings(self, ctx):
         """Show current settings for VirusTotal"""
@@ -47,11 +110,25 @@ class VirusTotal(commands.Cog):
         
         version = "1.2.2"
         last_update = "August 29th, 2024"
+
+        log_channel_id = await self.config.guild(guild).log_channel()
+        log_channel_status = f"<#{log_channel_id}>" if log_channel_id else "Not set"
+
+        malware_action = await self.config.guild(guild).malware_action()
+        malware_action_threshold = await self.config.guild(guild).malware_action_threshold()
+        malware_action_timeout = await self.config.guild(guild).malware_action_timeout()
+        action_desc = f"Action: `{malware_action}`"
+        if malware_action != "none":
+            action_desc += f"\nThreshold: `{malware_action_threshold}`"
+            if malware_action == "timeout":
+                action_desc += f"\nTimeout: `{malware_action_timeout}` seconds"
         
         embed = discord.Embed(title="VirusTotal settings", colour=discord.Colour(0x394eff))
         embed.add_field(name="Overview", value="", inline=False)
         embed.add_field(name="Automatic uploads", value=auto_scan_status, inline=True)
         embed.add_field(name="API key", value=api_key_status, inline=True)
+        embed.add_field(name="Log Channel", value=log_channel_status, inline=True)
+        embed.add_field(name="Malware Action", value=action_desc, inline=False)
         embed.add_field(name="About this cog", value="", inline=False)
         embed.add_field(name="Version", value=version, inline=True)
         embed.add_field(name="Last updated", value=last_update, inline=True)
@@ -68,7 +145,7 @@ class VirusTotal(commands.Cog):
         if auto_scan_enabled and message.attachments:
             ctx = await self.bot.get_context(message)
             if ctx.valid:
-                await self.silent_scan(ctx, message.attachments)
+                await self.silent_scan(ctx, message.attachments, message=message)
 
     def extract_hashes(self, text):
         """Extract potential file hashes from the text"""
@@ -84,11 +161,27 @@ class VirusTotal(commands.Cog):
             hashes.extend(re.findall(pattern, text))
         return hashes
 
-    async def silent_scan(self, ctx, attachments):
-        """Scan files silently and alert only if they're malicious or suspicious"""
+    async def silent_scan(self, ctx, attachments, message=None):
+        """Scan files silently and alert/log if they're malicious or suspicious"""
         vt_key = await self.bot.get_shared_api_tokens("virustotal")
         if not vt_key.get("api_key"):
             return  # No API key set, silently return
+
+        guild = ctx.guild
+        log_channel_id = await self.config.guild(guild).log_channel()
+        log_channel = None
+        if log_channel_id:
+            log_channel = guild.get_channel(log_channel_id)
+            if log_channel is None:
+                # Try to fetch if not cached
+                try:
+                    log_channel = await guild.fetch_channel(log_channel_id)
+                except Exception:
+                    log_channel = None
+
+        malware_action = await self.config.guild(guild).malware_action()
+        malware_action_threshold = await self.config.guild(guild).malware_action_threshold()
+        malware_action_timeout = await self.config.guild(guild).malware_action_timeout()
 
         async with aiohttp.ClientSession() as session:
             for attachment in attachments:
@@ -129,8 +222,88 @@ class VirusTotal(commands.Cog):
                                 status = result_data.get("data", {}).get("attributes", {}).get("status")
                                 if status == "completed":
                                     stats = result_data.get("data", {}).get("attributes", {}).get("stats", {})
-                                    if stats.get("malicious", 0) > 0 or stats.get("suspicious", 0) > 0:
-                                        await ctx.send(f"Alert: The file {file_name} is flagged as malicious or suspicious.")
+                                    malicious = stats.get("malicious", 0)
+                                    suspicious = stats.get("suspicious", 0)
+                                    undetected = stats.get("undetected", 0)
+                                    harmless = stats.get("harmless", 0)
+                                    failure = stats.get("failure", 0)
+                                    unsupported = stats.get("type-unsupported", 0)
+                                    total = malicious + suspicious + undetected + harmless + failure + unsupported
+                                    percent = round((malicious / total) * 100, 2) if total > 0 else 0
+
+                                    # Try to get hashes for logging
+                                    meta = result_data.get("meta", {}).get("file_info", {})
+                                    sha256 = meta.get("sha256", "Unknown")
+                                    sha1 = meta.get("sha1", "Unknown")
+                                    md5 = meta.get("md5", "Unknown")
+
+                                    # Compose embed for log
+                                    embed = discord.Embed(
+                                        title="VirusTotal Auto Scan Result",
+                                        description=f"File: `{file_name}`",
+                                        color=discord.Colour(0xff4545) if malicious > 0 else (discord.Colour(0xff9144) if suspicious > 0 else discord.Colour(0x2BBD8E))
+                                    )
+                                    embed.add_field(name="Malicious", value=str(malicious), inline=True)
+                                    embed.add_field(name="Suspicious", value=str(suspicious), inline=True)
+                                    embed.add_field(name="Harmless", value=str(harmless), inline=True)
+                                    embed.add_field(name="Undetected", value=str(undetected), inline=True)
+                                    embed.add_field(name="Failure", value=str(failure), inline=True)
+                                    embed.add_field(name="Unsupported", value=str(unsupported), inline=True)
+                                    embed.add_field(name="Detection %", value=f"{percent}%", inline=True)
+                                    embed.add_field(name="SHA256", value=sha256, inline=False)
+                                    embed.add_field(name="SHA1", value=sha1, inline=False)
+                                    embed.add_field(name="MD5", value=md5, inline=False)
+                                    embed.add_field(name="VirusTotal Link", value=f"[View results](https://www.virustotal.com/gui/file/{sha256})", inline=False)
+                                    if message:
+                                        embed.add_field(name="Submitted By", value=message.author.mention, inline=True)
+                                        embed.add_field(name="Channel", value=message.channel.mention, inline=True)
+                                        embed.timestamp = message.created_at
+
+                                    # --- Malware action logic ---
+                                    action_taken = False
+                                    if malicious >= malware_action_threshold and malware_action != "none" and message:
+                                        member = message.author
+                                        reason = f"VirusTotal: Sent file flagged as malware by {malicious} vendors."
+                                        try:
+                                            if malware_action == "kick":
+                                                await member.kick(reason=reason)
+                                                await ctx.send(f":warning: {member.mention} was **kicked** for sending a file flagged as malware by {malicious} vendors.")
+                                                action_taken = True
+                                            elif malware_action == "ban":
+                                                await member.ban(reason=reason, delete_message_days=0)
+                                                await ctx.send(f":warning: {member.mention} was **banned** for sending a file flagged as malware by {malicious} vendors.")
+                                                action_taken = True
+                                            elif malware_action == "timeout":
+                                                # Discord timeouts require discord.py 2.0+ and permissions
+                                                if hasattr(member, "timed_out_until"):
+                                                    from datetime import timedelta, datetime, timezone
+                                                    until = datetime.now(timezone.utc) + timedelta(seconds=malware_action_timeout)
+                                                    await member.edit(timeout=until, reason=reason)
+                                                    await ctx.send(f":warning: {member.mention} was **timed out** for {malware_action_timeout} seconds for sending a file flagged as malware by {malicious} vendors.")
+                                                    action_taken = True
+                                                else:
+                                                    await ctx.send(":warning: Timeout action is not supported on this version of discord.py.")
+                                        except discord.Forbidden:
+                                            await ctx.send(f":warning: I do not have permission to {malware_action} {member.mention}.")
+                                        except Exception as e:
+                                            await ctx.send(f":warning: Failed to {malware_action} {member.mention}: {e}")
+
+                                    if malicious > 0 or suspicious > 0:
+                                        # Alert in context channel
+                                        await ctx.send(f"Alert: The file `{file_name}` is flagged as malicious or suspicious.")
+                                        # Log to log channel if set
+                                        if log_channel:
+                                            try:
+                                                await log_channel.send(embed=embed)
+                                            except Exception:
+                                                pass
+                                    else:
+                                        # Log all scans to log channel if set
+                                        if log_channel:
+                                            try:
+                                                await log_channel.send(embed=embed)
+                                            except Exception:
+                                                pass
                                     break
                                 else:
                                     await asyncio.sleep(15)  # Wait a bit before checking again
