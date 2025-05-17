@@ -72,7 +72,7 @@ class AntiSpam(commands.Cog):
         await ctx.send(f"Set to {messages} messages per {seconds} seconds.")
 
     @antispam.command()
-    async def setpunishment(self, ctx, punishment: str):
+    async def punishment(self, ctx, punishment: str):
         """Set punishment: timeout, kick, ban, none."""
         punishment = punishment.lower()
         if punishment not in ("timeout", "kick", "ban", "none"):
@@ -82,7 +82,7 @@ class AntiSpam(commands.Cog):
         await ctx.send(f"Punishment set to: {punishment}")
 
     @antispam.command()
-    async def settimeouttime(self, ctx, seconds: int):
+    async def timeout(self, ctx, seconds: int):
         """Set timeout duration in seconds."""
         if seconds < 1:
             await ctx.send("Timeout time must be greater than 0 seconds.")
@@ -91,7 +91,7 @@ class AntiSpam(commands.Cog):
         await ctx.send(f"Timeout time set to {seconds} seconds.")
 
     @antispam.command()
-    async def setemojispam(self, ctx, max_emojis: int = 15, max_unique: int = 10):
+    async def emojispam(self, ctx, max_emojis: int = 15, max_unique: int = 10):
         """Set emoji spam thresholds: max_emojis per message, max_unique emojis per message."""
         if max_emojis < 1 or max_unique < 1:
             await ctx.send("Both emoji thresholds must be greater than 0.")
@@ -101,7 +101,7 @@ class AntiSpam(commands.Cog):
         await ctx.send(f"Emoji spam thresholds set: {max_emojis} total, {max_unique} unique per message.")
 
     @antispam.command(name="setlogchannel")
-    async def set_log_channel(self, ctx, channel: discord.TextChannel = None):
+    async def logs(self, ctx, channel: discord.TextChannel = None):
         """Set the channel where antispam logs are sent. Use without argument to clear."""
         if channel is None:
             await self.config.guild(ctx.guild).log_channel.set(None)
