@@ -1,7 +1,7 @@
 import discord
 from redbot.core import commands, Config
 import aiohttp
-from collections import Counter, defaultdict
+from collections import Counter
 import unicodedata
 import re
 import asyncio
@@ -20,26 +20,13 @@ class Omni(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.session = None
-        self.save_interval = 300  # Save every 5 minutes
 
         # Configuration setup
         self.config = Config.get_conf(self, identifier=11111111111)
         self._register_config()
 
-        # In-memory statistics
-        self.memory_stats = defaultdict(lambda: defaultdict(int))
-        self.memory_user_message_counts = defaultdict(lambda: defaultdict(int))
-        self.memory_moderated_users = defaultdict(lambda: defaultdict(int))
-        self.memory_category_counter = defaultdict(Counter)
-
-        # In-memory per-user violation tracking (guild_id -> user_id -> [violation dicts])
-        self.memory_user_violations = defaultdict(lambda: defaultdict(list))
-
-        # In-memory per-user warning tracking (guild_id -> user_id -> int)
-        self.memory_user_warnings = defaultdict(lambda: defaultdict(int))
-
         # In-memory reminder tracking to prevent duplicate reminders
-        self._reminder_sent_at = defaultdict(dict)  # {guild_id: {channel_id: datetime}}
+        self._reminder_sent_at = {}  # {guild_id: {channel_id: datetime}}
 
         # Track timeouts issued by message id for "Untimeout" button
         self._timeout_issued_for_message = {}  # {message_id: True/False}
@@ -49,13 +36,6 @@ class Omni(commands.Cog):
 
         # For logging: track which image was flagged if an image is moderated
         self._flagged_image_for_message = {}  # {message_id: image_url}
-
-        # Start periodic save task
-        # Use asyncio.create_task for compatibility with modern Red/discord.py
-        try:
-            self.bot.loop.create_task(self.periodic_save())
-        except Exception:
-            asyncio.create_task(self.periodic_save())
 
     def _register_config(self):
         """Register configuration defaults."""
@@ -168,20 +148,27 @@ class Omni(commands.Cog):
             if is_nsfw and bypass_nsfw:
                 return
 
-        # Increment the message count for the channel
-        self.memory_user_message_counts[guild.id][channel.id] += 1
+        # Increment the message count for the channel in config
+        guild_conf = self.config.guild(guild)
+        user_message_counts = await guild_conf.user_message_counts()
+        channel_id = channel.id
+        user_message_counts[channel_id] = user_message_counts.get(channel_id, 0) + 1
+        await guild_conf.user_message_counts.set(user_message_counts)
 
         # Check if the message count has reached 75
-        if self.memory_user_message_counts[guild.id][channel.id] >= 75:
+        if user_message_counts[channel_id] >= 75:
             # Prevent duplicate reminders by checking last sent time
             now = datetime.utcnow()
+            if guild.id not in self._reminder_sent_at:
+                self._reminder_sent_at[guild.id] = {}
             last_sent = self._reminder_sent_at[guild.id].get(channel.id)
             # Only send if not sent in the last 5 minutes (300 seconds)
             if not last_sent or (now - last_sent).total_seconds() > 300:
                 await self.send_monitoring_reminder(channel)
                 self._reminder_sent_at[guild.id][channel.id] = now
             # Reset the message count for the channel regardless
-            self.memory_user_message_counts[guild.id][channel.id] = 0
+            user_message_counts[channel_id] = 0
+            await guild_conf.user_message_counts.set(user_message_counts)
 
     async def send_monitoring_reminder(self, channel):
         """Send a monitoring reminder to the specified channel."""
@@ -216,21 +203,22 @@ class Omni(commands.Cog):
                 return
 
             guild = message.guild
-            if not await self.config.guild(guild).moderation_enabled():
+            guild_conf = self.config.guild(guild)
+            if not await guild_conf.moderation_enabled():
                 return
 
-            if getattr(message.channel, "id", None) in await self.config.guild(guild).whitelisted_channels():
+            if getattr(message.channel, "id", None) in await guild_conf.whitelisted_channels():
                 return
 
-            whitelisted_categories = await self.config.guild(guild).whitelisted_categories()
+            whitelisted_categories = await guild_conf.whitelisted_categories()
             if getattr(message.channel, "category_id", None) in whitelisted_categories:
                 return
 
-            whitelisted_roles = await self.config.guild(guild).whitelisted_roles()
+            whitelisted_roles = await guild_conf.whitelisted_roles()
             if hasattr(message.author, "roles") and any(getattr(role, "id", None) in whitelisted_roles for role in getattr(message.author, "roles", [])):
                 return
 
-            if getattr(message.author, "id", None) in await self.config.guild(guild).whitelisted_users():
+            if getattr(message.author, "id", None) in await guild_conf.whitelisted_users():
                 return
 
             if hasattr(message.channel, "is_nsfw") and callable(getattr(message.channel, "is_nsfw", None)):
@@ -238,12 +226,13 @@ class Omni(commands.Cog):
                     is_nsfw = message.channel.is_nsfw()
                 except Exception:
                     is_nsfw = False
-                if is_nsfw and await self.config.guild(guild).bypass_nsfw():
+                if is_nsfw and await guild_conf.bypass_nsfw():
                     return
 
-            self.increment_statistic(guild.id, 'message_count')
-            self.increment_statistic('global', 'global_message_count')
-            self.increment_user_message_count(guild.id, message.author.id)
+            # Increment statistics directly in config
+            await self.increment_statistic(guild.id, 'message_count')
+            await self.increment_statistic('global', 'global_message_count')
+            await self.increment_user_message_count(guild.id, message.author.id)
 
             api_key = (await self.bot.get_shared_api_tokens("openai")).get("api_key")
             if not api_key:
@@ -261,12 +250,12 @@ class Omni(commands.Cog):
                 for attachment in message.attachments:
                     if getattr(attachment, "content_type", None) and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif"):
                         image_attachments.append(attachment)
-                        self.increment_statistic(guild.id, 'image_count')
-                        self.increment_statistic('global', 'global_image_count')
+                        await self.increment_statistic(guild.id, 'image_count')
+                        await self.increment_statistic('global', 'global_image_count')
 
             # Only send text for moderation in the main request
             text_category_scores = await self.analyze_content(input_data, api_key, message)
-            moderation_threshold = await self.config.guild(guild).moderation_threshold()
+            moderation_threshold = await guild_conf.moderation_threshold()
             text_flagged = any(score > moderation_threshold for score in text_category_scores.values())
 
             # Analyze each image individually (API only supports one image at a time)
@@ -276,7 +265,7 @@ class Omni(commands.Cog):
                 image_flagged = any(score > moderation_threshold for score in image_category_scores.values())
 
                 if image_flagged:
-                    self.update_moderation_stats(guild.id, message, image_category_scores)
+                    await self.update_moderation_stats(guild.id, message, image_category_scores)
                     # Track which image was flagged for this message
                     self._flagged_image_for_message[message.id] = attachment.url
                     await self.handle_moderation(message, image_category_scores, flagged_image_url=attachment.url)
@@ -289,30 +278,54 @@ class Omni(commands.Cog):
                 await asyncio.sleep(1)
 
             if text_flagged:
-                self.update_moderation_stats(guild.id, message, text_category_scores)
+                await self.update_moderation_stats(guild.id, message, text_category_scores)
                 # For text moderation, clear any flagged image for this message
                 if message.id in self._flagged_image_for_message:
                     del self._flagged_image_for_message[message.id]
                 await self.handle_moderation(message, text_category_scores, flagged_image_url=None)
 
-            if await self.config.guild(guild).debug_mode():
+            if await guild_conf.debug_mode():
                 await self.log_message(message, text_category_scores)
         except Exception as e:
             raise RuntimeError(f"Error processing message: {e}")
 
-    def increment_statistic(self, guild_id, stat_name, increment_value=1):
-        self.memory_stats[guild_id][stat_name] += increment_value
+    async def increment_statistic(self, guild_id, stat_name, increment_value=1):
+        if guild_id == 'global':
+            current_value = await self.config.get_attr(stat_name)()
+            await self.config.get_attr(stat_name).set(current_value + increment_value)
+        else:
+            guild_conf = self.config.guild_from_id(guild_id)
+            current_value = await guild_conf.get_attr(stat_name)()
+            await guild_conf.get_attr(stat_name).set(current_value + increment_value)
 
-    def increment_user_message_count(self, guild_id, user_id):
-        self.memory_user_message_counts[guild_id][user_id] += 1
+    async def increment_user_message_count(self, guild_id, user_id):
+        if guild_id == 'global':
+            # Not used for global
+            return
+        guild_conf = self.config.guild_from_id(guild_id)
+        user_message_counts = await guild_conf.user_message_counts()
+        user_message_counts[user_id] = user_message_counts.get(user_id, 0) + 1
+        await guild_conf.user_message_counts.set(user_message_counts)
 
-    def update_moderation_stats(self, guild_id, message, text_category_scores):
-        self.increment_statistic(guild_id, 'moderated_count')
-        self.increment_statistic('global', 'global_moderated_count')
-        self.memory_moderated_users[guild_id][message.author.id] += 1
-        self.memory_moderated_users['global'][message.author.id] += 1
-        self.update_category_counter(guild_id, text_category_scores)
-        self.update_category_counter('global', text_category_scores)
+    async def update_moderation_stats(self, guild_id, message, text_category_scores):
+        # Increment counts
+        await self.increment_statistic(guild_id, 'moderated_count')
+        await self.increment_statistic('global', 'global_moderated_count')
+
+        # Update per-user moderation counts
+        if guild_id == 'global':
+            conf = self.config
+            key = 'global_moderated_users'
+        else:
+            conf = self.config.guild_from_id(guild_id)
+            key = 'moderated_users'
+        users = await conf.get_attr(key)()
+        users[str(message.author.id)] = users.get(str(message.author.id), 0) + 1
+        await conf.get_attr(key).set(users)
+
+        # Update category counters
+        await self.update_category_counter(guild_id, text_category_scores)
+        await self.update_category_counter('global', text_category_scores)
 
         # --- Per-user violation tracking ---
         # Only store if at least one score > 0.2 (to avoid noise)
@@ -329,16 +342,30 @@ class Omni(commands.Cog):
                 "author_name": getattr(message.author, "display_name", str(message.author)),
                 "attachments": [a.url for a in getattr(message, "attachments", []) if getattr(a, "content_type", None) and a.content_type.startswith("image/") and not a.content_type.endswith("gif")],
             }
-            self.memory_user_violations[guild_id][message.author.id].append(violation_entry)
+            guild_conf = self.config.guild_from_id(guild_id)
+            user_violations = await guild_conf.user_violations()
+            user_id_str = str(message.author.id)
+            if user_id_str not in user_violations:
+                user_violations[user_id_str] = []
+            user_violations[user_id_str] = (user_violations[user_id_str] + [violation_entry])[-50:]
+            await guild_conf.user_violations.set(user_violations)
 
         if any(getattr(attachment, "content_type", None) and attachment.content_type.startswith("image/") and not attachment.content_type.endswith("gif") for attachment in getattr(message, "attachments", [])):
-            self.increment_statistic(guild_id, 'moderated_image_count')
-            self.increment_statistic('global', 'global_moderated_image_count')
+            await self.increment_statistic(guild_id, 'moderated_image_count')
+            await self.increment_statistic('global', 'global_moderated_image_count')
 
-    def update_category_counter(self, guild_id, text_category_scores):
+    async def update_category_counter(self, guild_id, text_category_scores):
+        if guild_id == 'global':
+            conf = self.config
+            key = 'global_category_counter'
+        else:
+            conf = self.config.guild_from_id(guild_id)
+            key = 'category_counter'
+        counter = Counter(await conf.get_attr(key)())
         for category, score in text_category_scores.items():
             if score > 0.2:
-                self.memory_category_counter[guild_id][category] += 1
+                counter[category] += 1
+        await conf.get_attr(key).set(dict(counter))
 
     async def analyze_content(self, input_data, api_key, message):
         """
@@ -507,9 +534,10 @@ class Omni(commands.Cog):
     async def handle_moderation(self, message, category_scores, flagged_image_url=None):
         try:
             guild = message.guild
-            timeout_duration = await self.config.guild(guild).timeout_duration()
-            log_channel_id = await self.config.guild(guild).log_channel()
-            delete_violatory_messages = await self.config.guild(guild).delete_violatory_messages()
+            guild_conf = self.config.guild(guild)
+            timeout_duration = await guild_conf.timeout_duration()
+            log_channel_id = await guild_conf.log_channel()
+            delete_violatory_messages = await guild_conf.delete_violatory_messages()
 
             message_deleted = False
             if delete_violatory_messages:
@@ -524,7 +552,10 @@ class Omni(commands.Cog):
                         "attachments": [a.url for a in getattr(message, "attachments", []) if getattr(a, "content_type", None) and a.content_type.startswith("image/") and not a.content_type.endswith("gif")]
                     }
                     await message.delete()
-                    self.memory_moderated_users[guild.id][message.author.id] += 1
+                    # Increment per-user moderation count
+                    users = await guild_conf.moderated_users()
+                    users[str(message.author.id)] = users.get(str(message.author.id), 0) + 1
+                    await guild_conf.moderated_users.set(users)
                     message_deleted = True
                 except discord.NotFound:
                     pass
@@ -540,10 +571,10 @@ class Omni(commands.Cog):
                         f". Message: {message.content}"
                     )
                     await message.author.timeout(timedelta(minutes=timeout_duration), reason=reason)
-                    self.increment_statistic(guild.id, 'timeout_count')
-                    self.increment_statistic('global', 'global_timeout_count')
-                    self.increment_statistic(guild.id, 'total_timeout_duration', timeout_duration)
-                    self.increment_statistic('global', 'global_total_timeout_duration', timeout_duration)
+                    await self.increment_statistic(guild.id, 'timeout_count')
+                    await self.increment_statistic('global', 'global_timeout_count')
+                    await self.increment_statistic(guild.id, 'total_timeout_duration', timeout_duration)
+                    await self.increment_statistic('global', 'global_total_timeout_duration', timeout_duration)
                     timeout_issued = True
                 except discord.Forbidden:
                     pass
@@ -605,7 +636,7 @@ class Omni(commands.Cog):
                     )
                     # Use the ModerationActionView from views.py instead of the local class
                     timeout_issued_val = timeout_issued
-                    timeout_duration_val = await self.config.guild(message.guild).timeout_duration()
+                    timeout_duration_val = await guild_conf.timeout_duration()
                     view = views.ModerationActionView(self, message, timeout_issued_val, timeout_duration=timeout_duration_val)
                     await log_channel.send(embed=embed, view=view)
         except Exception as e:
@@ -728,90 +759,6 @@ class Omni(commands.Cog):
                     await log_channel.send(embed=embed, view=view)
         except Exception as e:
             raise RuntimeError(f"Failed to log message: {e}")
-
-    async def periodic_save(self):
-        """Periodically save in-memory statistics to persistent storage."""
-        while True:
-            await asyncio.sleep(self.save_interval)
-            try:
-                await self._save_statistics()
-            except Exception as e:
-                raise RuntimeError(f"Failed to save statistics: {e}")
-
-    async def _save_statistics(self):
-        """Save statistics to persistent storage."""
-        for guild_id, stats in self.memory_stats.items():
-            if guild_id == 'global':
-                for stat_name, value in stats.items():
-                    current_value = await self.config.get_attr(stat_name)()
-                    await self.config.get_attr(stat_name).set(current_value + value)
-            else:
-                guild_conf = self.config.guild_from_id(guild_id)
-                for stat_name, value in stats.items():
-                    current_value = await guild_conf.get_attr(stat_name)()
-                    await guild_conf.get_attr(stat_name).set(current_value + value)
-
-        for guild_id, user_counts in self.memory_user_message_counts.items():
-            if guild_id != 'global':
-                guild_conf = self.config.guild_from_id(guild_id)
-                current_user_counts = await guild_conf.user_message_counts()
-                for user_id, count in user_counts.items():
-                    current_user_counts[user_id] = current_user_counts.get(user_id, 0) + count
-                await guild_conf.user_message_counts.set(current_user_counts)
-
-        for guild_id, users in self.memory_moderated_users.items():
-            if guild_id == 'global':
-                current_users = await self.config.global_moderated_users()
-                for user_id, count in users.items():
-                    current_users[user_id] = current_users.get(user_id, 0) + count
-                await self.config.global_moderated_users.set(current_users)
-            else:
-                guild_conf = self.config.guild_from_id(guild_id)
-                current_users = await guild_conf.moderated_users()
-                for user_id, count in users.items():
-                    current_users[user_id] = current_users.get(user_id, 0) + count
-                await guild_conf.moderated_users.set(current_users)
-
-        for guild_id, counter in self.memory_category_counter.items():
-            if guild_id == 'global':
-                current_counter = Counter(await self.config.global_category_counter())
-                current_counter.update(counter)
-                await self.config.global_category_counter.set(dict(current_counter))
-            else:
-                guild_conf = self.config.guild_from_id(guild_id)
-                current_counter = Counter(await guild_conf.category_counter())
-                current_counter.update(counter)
-                await guild_conf.category_counter.set(dict(current_counter))
-
-        # Save per-user violation history
-        for guild_id, user_violations in self.memory_user_violations.items():
-            guild_conf = self.config.guild_from_id(guild_id)
-            current_violations = await guild_conf.user_violations()
-            for user_id, violations in user_violations.items():
-                # Append new violations to existing list
-                if str(user_id) not in current_violations:
-                    current_violations[str(user_id)] = []
-                # Only keep the last 50 violations per user to avoid unbounded growth
-                current_violations[str(user_id)] = (current_violations[str(user_id)] + violations)[-50:]
-            await guild_conf.user_violations.set(current_violations)
-
-        # Save per-user warning counts
-        for guild_id, user_warnings in self.memory_user_warnings.items():
-            guild_conf = self.config.guild_from_id(guild_id)
-            current_warnings = await guild_conf.user_warnings()
-            for user_id, count in user_warnings.items():
-                current_warnings[str(user_id)] = current_warnings.get(str(user_id), 0) + count
-            await guild_conf.user_warnings.set(current_warnings)
-
-        # Clear in-memory statistics after saving
-        self.memory_stats.clear()
-        self.memory_user_message_counts.clear()
-        self.memory_moderated_users.clear()
-        self.memory_category_counter.clear()
-        self.memory_user_violations.clear()
-        self.memory_user_warnings.clear()
-        # Also clear flagged image tracking after save
-        self._flagged_image_for_message.clear()
 
     @commands.guild_only()
     @commands.group()
@@ -990,13 +937,6 @@ class Omni(commands.Cog):
             user_violations = await guild_conf.user_violations()
             violations = user_violations.get(str(user.id), [])
 
-            # Add in-memory violations not yet saved
-            mem_violations = self.memory_user_violations[guild.id].get(user.id, [])
-            if mem_violations:
-                violations = (violations + mem_violations)[-50:]
-            else:
-                violations = violations[-50:]
-
             # Sort violations most recent first by timestamp (descending)
             violations = sorted(
                 violations,
@@ -1007,10 +947,8 @@ class Omni(commands.Cog):
             # Get warning count for this user
             user_warnings = await guild_conf.user_warnings()
             warning_count = user_warnings.get(str(user.id), 0)
-            mem_warning_count = self.memory_user_warnings[guild.id].get(user.id, 0)
-            total_warning_count = warning_count + mem_warning_count
 
-            if not violations and total_warning_count == 0:
+            if not violations and warning_count == 0:
                 await ctx.send(f"No violations or warnings found for {user.mention}.")
                 return
 
@@ -1107,7 +1045,7 @@ class Omni(commands.Cog):
                     )
                 embed.add_field(
                     name="Warnings issued",
-                    value=f"{total_warning_count} warning{'s' if total_warning_count != 1 else ''} for this user.",
+                    value=f"{warning_count} warning{'s' if warning_count != 1 else ''} for this user.",
                     inline=False
                 )
                 embed.set_footer(text=f"Page {page+1}/{total_pages} • Only the last 50 violations are kept per user. Warnings are cumulative.")
@@ -1312,12 +1250,6 @@ class Omni(commands.Cog):
             await self.config.global_total_timeout_duration.set(0)
 
             # Clear in-memory statistics
-            self.memory_stats.clear()
-            self.memory_user_message_counts.clear()
-            self.memory_moderated_users.clear()
-            self.memory_category_counter.clear()
-            self.memory_user_violations.clear()
-            self.memory_user_warnings.clear()
             self._reminder_sent_at.clear()
             self._timeout_issued_for_message.clear()
             self._deleted_messages.clear()
