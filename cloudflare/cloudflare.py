@@ -39,7 +39,7 @@ class Cloudflare(commands.Cog):
         Learn more at https://developers.cloudflare.com/radar/investigate/url-scanner/
         """
 
-    @urlscanner.command(name="setlog")
+    @urlscanner.command(name="logs")
     @commands.has_permissions(administrator=True)
     async def set_log_channel(self, ctx, channel: discord.TextChannel = None):
         """
