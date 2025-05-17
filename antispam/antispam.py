@@ -15,6 +15,17 @@ class AntiSpam(commands.Cog):
     __author__ = "adminelevation"
     __version__ = "1.0.0"
 
+    # Virus signature-like detection codes and their descriptions
+    DETECTION_SIGNATURES = {
+        "Spam:MsgFlood.A!msg": "Message flooding: Too many messages sent in a short time.",
+        "Spam:Repeat.Copypasta.B!msg": "Copypasta/repeat: Multiple highly similar messages sent in a short time.",
+        "Spam:Repeat.Timespan.C!msg": "Repeated similar messages: Multiple highly similar messages sent over a longer period.",
+        "Spam:Block.AsciiArt.D!msg": "ASCII art/large block: Message contains large ASCII art or block text.",
+        "Spam:Emoji.Spam.E!msg": "Emoji spam: Excessive emoji usage in a single message.",
+        "Spam:Unicode.Zalgo.F!msg": "Zalgo/unicode spam: Excessive use of combining unicode marks (Zalgo text).",
+        "Spam:Mention.Mass.G!msg": "Mass mention: Excessive user mentions or use of @everyone/@here.",
+    }
+
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=73947298374)
@@ -25,21 +36,20 @@ class AntiSpam(commands.Cog):
             "similarity_threshold": 0.85,
             "ascii_art_threshold": 12,
             "ascii_art_min_lines": 6,
-            "emoji_spam_threshold": 15,  # New: max emojis per message before considered spam
-            "emoji_spam_unique_threshold": 10,  # New: max unique emojis per message before considered spam
-            "punishment": "timeout",  # timeout, kick, ban, none
-            "timeout_time": 60,  # seconds
+            "emoji_spam_threshold": 15,
+            "emoji_spam_unique_threshold": 10,
+            "punishment": "timeout",
+            "timeout_time": 60,
             "ignored_channels": [],
             "ignored_roles": [],
             "ignored_users": [],
             "log_channel": None,
         }
         self.config.register_guild(**default_guild)
-        self.user_message_cache = defaultdict(lambda: deque(maxlen=15))  # user_id: deque of (timestamp, content)
-        self.user_last_action = {}  # user_id: timestamp of last punishment
+        self.user_message_cache = defaultdict(lambda: deque(maxlen=15))
+        self.user_last_action = {}
 
     async def red_delete_data_for_user(self, *, requester, user_id: int):
-        # No persistent user data
         pass
 
     @commands.group(name="antispam", invoke_without_command=True)
@@ -176,12 +186,23 @@ class AntiSpam(commands.Cog):
                 users.remove(user.id)
         await ctx.send(f"Removed user from whitelist: {user.mention}")
 
+    @antispam.command(name="signatures")
+    async def signatures(self, ctx):
+        """Show detection signature codes and their descriptions."""
+        embed = discord.Embed(
+            title="AntiSpam Detection Signatures",
+            color=0x00bfff,
+            description="These are the detection codes used in AntiSpam logs and punishments."
+        )
+        for code, desc in self.DETECTION_SIGNATURES.items():
+            embed.add_field(name=code, value=desc, inline=False)
+        await ctx.send(embed=embed)
+
     @commands.Cog.listener()
     async def on_message_without_command(self, message: discord.Message):
         if not message.guild or message.author.bot:
             return
 
-        # Prevent responding to self-bot or webhook messages
         if getattr(message, "webhook_id", None) is not None:
             return
 
@@ -195,7 +216,6 @@ class AntiSpam(commands.Cog):
         if not enabled:
             return
 
-        # Ignore if in ignored channel/role/user
         try:
             ignored_channels = await conf.ignored_channels()
             ignored_roles = await conf.ignored_roles()
@@ -211,7 +231,6 @@ class AntiSpam(commands.Cog):
         if message.author.id in ignored_users:
             return
 
-        # Cache message
         now = time.time()
         cache = self.user_message_cache[message.author.id]
         cache.append((now, message.content))
@@ -224,11 +243,7 @@ class AntiSpam(commands.Cog):
             return
         recent_msgs = [t for t, _ in cache if now - t < interval]
         if len(recent_msgs) >= message_limit:
-            reason = (
-                f"Failed antispam check 1 for message flooding: "
-                f"Sent {len(recent_msgs)} messages in {interval} seconds."
-            )
-            # Show each message with its timestamp (dynamic Discord timestamp)
+            reason = "Spam:MsgFlood.A!msg"
             evidence = "\n".join(
                 f"<t:{int(ts)}:f>: {content[:200]}"
                 for ts, content in list(cache)[-len(recent_msgs):]
@@ -252,11 +267,7 @@ class AntiSpam(commands.Cog):
                     similar_msgs.append(prev)
                     similar_msgs_timestamps.append(ts)
             if similar_count >= 2:
-                reason = (
-                    f"Failed antispam check 2 for copypasta/repeat: "
-                    f"Sent {similar_count+1} highly similar messages."
-                )
-                # Show previous similar messages with their timestamps (dynamic Discord timestamp)
+                reason = "Spam:Repeat.Copypasta.B!msg"
                 evidence = (
                     f"Latest message:\n{last[:400]}\n\n"
                     f"Previous similar messages:\n" +
@@ -269,25 +280,19 @@ class AntiSpam(commands.Cog):
                 return
 
         # Heuristic 2b: Similar message content in last 5 minutes
-        # This is the new check for similar messages over the last 5 minutes
         five_minutes = 5 * 60
         similar_count_5min = 0
         similar_msgs_5min = []
         if len(cache) >= 2:
             last_content = cache[-1][1]
-            # Only consider messages in the last 5 minutes, excluding the current one
             for ts, prev_content in list(cache)[:-1]:
                 if now - ts > five_minutes:
                     continue
                 if self._similar(last_content, prev_content, similarity_threshold):
                     similar_count_5min += 1
                     similar_msgs_5min.append((ts, prev_content))
-            # If 3 or more similar messages in last 5 minutes (including the current one)
             if similar_count_5min >= 2:
-                reason = (
-                    f"Failed antispam check 2b for repeated similar messages in last 5 minutes: "
-                    f"Sent {similar_count_5min+1} highly similar messages in 5 minutes."
-                )
+                reason = "Spam:Repeat.Timespan.C!msg"
                 evidence = (
                     f"Latest message:\n{last_content[:400]}\n\n"
                     f"Previous similar messages in last 5 minutes:\n" +
@@ -307,10 +312,7 @@ class AntiSpam(commands.Cog):
             ascii_art_threshold = 12
             ascii_art_min_lines = 6
         if self._is_ascii_art(message.content, ascii_art_threshold, ascii_art_min_lines):
-            reason = (
-                "Failed antispam check 3 for ASCII art/large block message: "
-                "Sent ASCII art or large block message."
-            )
+            reason = "Spam:Block.AsciiArt.D!msg"
             evidence = f"Message content (first 600 chars):\n`{message.content[:600]}`"
             await self._punish(message, reason, evidence=evidence)
             return
@@ -324,11 +326,7 @@ class AntiSpam(commands.Cog):
             emoji_spam_unique_threshold = 10
         emoji_count, unique_emoji_count, emoji_list = self._count_emojis(message.content)
         if emoji_count >= emoji_spam_threshold or unique_emoji_count >= emoji_spam_unique_threshold:
-            reason = (
-                f"Failed antispam check 4 for emoji spam: "
-                f"Emoji spam/excessive emoji usage. "
-                f"Total emojis: {emoji_count}, Unique emojis: {unique_emoji_count}."
-            )
+            reason = "Spam:Emoji.Spam.E!msg"
             evidence = (
                 f"Total emojis: {emoji_count}\n"
                 f"Unique emojis: {unique_emoji_count}\n"
@@ -341,10 +339,7 @@ class AntiSpam(commands.Cog):
         # Heuristic 5: Zalgo/Unicode Spam
         if self._is_zalgo(message.content):
             zalgo_chars = re.findall(r'[\u0300-\u036F\u0489]', message.content)
-            reason = (
-                f"Failed antispam check 5 for Zalgo/unicode spam: "
-                f"Sent Zalgo/unicode spam. Number of zalgo/unicode marks: {len(zalgo_chars)}."
-            )
+            reason = "Spam:Unicode.Zalgo.F!msg"
             evidence = (
                 f"Message content (first 400 chars):\n{message.content[:400]}\n\n"
                 f"Number of zalgo/unicode marks: {len(zalgo_chars)}"
@@ -355,11 +350,7 @@ class AntiSpam(commands.Cog):
         # Heuristic 6: Mass Mentions
         if self._is_mass_mention(message):
             mention_list = [f"<@{m.id}>" for m in message.mentions]
-            reason = (
-                f"Failed antispam check 6 for mass mention spam: "
-                f"Mass mention spam. Mentions: {len(message.mentions)}, "
-                f"@everyone: {'@everyone' in message.content}, @here: {'@here' in message.content}."
-            )
+            reason = "Spam:Mention.Mass.G!msg"
             evidence = (
                 f"Mentions: {', '.join(mention_list) if mention_list else 'None'}\n"
                 f"@everyone: {'@everyone' in message.content}\n"
@@ -379,19 +370,16 @@ class AntiSpam(commands.Cog):
         return ratio > threshold
 
     def _is_ascii_art(self, content, threshold, min_lines):
-        # Count lines with high ascii density or long lines
         lines = content.splitlines()
         if len(lines) < min_lines:
             return False
         ascii_lines = 0
         for line in lines:
-            # Only count lines with at least one non-whitespace character
             if len(line) > threshold and all(ord(c) < 128 for c in line if c.strip()):
                 ascii_lines += 1
         return ascii_lines >= min_lines
 
     def _is_zalgo(self, content):
-        # Zalgo = excessive combining unicode marks
         zalgo_re = re.compile(r'[\u0300-\u036F\u0489]')
         try:
             return len(zalgo_re.findall(content)) > 15
@@ -399,38 +387,32 @@ class AntiSpam(commands.Cog):
             return False
 
     def _is_mass_mention(self, message):
-        # 5+ mentions in a message
         if hasattr(message, "mentions") and len(message.mentions) >= 5:
             return True
-        # @everyone or @here
         if "@everyone" in message.content or "@here" in message.content:
             return True
         return False
 
     def _count_emojis(self, content):
-        # Returns (total_emoji_count, unique_emoji_count, emoji_list)
-        # Discord custom emoji: <a?:name:id>
         custom_emoji_re = re.compile(r'<a?:\w+:\d+>')
-        # Unicode emoji: use a broad regex for emoji blocks
-        # This regex is not perfect but covers most emoji
         unicode_emoji_re = re.compile(
             "["
-            "\U0001F600-\U0001F64F"  # emoticons
-            "\U0001F300-\U0001F5FF"  # symbols & pictographs
-            "\U0001F680-\U0001F6FF"  # transport & map symbols
-            "\U0001F1E0-\U0001F1FF"  # flags (iOS)
-            "\U00002700-\U000027BF"  # Dingbats
-            "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
-            "\U00002600-\U000026FF"  # Misc symbols
-            "\U00002B50"             # ⭐
-            "\U00002B06"             # ⬆
-            "\U00002B07"             # ⬇
-            "\U00002B1B-\U00002B1C"  # ⬛⬜
-            "\U0000231A-\U0000231B"  # ⌚⌛
-            "\U000025AA-\U000025AB"  # ▪▫
-            "\U000025FB-\U000025FE"  # ◻◾
-            "\U0001F004"             # 🀄
-            "\U0001F0CF"             # 🃏
+            "\U0001F600-\U0001F64F"
+            "\U0001F300-\U0001F5FF"
+            "\U0001F680-\U0001F6FF"
+            "\U0001F1E0-\U0001F1FF"
+            "\U00002700-\U000027BF"
+            "\U0001F900-\U0001F9FF"
+            "\U00002600-\U000026FF"
+            "\U00002B50"
+            "\U00002B06"
+            "\U00002B07"
+            "\U00002B1B-\U00002B1C"
+            "\U0000231A-\U0000231B"
+            "\U000025AA-\U000025AB"
+            "\U000025FB-\U000025FE"
+            "\U0001F004"
+            "\U0001F0CF"
             "]+"
         )
         custom_emojis = custom_emoji_re.findall(content)
@@ -452,14 +434,12 @@ class AntiSpam(commands.Cog):
             timeout_time = 60
         user = message.author
 
-        # Prevent repeated actions in a short time
         now = time.time()
         last = self.user_last_action.get(user.id, 0)
         if now - last < 10:
             return
         self.user_last_action[user.id] = now
 
-        # Try to delete the message, but ignore if already deleted or missing permissions
         try:
             await message.delete()
         except discord.NotFound:
@@ -470,15 +450,12 @@ class AntiSpam(commands.Cog):
             pass
 
         try:
-            # The reason string is already descriptive from the calling context
             if punishment == "timeout":
-                # Use Discord's timeout (communication disabled) if available
                 if hasattr(user, "timeout"):
                     import datetime
                     until = discord.utils.utcnow() + datetime.timedelta(seconds=timeout_time)
                     await user.timeout(until, reason=reason)
                 else:
-                    # Fallback: try to find a Muted role (legacy, not recommended)
                     muted = discord.utils.get(guild.roles, name="Muted")
                     if not muted:
                         try:
@@ -507,28 +484,21 @@ class AntiSpam(commands.Cog):
                     await user.ban(reason=reason, delete_message_days=1)
                 except Exception:
                     pass
-            # else: none
         except Exception:
             pass
 
-        # Log to the configured log channel, if set
         try:
             log_channel_id = await conf.log_channel()
         except Exception:
             log_channel_id = None
 
         log_channel = None
-        # Fix: Use bot.get_channel if get_channel is not available on guild, and check permissions
         if log_channel_id:
-            # Try to get channel from guild first
             log_channel = guild.get_channel(log_channel_id)
-            # If not found, fallback to bot.get_channel
             if log_channel is None and hasattr(self.bot, "get_channel"):
                 log_channel = self.bot.get_channel(log_channel_id)
-        # Also check if log_channel is a TextChannel and bot can send messages
         if log_channel and isinstance(log_channel, discord.TextChannel):
             try:
-                # Check if bot has permission to send messages and embeds
                 perms = log_channel.permissions_for(guild.me)
                 if not (perms.send_messages and perms.embed_links):
                     return
@@ -538,17 +508,19 @@ class AntiSpam(commands.Cog):
                     timestamp=discord.utils.utcnow(),
                 )
                 embed.add_field(name="User", value=f"{user.mention} (`{user.id}`)", inline=False)
-                embed.add_field(name="Reason", value=reason, inline=False)
+                embed.add_field(
+                    name="Reason",
+                    value=f"{reason}\n`[p]antispam signatures` for details.",
+                    inline=False
+                )
                 embed.add_field(name="Punishment", value=punishment)
                 embed.add_field(name="Channel", value=message.channel.mention)
                 if evidence:
-                    # Truncate evidence if too long for Discord
                     if len(evidence) > 1000:
                         evidence = evidence[:1000] + "\n...(truncated)"
                     embed.add_field(name="Evidence", value=evidence, inline=False)
                 await log_channel.send(embed=embed)
             except Exception as e:
-                # For debugging, you may want to log this somewhere else
                 pass
 
     @antispam.command()
@@ -572,7 +544,6 @@ class AntiSpam(commands.Cog):
         except Exception:
             await ctx.send("Failed to fetch AntiSpam settings.")
             return
-        # Fix: Use bot.get_channel if get_channel is not available on guild
         log_channel = None
         if log_channel_id:
             log_channel = ctx.guild.get_channel(log_channel_id)
