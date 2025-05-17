@@ -190,14 +190,13 @@ class Logging(EventMixin, commands.Cog):
         await ctx.maybe_send_embed(msg)
 
     @checks.admin_or_permissions(manage_channels=True)
-    @commands.group(name="logging", aliases=["modlogtoggle", "modlogs"])
+    @commands.group(name="logging")
     @commands.guild_only()
     async def _logging(self, ctx: commands.Context) -> None:
         """
-        Toggle various extended modlog notifications
+        Configure server event logging preferences and destinations.
 
-        Requires the channel to be setup with `[p]logging modlog #channel`
-        Or can be sent to separate channels with `[p]modlog channel #channel event_name`
+        [Review the documentation to learn more](<https://sentri.beehive.systems/features/comprehensive-logging>)
         """
         pass
 
@@ -209,7 +208,7 @@ class Logging(EventMixin, commands.Cog):
     @_logging.command(name="settings")
     async def _show_logging_settings(self, ctx: commands.Context):
         """
-        Show the servers current ExtendedModlog settings
+        Show the servers current logging settings
         """
         if ctx.guild.id not in self.settings:
             self.settings[ctx.guild.id] = await self.config.guild(ctx.guild).all()
