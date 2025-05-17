@@ -764,7 +764,9 @@ class AutoMod(commands.Cog):
     @commands.group()
     async def automod(self, ctx):
         """
-        [Automated AI moderation for chats, images, and emotes powered by the latest frontier moderation models.](<https://sentri.beehive.systems/features/agentic-moderator>)
+        Automated AI moderation for chats, images, and emotes powered by the latest frontier moderation models.
+        
+        [Check the documentation to learn more](<https://sentri.beehive.systems/features/agentic-moderator>)
         """
         pass
 
