@@ -187,7 +187,7 @@ class EventMixin:
             channel = guild.get_channel(settings["channel"])
         if channel is None:
             try:
-                channel = await modlog.get_modlog_channel(guild)
+                channel = await modlog.get_logging_channel(guild)
             except RuntimeError:
                 raise RuntimeError("No Modlog set")
         if not channel.permissions_for(guild.me).send_messages:

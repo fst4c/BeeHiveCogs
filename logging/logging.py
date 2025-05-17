@@ -122,8 +122,8 @@ class Logging(EventMixin, commands.Cog):
     async def modlog_settings(self, ctx: commands.Context) -> None:
         guild = ctx.message.guild
         try:
-            _modlog_channel = await modlog.get_modlog_channel(guild)
-            modlog_channel = _modlog_channel.mention
+            _logging_channel = await modlog.get_logging_channel(guild)
+            modlog_channel = _logging_channel.mention
         except Exception:
             modlog_channel = _("Not Set")
         cur_settings = {
@@ -190,9 +190,9 @@ class Logging(EventMixin, commands.Cog):
         await ctx.maybe_send_embed(msg)
 
     @checks.admin_or_permissions(manage_channels=True)
-    @commands.group(name="modlog", aliases=["modlogtoggle", "modlogs"])
+    @commands.group(name="logging", aliases=["modlogtoggle", "modlogs"])
     @commands.guild_only()
-    async def _modlog(self, ctx: commands.Context) -> None:
+    async def _logging(self, ctx: commands.Context) -> None:
         """
         Toggle various extended modlog notifications
 
@@ -206,8 +206,8 @@ class Logging(EventMixin, commands.Cog):
             for key, value in self.settings[guild.id].items():
                 all_settings[key] = value
 
-    @_modlog.command(name="settings")
-    async def _show_modlog_settings(self, ctx: commands.Context):
+    @_logging.command(name="settings")
+    async def _show_logging_settings(self, ctx: commands.Context):
         """
         Show the servers current ExtendedModlog settings
         """
@@ -215,7 +215,7 @@ class Logging(EventMixin, commands.Cog):
             self.settings[ctx.guild.id] = await self.config.guild(ctx.guild).all()
         await self.modlog_settings(ctx)
 
-    @_modlog.command(name="colour", aliases=["color"])
+    @_logging.command(name="colour", aliases=["color"])
     @wrapped_additional_help()
     async def _set_event_colours(
         self, ctx: commands.Context, colour: discord.Colour, *events: EventChooser
@@ -240,7 +240,7 @@ class Logging(EventMixin, commands.Cog):
             )
         )
 
-    @_modlog.command(name="embeds", aliases=["embed"])
+    @_logging.command(name="embeds", aliases=["embed"])
     @wrapped_additional_help()
     async def _set_embds(
         self, ctx: commands.Context, true_or_false: bool, *events: EventChooser
@@ -264,7 +264,7 @@ class Logging(EventMixin, commands.Cog):
             )
         )
 
-    @_modlog.command(name="emojiset", send_help=True)
+    @_logging.command(name="emojiset", send_help=True)
     @commands.bot_has_permissions(add_reactions=True)
     @wrapped_additional_help()
     async def _set_event_emoji(
@@ -298,7 +298,7 @@ class Logging(EventMixin, commands.Cog):
             )
         )
 
-    @_modlog.command(name="toggle")
+    @_logging.command(name="toggle")
     @wrapped_additional_help()
     async def _set_event_on_or_off(
         self,
@@ -325,7 +325,7 @@ class Logging(EventMixin, commands.Cog):
             )
         )
 
-    @_modlog.command(name="channel")
+    @_logging.command(name="channel")
     @wrapped_additional_help()
     async def _set_event_channel(
         self,
@@ -352,7 +352,7 @@ class Logging(EventMixin, commands.Cog):
             )
         )
 
-    @_modlog.command(name="resetchannel")
+    @_logging.command(name="resetchannel")
     @wrapped_additional_help()
     async def _reset_event_channel(
         self,
@@ -373,7 +373,7 @@ class Logging(EventMixin, commands.Cog):
             _("{event} logs channel have been reset.").format(event=humanize_list(events))
         )
 
-    @_modlog.command(name="all", aliases=["all_settings", "toggle_all"])
+    @_logging.command(name="all", aliases=["all_settings", "toggle_all"])
     async def _toggle_all_logs(self, ctx: commands.Context, true_or_false: bool) -> None:
         """
         Turn all logging options on or off.
@@ -388,7 +388,7 @@ class Logging(EventMixin, commands.Cog):
         await self.save(ctx.guild)
         await self.modlog_settings(ctx)
 
-    @_modlog.group(name="delete")
+    @_logging.group(name="delete")
     async def _delete(self, ctx: commands.Context) -> None:
         """
         Delete logging settings.
@@ -470,7 +470,7 @@ class Logging(EventMixin, commands.Cog):
         await self.save(ctx.guild)
         await ctx.send(msg.format(enabled_or_disabled=verb))
 
-    @_modlog.group(name="member", aliases=["members", "memberchanges"])
+    @_logging.group(name="member", aliases=["members", "memberchanges"])
     async def _members(self, ctx: commands.Context) -> None:
         """
         Toggle individual member update settings.
@@ -625,7 +625,7 @@ class Logging(EventMixin, commands.Cog):
         await self.save(ctx.guild)
         await self._members_settings(ctx)
 
-    @_modlog.command(name="commandlevel", aliases=["commandslevel"])
+    @_logging.command(name="commandlevel", aliases=["commandslevel"])
     async def _command_level(self, ctx: commands.Context, *level: CommandPrivs) -> None:
         """
         Set the level of commands to be logged.
@@ -650,7 +650,7 @@ class Logging(EventMixin, commands.Cog):
         await self.save(ctx.guild)
         await ctx.send(msg + humanize_list(level))
 
-    @_modlog.command()
+    @_logging.command()
     async def ignore(
         self,
         ctx: commands.Context,
@@ -682,7 +682,7 @@ class Logging(EventMixin, commands.Cog):
                 _("{channel} is already being ignored.").format(channel=channel.mention)
             )
 
-    @_modlog.command()
+    @_logging.command()
     async def unignore(
         self,
         ctx: commands.Context,
@@ -712,11 +712,11 @@ class Logging(EventMixin, commands.Cog):
         else:
             await ctx.send(_("{channel} is not being ignored.").format(channel=channel.mention))
 
-    @_modlog.group(name="bot", aliases=["bots"])
-    async def _modlog_bot(self, ctx: commands.Context) -> None:
+    @_logging.group(name="bot", aliases=["bots"])
+    async def _logging_bot(self, ctx: commands.Context) -> None:
         """Bot filter settings."""
 
-    @_modlog_bot.command(name="edits", aliases=["edit"])
+    @_logging_bot.command(name="edits", aliases=["edit"])
     async def _edit_toggle_bots(self, ctx: commands.Context) -> None:
         """
         Toggle message edit notifications for bot users.
@@ -734,7 +734,7 @@ class Logging(EventMixin, commands.Cog):
         await self.save(ctx.guild)
         await ctx.send(msg.format(enabled_or_disabled=verb))
 
-    @_modlog_bot.command(name="deletes", aliases=["delete"])
+    @_logging_bot.command(name="deletes", aliases=["delete"])
     async def _delete_bots(self, ctx: commands.Context) -> None:
         """
         Toggle message delete notifications for bot users.
@@ -754,7 +754,7 @@ class Logging(EventMixin, commands.Cog):
         await self.save(ctx.guild)
         await ctx.send(msg.format(enabled_or_disabled=verb))
 
-    @_modlog_bot.command(name="change")
+    @_logging_bot.command(name="change")
     async def _user_bot_logging(self, ctx: commands.Context) -> None:
         """
         Toggle bots from being logged in user updates.
@@ -771,7 +771,7 @@ class Logging(EventMixin, commands.Cog):
         else:
             await ctx.send(_("Bots will be tracked in member change logs."))
 
-    @_modlog_bot.command(name="voice")
+    @_logging_bot.command(name="voice")
     async def _user_bot_voice_logging(self, ctx: commands.Context) -> None:
         """
         Toggle bots from being logged in voice state updates.
