@@ -16,6 +16,12 @@ def loop(*, seconds=0, minutes=0, hours=0):
         return func
     return decorator
 
+def plural(n, singular, plural=None):
+    """Return singular/plural form based on n."""
+    if n == 1:
+        return singular
+    return plural if plural is not None else singular + "s"
+
 class DynamicSlowmode(commands.Cog):
     """
     Dynamically adjust channel slowmode in 1-second increments based on activity to keep chat readable and moderatable.
@@ -79,7 +85,7 @@ class DynamicSlowmode(commands.Cog):
         await self.config.guild(ctx.guild).min_slowmode.set(seconds)
         embed = discord.Embed(
             title="Dynamic slowmode",
-            description=f"Minimum slowmode set to {seconds} seconds.",
+            description=f"Minimum slowmode set to {seconds} {plural(seconds, 'second')}.",
             color=discord.Color.blue()
         )
         await ctx.send(embed=embed)
@@ -90,7 +96,7 @@ class DynamicSlowmode(commands.Cog):
         await self.config.guild(ctx.guild).max_slowmode.set(seconds)
         embed = discord.Embed(
             title="Dynamic slowmode",
-            description=f"Maximum slowmode set to {seconds} seconds.",
+            description=f"Maximum slowmode set to {seconds} {plural(seconds, 'second')}.",
             color=discord.Color.blue()
         )
         await ctx.send(embed=embed)
@@ -101,7 +107,7 @@ class DynamicSlowmode(commands.Cog):
         await self.config.guild(ctx.guild).target_msgs_per_min.set(msgs_per_min)
         embed = discord.Embed(
             title="Dynamic slowmode",
-            description=f"Target messages per minute set to {msgs_per_min}.",
+            description=f"Target {plural(msgs_per_min, 'message')} per minute set to {msgs_per_min}.",
             color=discord.Color.blue()
         )
         await ctx.send(embed=embed)
@@ -151,8 +157,8 @@ class DynamicSlowmode(commands.Cog):
             color=discord.Color.blue()
         )
         embed.add_field(name="Enabled", value=str(enabled), inline=False)
-        embed.add_field(name="Min slowmode", value=f"{min_slowmode} seconds", inline=True)
-        embed.add_field(name="Max slowmode", value=f"{max_slowmode} seconds", inline=True)
+        embed.add_field(name="Min slowmode", value=f"{min_slowmode} {plural(min_slowmode, 'second')}", inline=True)
+        embed.add_field(name="Max slowmode", value=f"{max_slowmode} {plural(max_slowmode, 'second')}", inline=True)
         embed.add_field(name="Target Messages/Minute", value=str(target_mpm), inline=True)
         embed.add_field(name="Log channel", value=log_channel.mention if log_channel else "None", inline=False)
         embed.add_field(name="Channels", value="\n".join(channels) if channels else "No channels set", inline=False)
@@ -249,10 +255,11 @@ class DynamicSlowmode(commands.Cog):
 
         survey_result = (
             f"Survey complete for {channel.mention}!\n"
-            f"Messages in last 5 minutes: **{msg_count_5min}**\n"
-            f"Average messages/minute: **{msgs_per_min:.2f}**\n"
-            f"Set target messages/minute to **{int(msgs_per_min)}**\n"
-            f"Set min slowmode to **{min_slow}**s, max slowmode to **{max_slow}**s.\n"
+            f"{plural(msg_count_5min, 'Message')} in last 5 minutes: **{msg_count_5min}**\n"
+            f"Average {plural(msgs_per_min, 'message')}/minute: **{msgs_per_min:.2f}**\n"
+            f"Set target {plural(int(msgs_per_min), 'message')}/minute to **{int(msgs_per_min)}**\n"
+            f"Set min slowmode to **{min_slow}**{plural(min_slow, 's', 's')},"  # always plural 's' for seconds
+            f" max slowmode to **{max_slow}**{plural(max_slow, 's', 's')}.\n"
             f"{channel.mention} is now enabled for dynamic slowmode."
         )
 
@@ -320,7 +327,7 @@ class DynamicSlowmode(commands.Cog):
             try:
                 await self.channel.edit(slowmode_delay=new_slowmode, reason="Manual increase via log button")
                 await interaction.response.send_message(
-                    f"Slowmode for {self.channel.mention} increased to {new_slowmode}s.", ephemeral=True
+                    f"Slowmode for {self.channel.mention} increased to {new_slowmode} {plural(new_slowmode, 'second')}.", ephemeral=True
                 )
             except discord.Forbidden:
                 await interaction.response.send_message("I don't have permission to edit this channel.", ephemeral=True)
@@ -350,7 +357,7 @@ class DynamicSlowmode(commands.Cog):
             try:
                 await self.channel.edit(slowmode_delay=new_slowmode, reason="Manual decrease via log button")
                 await interaction.response.send_message(
-                    f"Slowmode for {self.channel.mention} decreased to {new_slowmode}s.", ephemeral=True
+                    f"Slowmode for {self.channel.mention} decreased to {new_slowmode} {plural(new_slowmode, 'second')}.", ephemeral=True
                 )
             except discord.Forbidden:
                 await interaction.response.send_message("I don't have permission to edit this channel.", ephemeral=True)
@@ -437,12 +444,12 @@ class DynamicSlowmode(commands.Cog):
                     )
                     embed.add_field(
                         name="Current slowmode",
-                        value=f"{current}s",
+                        value=f"{current} {plural(current, 'second')}",
                         inline=True
                     )
                     embed.add_field(
                         name="Target per minute",
-                        value=f"{target_mpm} messages/min",
+                        value=f"{target_mpm} {plural(target_mpm, 'message')}/min",
                         inline=True
                     )
                     # Use dynamic Discord timestamps for each minute
@@ -452,7 +459,7 @@ class DynamicSlowmode(commands.Cog):
                         # Each i is 4,3,2,1,0 (oldest to newest)
                         minute_ago_ts = now_ts - (i * 60)
                         # <t:TIMESTAMP:R> gives "x minutes ago"
-                        minute_lines.append(f"<t:{minute_ago_ts}:R>: {n} msg(s)")
+                        minute_lines.append(f"<t:{minute_ago_ts}:R>: {n} {plural(n, 'msg', 'msgs')}")
                     embed.add_field(
                         name="Last 5 minutes",
                         value="\n".join(minute_lines),
