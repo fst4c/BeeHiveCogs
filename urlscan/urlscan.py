@@ -16,7 +16,9 @@ class URLScan(commands.Cog):
         self.config = Config.get_conf(self, identifier=1234567890)
         default_guild = {
             "autoscan_enabled": False,
-            "log_channel": None
+            "log_channel": None,
+            "punishment": "delete",  # default punishment
+            "punishment_duration": 60,  # seconds for timeout
         }
         self.config.register_guild(**default_guild)
 
@@ -59,6 +61,30 @@ class URLScan(commands.Cog):
         """Set the logging channel for URL scan results and autoscan detections"""
         await self.config.guild(ctx.guild).log_channel.set(channel.id)
         await ctx.send(f"Log channel set to {channel.mention}")
+
+    @commands.guild_only()
+    @commands.has_permissions(manage_guild=True)
+    @urlscan.command(name="action", description="Set the punishment for users who send suspicious links")
+    async def set_punishment(self, ctx, punishment: str, duration: int = None):
+        """
+        Set the punishment for users who send suspicious links.
+        Punishment can be: delete, timeout, kick, ban
+        If timeout, you can specify duration in seconds (default 60).
+        """
+        punishment = punishment.lower()
+        valid = ["delete", "timeout", "kick", "ban"]
+        if punishment not in valid:
+            await ctx.send(f"Invalid punishment. Choose one of: {', '.join(valid)}")
+            return
+        await self.config.guild(ctx.guild).punishment.set(punishment)
+        if punishment == "timeout":
+            if duration is not None and duration > 0:
+                await self.config.guild(ctx.guild).punishment_duration.set(duration)
+                await ctx.send(f"Punishment set to timeout for {duration} seconds.")
+            else:
+                await ctx.send("Punishment set to timeout. Use `[p]urlscan punishment timeout <seconds>` to set duration.")
+        else:
+            await ctx.send(f"Punishment set to {punishment}.")
 
     async def scan_urls(self, ctx, urls: str = None):
         urlscan_key = await self.bot.get_shared_api_tokens("urlscan")
@@ -160,6 +186,9 @@ class URLScan(commands.Cog):
             except Exception:
                 log_channel = None
 
+        punishment = await self.config.guild(message.guild).punishment()
+        punishment_duration = await self.config.guild(message.guild).punishment_duration()
+
         for url in urls_to_scan:
             urlscan_key = await self.bot.get_shared_api_tokens("urlscan")
             api_key = urlscan_key.get("api_key")
@@ -185,48 +214,11 @@ class URLScan(commands.Cog):
                             threat_level = res2['verdicts']['overall']['score']
                             if threat_level != 0:
                                 try:
+                                    # Always try to delete the message first
                                     await message.delete()
-                                    embed = discord.Embed(
-                                        title="URLScan detected a threat",
-                                        description=f"Deleted a suspicious URL posted by {message.author.mention}.",
-                                        color=0xe25946
-                                    )
-                                    await message.channel.send(embed=embed)
-                                    # Send alert to log channel if set and different from the message channel
-                                    if log_channel and log_channel.id != message.channel.id:
-                                        try:
-                                            log_embed = discord.Embed(
-                                                title="URLScan detected a threat",
-                                                description=f"A message containing a suspicious URL was detected and deleted in {message.channel.mention}.",
-                                                color=0xe25946
-                                            )
-                                            log_embed.add_field(
-                                                name="User",
-                                                value=f"{message.author.mention} (`{message.author.id}`)",
-                                                inline=False
-                                            )
-                                            log_embed.add_field(
-                                                name="URL",
-                                                value=url,
-                                                inline=False
-                                            )
-                                            log_embed.add_field(
-                                                name="Content",
-                                                value=message.content[:1024],
-                                                inline=False
-                                            )
-                                            log_embed.set_footer(text=f"User ID: {message.author.id}")
-                                            await log_channel.send(embed=log_embed)
-                                        except Exception:
-                                            pass
-                                    elif log_channel:
-                                        # If log channel is same as message channel, just send the embed
-                                        await log_channel.send(embed=embed)
                                 except discord.NotFound:
-                                    # Message was already deleted, possibly by another link filtering module
                                     pass
                                 except discord.Forbidden:
-                                    # Bot does not have permission to delete the message
                                     embed = discord.Embed(
                                         title="URLScan detected a threat",
                                         description=f"Detected a suspicious URL posted by {message.author.mention}, but I don't have permission to delete it.",
@@ -235,5 +227,81 @@ class URLScan(commands.Cog):
                                     await message.channel.send(embed=embed)
                                     if log_channel:
                                         await log_channel.send(embed=embed)
+                                    break
+
+                                # Now apply the configured punishment
+                                punishment_applied = False
+                                reason = "URLScan: Suspicious link detected"
+                                if punishment == "timeout":
+                                    # Discord timeouts require discord.py 2.0+ and permissions
+                                    try:
+                                        if hasattr(message.author, "timed_out_until"):
+                                            # Already timed out? (discord.py 2.0+)
+                                            await message.author.edit(timeout=discord.utils.utcnow() + discord.timedelta(seconds=punishment_duration), reason=reason)
+                                            punishment_applied = True
+                                        else:
+                                            # Try anyway (for compatibility)
+                                            await message.author.timeout(duration=punishment_duration, reason=reason)
+                                            punishment_applied = True
+                                    except Exception:
+                                        pass
+                                elif punishment == "kick":
+                                    try:
+                                        await message.author.kick(reason=reason)
+                                        punishment_applied = True
+                                    except Exception:
+                                        pass
+                                elif punishment == "ban":
+                                    try:
+                                        await message.author.ban(reason=reason, delete_message_days=0)
+                                        punishment_applied = True
+                                    except Exception:
+                                        pass
+                                # If punishment is delete or fallback, just deletion is enough
+
+                                embed = discord.Embed(
+                                    title="URLScan detected a threat",
+                                    description=f"Deleted a suspicious URL posted by {message.author.mention}."
+                                                + (f"\n\nPunishment applied: **{punishment}**"
+                                                   + (f" ({punishment_duration}s)" if punishment == "timeout" else "")
+                                                   if punishment != "delete" else ""),
+                                    color=0xe25946
+                                )
+                                await message.channel.send(embed=embed)
+                                # Send alert to log channel if set and different from the message channel
+                                if log_channel and log_channel.id != message.channel.id:
+                                    try:
+                                        log_embed = discord.Embed(
+                                            title="URLScan detected a threat",
+                                            description=f"A message containing a suspicious URL was detected and deleted in {message.channel.mention}.",
+                                            color=0xe25946
+                                        )
+                                        log_embed.add_field(
+                                            name="User",
+                                            value=f"{message.author.mention} (`{message.author.id}`)",
+                                            inline=False
+                                        )
+                                        log_embed.add_field(
+                                            name="URL",
+                                            value=url,
+                                            inline=False
+                                        )
+                                        log_embed.add_field(
+                                            name="Content",
+                                            value=message.content[:1024],
+                                            inline=False
+                                        )
+                                        log_embed.add_field(
+                                            name="Punishment",
+                                            value=f"{punishment}" + (f" ({punishment_duration}s)" if punishment == "timeout" else ""),
+                                            inline=False
+                                        )
+                                        log_embed.set_footer(text=f"User ID: {message.author.id}")
+                                        await log_channel.send(embed=log_embed)
+                                    except Exception:
+                                        pass
+                                elif log_channel:
+                                    # If log channel is same as message channel, just send the embed
+                                    await log_channel.send(embed=embed)
                                 break
             
