@@ -45,6 +45,7 @@ class DynamicSlowmode(commands.Cog):
         self._slowmode_task = self.bot.loop.create_task(self._run_slowmode_task())
         self._minute_stats = defaultdict(lambda: deque(maxlen=5))  # channel_id: deque of last 5 minute counts
         self._minute_tick = 0  # Used to track when to send the 5-min report
+        self._last_log_message = {}  # channel_id: discord.Message
 
     def cog_unload(self):
         if hasattr(self, "_slowmode_task"):
@@ -194,7 +195,50 @@ class DynamicSlowmode(commands.Cog):
             log_channel = guild.get_channel(log_channel_id)
             if log_channel and log_channel.permissions_for(guild.me).send_messages:
                 try:
-                    await log_channel.send(embed=embed, view=view)
+                    # If this is a 5-min log (view is SlowmodeLogView), disable the previous one for this channel
+                    channel_id = None
+                    if view and hasattr(view, "channel"):
+                        channel_id = getattr(view, "channel", None)
+                        if channel_id is not None:
+                            channel_id = view.channel.id
+                    if channel_id is not None and hasattr(self, "_last_log_message"):
+                        last_msg = self._last_log_message.get(channel_id)
+                        if last_msg:
+                            try:
+                                # Disable all buttons in the previous view
+                                if last_msg.components:
+                                    # Discord.py 2.x: edit with disabled view
+                                    # Rebuild the view with all items disabled
+                                    old_view = None
+                                    try:
+                                        # Try to reconstruct the view from the message
+                                        # This is a best effort, as discord.py does not provide a direct way
+                                        # We'll just disable all items in the old view if possible
+                                        # But since we have the view object, we can just disable it
+                                        # (if we kept the view object, but we don't, so we reconstruct)
+                                        pass
+                                    except Exception:
+                                        pass
+                                    # Instead, just try to edit with a disabled view
+                                    # We'll create a new view with all items disabled
+                                    if isinstance(view, discord.ui.View):
+                                        disabled_view = type(view)(
+                                            view.cog, view.channel, view.current, view.min_slow, view.max_slow
+                                        )
+                                        for item in disabled_view.children:
+                                            item.disabled = True
+                                        await last_msg.edit(view=disabled_view)
+                                    else:
+                                        # fallback: try to remove the view
+                                        await last_msg.edit(view=None)
+                                else:
+                                    await last_msg.edit(view=None)
+                            except Exception:
+                                pass
+                    # Send the new log message and store it if it's a 5-min log
+                    sent_msg = await log_channel.send(embed=embed, view=view)
+                    if channel_id is not None:
+                        self._last_log_message[channel_id] = sent_msg
                 except discord.Forbidden:
                     print(f"Permission error: Cannot send log message to {log_channel.mention}.")
                 except discord.HTTPException as e:
