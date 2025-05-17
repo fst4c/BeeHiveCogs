@@ -22,7 +22,7 @@ def plural(n, singular, plural=None):
         return singular
     return plural if plural is not None else singular + "s"
 
-class DynamicSlowmode(commands.Cog):
+class AdaptiveSlowmode(commands.Cog):
     """
     Dynamically adjust channel slowmode in 1-second increments based on activity to keep chat readable and moderatable.
     """
