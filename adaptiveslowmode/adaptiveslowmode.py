@@ -84,7 +84,7 @@ class AdaptiveSlowmode(commands.Cog):
 
     @checks.admin_or_permissions(manage_guild=True)
     @adaptiveslowmode.command()
-    async def setmin(self, ctx, seconds: int):
+    async def min(self, ctx, seconds: int):
         """Set minimum slowmode (in seconds)."""
         await self.config.guild(ctx.guild).min_slowmode.set(seconds)
         embed = discord.Embed(
@@ -96,7 +96,7 @@ class AdaptiveSlowmode(commands.Cog):
 
     @checks.admin_or_permissions(manage_guild=True)
     @adaptiveslowmode.command()
-    async def setmax(self, ctx, seconds: int):
+    async def max(self, ctx, seconds: int):
         """Set maximum slowmode (in seconds)."""
         await self.config.guild(ctx.guild).max_slowmode.set(seconds)
         embed = discord.Embed(
@@ -108,7 +108,7 @@ class AdaptiveSlowmode(commands.Cog):
 
     @checks.admin_or_permissions(manage_guild=True)
     @adaptiveslowmode.command()
-    async def settarget(self, ctx, msgs_per_min: int):
+    async def target(self, ctx, msgs_per_min: int):
         """Set target messages per minute for a channel."""
         await self.config.guild(ctx.guild).target_msgs_per_min.set(msgs_per_min)
         embed = discord.Embed(
@@ -120,7 +120,7 @@ class AdaptiveSlowmode(commands.Cog):
 
     @checks.admin_or_permissions(manage_guild=True)
     @adaptiveslowmode.command()
-    async def addchannel(self, ctx, channel: discord.TextChannel):
+    async def add(self, ctx, channel: discord.TextChannel):
         """Add a channel to dynamic slowmode."""
         async with self.config.guild(ctx.guild).channels() as chans:
             if channel.id not in chans:
@@ -134,7 +134,7 @@ class AdaptiveSlowmode(commands.Cog):
 
     @checks.admin_or_permissions(manage_guild=True)
     @adaptiveslowmode.command()
-    async def removechannel(self, ctx, channel: discord.TextChannel):
+    async def remove(self, ctx, channel: discord.TextChannel):
         """Remove a channel from dynamic slowmode."""
         async with self.config.guild(ctx.guild).channels() as chans:
             if channel.id in chans:
