@@ -55,7 +55,7 @@ class AdaptiveSlowmode(commands.Cog):
     @commands.guild_only()
     @checks.admin_or_permissions(manage_guild=True)
     async def adaptiveslowmode(self, ctx):
-        """Dynamic slowmode configuration."""
+        """Adaptive slowmode configuration."""
         pass
 
     @adaptiveslowmode.command()
@@ -63,8 +63,8 @@ class AdaptiveSlowmode(commands.Cog):
         """Enable dynamic slowmode for this server."""
         await self.config.guild(ctx.guild).enabled.set(True)
         embed = discord.Embed(
-            title="Dynamic slowmode",
-            description="Dynamic slowmode enabled.",
+            title="Adaptive slowmode",
+            description="Adaptive slowmode enabled.",
             color=discord.Color.green()
         )
         await ctx.send(embed=embed)
@@ -74,8 +74,8 @@ class AdaptiveSlowmode(commands.Cog):
         """Disable dynamic slowmode for this server."""
         await self.config.guild(ctx.guild).enabled.set(False)
         embed = discord.Embed(
-            title="Dynamic slowmode",
-            description="Dynamic slowmode disabled.",
+            title="Adaptive slowmode",
+            description="Adaptive slowmode disabled.",
             color=discord.Color.red()
         )
         await ctx.send(embed=embed)
@@ -85,7 +85,7 @@ class AdaptiveSlowmode(commands.Cog):
         """Set minimum slowmode (in seconds)."""
         await self.config.guild(ctx.guild).min_slowmode.set(seconds)
         embed = discord.Embed(
-            title="Dynamic slowmode",
+            title="Adaptive slowmode",
             description=f"Minimum slowmode set to {seconds} {plural(seconds, 'second')}.",
             color=discord.Color.blue()
         )
@@ -96,7 +96,7 @@ class AdaptiveSlowmode(commands.Cog):
         """Set maximum slowmode (in seconds)."""
         await self.config.guild(ctx.guild).max_slowmode.set(seconds)
         embed = discord.Embed(
-            title="Dynamic slowmode",
+            title="Adaptive slowmode",
             description=f"Maximum slowmode set to {seconds} {plural(seconds, 'second')}.",
             color=discord.Color.blue()
         )
@@ -107,7 +107,7 @@ class AdaptiveSlowmode(commands.Cog):
         """Set target messages per minute for a channel."""
         await self.config.guild(ctx.guild).target_msgs_per_min.set(msgs_per_min)
         embed = discord.Embed(
-            title="Dynamic slowmode",
+            title="Adaptive slowmode",
             description=f"Target {plural(msgs_per_min, 'message')} per minute set to {msgs_per_min}.",
             color=discord.Color.blue()
         )
@@ -120,7 +120,7 @@ class AdaptiveSlowmode(commands.Cog):
             if channel.id not in chans:
                 chans.append(channel.id)
         embed = discord.Embed(
-            title="Dynamic slowmode",
+            title="Adaptive slowmode",
             description=f"{channel.mention} added to dynamic slowmode.",
             color=discord.Color.green()
         )
@@ -133,7 +133,7 @@ class AdaptiveSlowmode(commands.Cog):
             if channel.id in chans:
                 chans.remove(channel.id)
         embed = discord.Embed(
-            title="Dynamic slowmode",
+            title="Adaptive slowmode",
             description=f"{channel.mention} removed from dynamic slowmode.",
             color=discord.Color.red()
         )
@@ -154,7 +154,7 @@ class AdaptiveSlowmode(commands.Cog):
         channels = [c.mention for c in channels if c]
 
         embed = discord.Embed(
-            title="Dynamic slowmode settings",
+            title="Adaptive slowmode settings",
             color=discord.Color.blue()
         )
         embed.add_field(name="Enabled", value=str(enabled), inline=False)
@@ -175,16 +175,16 @@ class AdaptiveSlowmode(commands.Cog):
         if channel is None:
             await self.config.guild(ctx.guild).log_channel.set(None)
             embed = discord.Embed(
-                title="Dynamic slowmode",
-                description="Dynamic slowmode log channel cleared.",
+                title="Adaptive slowmode",
+                description="Adaptive slowmode log channel cleared.",
                 color=discord.Color.orange()
             )
             await ctx.send(embed=embed)
         else:
             await self.config.guild(ctx.guild).log_channel.set(channel.id)
             embed = discord.Embed(
-                title="Dynamic slowmode",
-                description=f"Dynamic slowmode log channel set to {channel.mention}.",
+                title="Adaptive slowmode",
+                description=f"Adaptive slowmode log channel set to {channel.mention}.",
                 color=discord.Color.green()
             )
             await ctx.send(embed=embed)
@@ -498,7 +498,7 @@ class AdaptiveSlowmode(commands.Cog):
                     users_field_value = ", ".join(user_mentions) if user_mentions else "No users seen"
 
                     embed = discord.Embed(
-                        title="Dynamic slowmode (5-minute report)",
+                        title="Adaptive slowmode (5-minute report)",
                         color=0xfffffe
                     )
                     embed.add_field(
