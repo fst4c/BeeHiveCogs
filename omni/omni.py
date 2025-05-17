@@ -975,8 +975,9 @@ class Omni(commands.Cog):
         Shows 9 violations per page, with emoji reactions to scroll if there are more.
         Also includes a graph of abuse trends over time.
         """
+        temp_file = None
+        file = None
         try:
-
             guild = ctx.guild
             if user is None:
                 user = ctx.author
@@ -1009,9 +1010,7 @@ class Omni(commands.Cog):
             # --- Generate abuse trend graph ---
             # We'll plot the number of violations per week (or per day if < 21 days)
             timestamps = [v.get("timestamp") for v in violations if v.get("timestamp")]
-            file = None
             image_url = None
-            temp_file = None
             if timestamps:
                 # Convert to datetime objects
                 datetimes = [datetime.fromtimestamp(ts, tz=timezone.utc) for ts in timestamps]
@@ -1063,13 +1062,13 @@ class Omni(commands.Cog):
                         plt.savefig(tmp, format="png", bbox_inches="tight", dpi=120)
                         temp_file = tmp.name
                     plt.close(fig)
-                    file = discord.File(temp_file, filename="abuse_trend.png")
+                    # Instead of passing an open file, open it fresh for each send/edit
                     image_url = "attachment://abuse_trend.png"
                 else:
-                    file = None
+                    temp_file = None
                     image_url = None
             else:
-                file = None
+                temp_file = None
                 image_url = None
 
             # Pagination setup
@@ -1112,8 +1111,10 @@ class Omni(commands.Cog):
             # If only one page, just send the embed
             if total_pages == 1:
                 embed = make_embed(0)
-                if file:
-                    await ctx.send(embed=embed, file=file)
+                if temp_file:
+                    with open(temp_file, "rb") as f:
+                        file = discord.File(f, filename="abuse_trend.png")
+                        await ctx.send(embed=embed, file=file)
                 else:
                     await ctx.send(embed=embed)
                 if temp_file:
@@ -1134,8 +1135,10 @@ class Omni(commands.Cog):
 
             page = 0
             embed = make_embed(page)
-            if file:
-                message = await ctx.send(embed=embed, file=file)
+            if temp_file:
+                with open(temp_file, "rb") as f:
+                    file = discord.File(f, filename="abuse_trend.png")
+                    message = await ctx.send(embed=embed, file=file)
             else:
                 message = await ctx.send(embed=embed)
 
@@ -1182,8 +1185,10 @@ class Omni(commands.Cog):
 
                     if page != old_page or emoji == STOP_EMOJI:
                         embed = make_embed(page)
-                        if file:
-                            await message.edit(embed=embed, attachments=[file])
+                        if temp_file:
+                            with open(temp_file, "rb") as f:
+                                file = discord.File(f, filename="abuse_trend.png")
+                                await message.edit(embed=embed, attachments=[file])
                         else:
                             await message.edit(embed=embed)
                     if emoji == STOP_EMOJI:
