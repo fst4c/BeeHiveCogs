@@ -1,8 +1,8 @@
-import aiohttp
+import aiohttp # type: ignore
 import asyncio
-import discord
+import discord # type: ignore
 import re
-from redbot.core import commands, Config, checks
+from redbot.core import commands, Config, checks # type: ignore
 
 class VirusTotal(commands.Cog):
     """VirusTotal file upload and analysis via Discord"""

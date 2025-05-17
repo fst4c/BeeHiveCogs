@@ -1,11 +1,11 @@
 from collections import deque
 from typing import Deque, Dict, Union
 
-import discord
-from red_commons.logging import getLogger
-from redbot.core import Config, checks, commands, modlog
-from redbot.core.i18n import Translator, cog_i18n
-from redbot.core.utils.chat_formatting import humanize_list
+import discord # type: ignore
+from red_commons.logging import getLogger # type: ignore
+from redbot.core import Config, checks, commands, modlog # type: ignore
+from redbot.core.i18n import Translator, cog_i18n # type: ignore
+from redbot.core.utils.chat_formatting import humanize_list # type: ignore
 
 from .eventmixin import CommandPrivs, EventChooser, EventMixin, MemberUpdateEnum
 from .settings import inv_settings

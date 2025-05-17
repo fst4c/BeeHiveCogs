@@ -5,13 +5,13 @@ from enum import Enum
 from typing import Any, Deque, Dict, List, Optional, Sequence, Tuple, Union, cast
 
 import discord # type: ignore
-from discord.ext import tasks
-from discord.ext.commands.converter import Converter
-from discord.ext.commands.errors import BadArgument
-from red_commons.logging import getLogger
-from redbot.core import Config, commands, i18n, modlog
-from redbot.core.bot import Red
-from redbot.core.utils.chat_formatting import (
+from discord.ext import tasks # type: ignore
+from discord.ext.commands.converter import Converter # type: ignore
+from discord.ext.commands.errors import BadArgument # type: ignore
+from red_commons.logging import getLogger # type: ignore
+from redbot.core import Config, commands, i18n, modlog # type: ignore
+from redbot.core.bot import Red # type: ignore
+from redbot.core.utils.chat_formatting import ( # type: ignore
     box,
     format_perms_list,
     humanize_list,
