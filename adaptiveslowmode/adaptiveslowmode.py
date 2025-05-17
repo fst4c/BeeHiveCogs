@@ -54,11 +54,11 @@ class AdaptiveSlowmode(commands.Cog):
     @commands.group(aliases=["dsm"])
     @commands.guild_only()
     @checks.admin_or_permissions(manage_guild=True)
-    async def dynamicslowmode(self, ctx):
+    async def adaptiveslowmode(self, ctx):
         """Dynamic slowmode configuration."""
         pass
 
-    @dynamicslowmode.command()
+    @adaptiveslowmode.command()
     async def enable(self, ctx):
         """Enable dynamic slowmode for this server."""
         await self.config.guild(ctx.guild).enabled.set(True)
@@ -69,7 +69,7 @@ class AdaptiveSlowmode(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @dynamicslowmode.command()
+    @adaptiveslowmode.command()
     async def disable(self, ctx):
         """Disable dynamic slowmode for this server."""
         await self.config.guild(ctx.guild).enabled.set(False)
@@ -80,7 +80,7 @@ class AdaptiveSlowmode(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @dynamicslowmode.command()
+    @adaptiveslowmode.command()
     async def setmin(self, ctx, seconds: int):
         """Set minimum slowmode (in seconds)."""
         await self.config.guild(ctx.guild).min_slowmode.set(seconds)
@@ -91,7 +91,7 @@ class AdaptiveSlowmode(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @dynamicslowmode.command()
+    @adaptiveslowmode.command()
     async def setmax(self, ctx, seconds: int):
         """Set maximum slowmode (in seconds)."""
         await self.config.guild(ctx.guild).max_slowmode.set(seconds)
@@ -102,7 +102,7 @@ class AdaptiveSlowmode(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @dynamicslowmode.command()
+    @adaptiveslowmode.command()
     async def settarget(self, ctx, msgs_per_min: int):
         """Set target messages per minute for a channel."""
         await self.config.guild(ctx.guild).target_msgs_per_min.set(msgs_per_min)
@@ -113,7 +113,7 @@ class AdaptiveSlowmode(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @dynamicslowmode.command()
+    @adaptiveslowmode.command()
     async def addchannel(self, ctx, channel: discord.TextChannel):
         """Add a channel to dynamic slowmode."""
         async with self.config.guild(ctx.guild).channels() as chans:
@@ -126,7 +126,7 @@ class AdaptiveSlowmode(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @dynamicslowmode.command()
+    @adaptiveslowmode.command()
     async def removechannel(self, ctx, channel: discord.TextChannel):
         """Remove a channel from dynamic slowmode."""
         async with self.config.guild(ctx.guild).channels() as chans:
@@ -139,7 +139,7 @@ class AdaptiveSlowmode(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @dynamicslowmode.command(name="settings")
+    @adaptiveslowmode.command(name="settings")
     async def _settings(self, ctx):
         """Show current dynamic slowmode settings and status."""
         conf = await self.config.guild(ctx.guild).all()
@@ -166,7 +166,7 @@ class AdaptiveSlowmode(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @dynamicslowmode.command()
+    @adaptiveslowmode.command()
     async def logs(self, ctx, channel: discord.TextChannel = None):
         """
         Set the logging channel for dynamic slowmode events.
@@ -246,7 +246,7 @@ class AdaptiveSlowmode(commands.Cog):
                 except Exception as e:
                     print(f"Unexpected error: Failed to send log message to {log_channel.mention}: {e}")
 
-    @dynamicslowmode.command()
+    @adaptiveslowmode.command()
     async def survey(self, ctx, channel: discord.TextChannel = None):
         """
         Calibrate dynamic slowmode for a channel by measuring 5 minutes of activity.
