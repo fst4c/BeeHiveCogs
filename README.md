@@ -63,15 +63,15 @@ Help manage unruly, unsightly, and otherwise annoying nicknames/screennames in y
 [p]load names
 ```
 
-### [antiphishing](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/antiphishing)
+### [linksafety](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/linksafety)
 
-Passively detect and remove known malicious websites sent in your server's chats. `[p]antiphishing`.
+Passively detect and remove known malicious websites sent in your server's chats. `[p]linksafety`.
 
 ```
-[p]cog install BeeHiveSafety antiphishing
+[p]cog install BeeHiveSafety linksafety
 ```
 ```
-[p]load antiphishing
+[p]load linksafety
 ```
 
 ### [skysearch](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/skysearch)
@@ -139,7 +139,7 @@ Integrate the AbuseIPDB API with your Red-DiscordBot to check and report IP addr
 
 ### [cloudflare](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/cloudflare)
 
-Utilize a multitude of advanced Cloudflare tools thru Discord, including the Cloudflare URL Scanner. For the bot owner, unlock the ability to interact with multiple Cloudflare products you utilize thru your Red-DiscordBot instance.
+Utilize Cloudflare's URL scanner and Cloudflare Intel via Discord.
 
 ```
 [p]cog install BeeHiveSafety cloudflare
@@ -184,15 +184,15 @@ Integrate the Ransomware.live API with your Red-DiscordBot to monitor and receiv
 [p]load ransomwaredotlive
 ```
 
-### [omni](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/omni)
+### [automod](https://github.com/BeeHiveSafety/BeeHive-Cogs/tree/main/automod)
 
-Utilize OpenAI's frontier moderation models to keep chat clean in your server for free. `[p]omni`
+Utilize OpenAI's frontier moderation models to keep chat clean in your server for free. `[p]automod`
 
 ```
-[p]cog install BeeHiveSafety omni
+[p]cog install BeeHiveSafety automod
 ```
 ```
-[p]load omni
+[p]load automod
 ```
 ```
 [p]set api openai api_key YOURAPIKEYHERE
