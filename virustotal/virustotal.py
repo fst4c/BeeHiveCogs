@@ -10,7 +10,7 @@ class VirusTotal(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=1234567890)
-        self.config.register_guild(auto_scan_enabled=False, submission_history={})
+        self.config.register_guild(auto_scan_enabled=True, submission_history={})
         self.submission_history = {}
 
     async def initialize(self):
