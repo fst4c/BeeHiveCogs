@@ -106,8 +106,8 @@ class VirusTotal(commands.Cog):
         vt_key = await self.bot.get_shared_api_tokens("virustotal")
         api_key_status = ":white_check_mark: Set" if vt_key.get("api_key") else ":x: Missing"
         
-        version = "1.2.2"
-        last_update = "August 29th, 2024"
+        version = "1.3.0"
+        last_update = "May 17th, 2025"
 
         log_channel_id = await self.config.guild(guild).log_channel()
         log_channel_status = f"<#{log_channel_id}>" if log_channel_id else "Not set"
