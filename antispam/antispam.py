@@ -100,6 +100,18 @@ class AntiSpam(commands.Cog):
         await self.config.guild(ctx.guild).emoji_spam_unique_threshold.set(max_unique)
         await ctx.send(f"Emoji spam thresholds set: {max_emojis} total, {max_unique} unique per message.")
 
+    @antispam.command(name="similarity")
+    async def similarity(self, ctx, threshold: float):
+        """
+        Set the similarity threshold for copypasta/repeat detection (0.0 - 1.0).
+        Higher values are stricter (default: 0.85).
+        """
+        if not (0.0 < threshold < 1.0):
+            await ctx.send("Threshold must be between 0.0 and 1.0 (exclusive).")
+            return
+        await self.config.guild(ctx.guild).similarity_threshold.set(threshold)
+        await ctx.send(f"Similarity threshold set to {threshold:.2f}.")
+
     @antispam.command(name="setlogchannel")
     async def logs(self, ctx, channel: discord.TextChannel = None):
         """Set the channel where antispam logs are sent. Use without argument to clear."""
@@ -216,9 +228,9 @@ class AntiSpam(commands.Cog):
                 f"Failed antispam check 1 for message flooding: "
                 f"Sent {len(recent_msgs)} messages in {interval} seconds."
             )
-            # Show each message with its timestamp (formatted), no [1], [2], etc.
+            # Show each message with its timestamp (dynamic Discord timestamp)
             evidence = "\n".join(
-                f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ts))}: {content[:200]}"
+                f"<t:{int(ts)}:f>: {content[:200]}"
                 for ts, content in list(cache)[-len(recent_msgs):]
             )
             await self._punish(message, reason, evidence=evidence)
@@ -244,12 +256,12 @@ class AntiSpam(commands.Cog):
                     f"Failed antispam check 2 for copypasta/repeat: "
                     f"Sent {similar_count+1} highly similar messages."
                 )
-                # Show previous similar messages with their timestamps, not [1], [2], etc.
+                # Show previous similar messages with their timestamps (dynamic Discord timestamp)
                 evidence = (
                     f"Latest message:\n{last[:400]}\n\n"
                     f"Previous similar messages:\n" +
                     "\n".join(
-                        f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ts))}: {msg[:400]}"
+                        f"<t:{int(ts)}:f>: {msg[:400]}"
                         for ts, msg in zip(similar_msgs_timestamps, similar_msgs)
                     )
                 )
@@ -280,7 +292,7 @@ class AntiSpam(commands.Cog):
                     f"Latest message:\n{last_content[:400]}\n\n"
                     f"Previous similar messages in last 5 minutes:\n" +
                     "\n".join(
-                        f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(ts))}: {msg[:400]}"
+                        f"<t:{int(ts)}:f>: {msg[:400]}"
                         for ts, msg in similar_msgs_5min
                     )
                 )
@@ -522,10 +534,11 @@ class AntiSpam(commands.Cog):
                     return
                 embed = discord.Embed(
                     title="Potential spam detected",
-                    description=f"User: {user.mention} (`{user.id}`)\nReason: {reason}",
                     color=0xff4545,
                     timestamp=discord.utils.utcnow(),
                 )
+                embed.add_field(name="User", value=f"{user.mention} (`{user.id}`)", inline=False)
+                embed.add_field(name="Reason", value=reason, inline=False)
                 embed.add_field(name="Punishment", value=punishment)
                 embed.add_field(name="Channel", value=message.channel.mention)
                 if evidence:
@@ -555,6 +568,7 @@ class AntiSpam(commands.Cog):
             log_channel_id = await conf.log_channel()
             emoji_spam_threshold = await conf.emoji_spam_threshold()
             emoji_spam_unique_threshold = await conf.emoji_spam_unique_threshold()
+            similarity_threshold = await conf.similarity_threshold()
         except Exception:
             await ctx.send("Failed to fetch AntiSpam settings.")
             return
@@ -571,6 +585,7 @@ class AntiSpam(commands.Cog):
         if punishment == "timeout":
             embed.add_field(name="Timeout Time", value=f"{timeout_time}s")
         embed.add_field(name="Emoji Spam Threshold", value=f"{emoji_spam_threshold} total, {emoji_spam_unique_threshold} unique", inline=False)
+        embed.add_field(name="Similarity Threshold", value=f"{similarity_threshold:.2f}", inline=False)
         if log_channel:
             embed.add_field(name="Log Channel", value=log_channel.mention, inline=False)
         if ignored_channels:
