@@ -445,11 +445,17 @@ class DynamicSlowmode(commands.Cog):
                         value=f"{target_mpm} messages/min",
                         inline=True
                     )
+                    # Use dynamic Discord timestamps for each minute
+                    now_ts = int(datetime.now(timezone.utc).timestamp())
+                    minute_lines = []
+                    for i, n in zip(range(4, -1, -1), stats):
+                        # Each i is 4,3,2,1,0 (oldest to newest)
+                        minute_ago_ts = now_ts - (i * 60)
+                        # <t:TIMESTAMP:R> gives "x minutes ago"
+                        minute_lines.append(f"<t:{minute_ago_ts}:R>: {n} msg(s)")
                     embed.add_field(
                         name="Last 5 minutes",
-                        value="\n".join(
-                            f"Minute -{i}: {n} msg(s)" for i, n in zip(range(4, -1, -1), stats)
-                        ),
+                        value="\n".join(minute_lines),
                         inline=False
                     )
                     # Add view with buttons for manual adjustment (using current slowmode)
