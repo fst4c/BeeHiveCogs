@@ -346,8 +346,8 @@ class AdaptiveSlowmode(commands.Cog):
             self.max_slow = max_slow
 
             # Add buttons
-            self.add_item(DynamicSlowmode.IncreaseSlowmodeButton(cog, channel, current, max_slow))
-            self.add_item(DynamicSlowmode.DecreaseSlowmodeButton(cog, channel, current, min_slow))
+            self.add_item(AdaptiveSlowmode.IncreaseSlowmodeButton(cog, channel, current, max_slow))
+            self.add_item(AdaptiveSlowmode.DecreaseSlowmodeButton(cog, channel, current, min_slow))
 
     class IncreaseSlowmodeButton(discord.ui.Button):
         def __init__(self, cog, channel: discord.TextChannel, current: int, max_slow: int):
