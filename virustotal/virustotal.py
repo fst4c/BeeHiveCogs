@@ -47,7 +47,7 @@ class VirusTotal(commands.Cog):
         await ctx.send(f"Automatic file scanning has been {status}.")
 
     @checks.admin_or_permissions(manage_guild=True)
-    @virustotal.command(name="setlog")
+    @virustotal.command(name="logs")
     async def set_log_channel(self, ctx, channel: discord.TextChannel = None):
         """Set the channel where auto scan logs are sent. Use without argument to clear."""
         if channel is not None:
