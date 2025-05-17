@@ -283,7 +283,8 @@ class DynamicSlowmode(commands.Cog):
             return
         now = datetime.now(timezone.utc)
         async with self._lock:
-            self._message_cache[message.channel.id].append(now)
+            # Store (timestamp, author_id) for user tracking
+            self._message_cache[message.channel.id].append((now, message.author.id))
 
     async def _run_slowmode_task(self):
         await self.bot.wait_until_ready()
@@ -384,11 +385,11 @@ class DynamicSlowmode(commands.Cog):
                 async with self._lock:
                     # Remove messages older than 5 minutes for stats, but only count last minute for slowmode
                     cache = self._message_cache[cid]
-                    while cache and (now - cache[0]).total_seconds() > 300:
+                    while cache and (now - cache[0][0]).total_seconds() > 300:
                         cache.popleft()
                     # Count messages in the last minute
                     minute_ago = now - timedelta(seconds=window_seconds)
-                    msg_count_minute = sum(1 for t in cache if t > minute_ago)
+                    msg_count_minute = sum(1 for t, _ in cache if t > minute_ago)
                     # Track per-minute stats for reporting
                     self._minute_stats[cid].append(msg_count_minute)
                 # Calculate new slowmode in 1-second increments
@@ -433,6 +434,25 @@ class DynamicSlowmode(commands.Cog):
                     # Pad with zeros if less than 5
                     stats = [0] * (5 - len(stats)) + stats
                     current = channel.slowmode_delay
+
+                    # Collect users seen in the last 5 minutes
+                    async with self._lock:
+                        cache = self._message_cache[cid]
+                        five_min_ago = datetime.now(timezone.utc) - timedelta(minutes=5)
+                        user_ids = set()
+                        for t, uid in cache:
+                            if t > five_min_ago:
+                                user_ids.add(uid)
+                    # Get user objects and mentions
+                    user_mentions = []
+                    for uid in user_ids:
+                        member = channel.guild.get_member(uid)
+                        if member:
+                            user_mentions.append(member.mention)
+                    # Sort mentions for consistency
+                    user_mentions.sort()
+                    users_field_value = ", ".join(user_mentions) if user_mentions else "No users seen"
+
                     embed = discord.Embed(
                         title="Dynamic slowmode (5-minute report)",
                         color=0xfffffe
@@ -463,6 +483,11 @@ class DynamicSlowmode(commands.Cog):
                     embed.add_field(
                         name="Last 5 minutes",
                         value="\n".join(minute_lines),
+                        inline=False
+                    )
+                    embed.add_field(
+                        name="Users seen recently",
+                        value=users_field_value,
                         inline=False
                     )
                     # Add view with buttons for manual adjustment (using current slowmode)
