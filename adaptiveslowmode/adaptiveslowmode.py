@@ -61,7 +61,7 @@ class AdaptiveSlowmode(commands.Cog):
     @checks.admin_or_permissions(manage_guild=True)
     @adaptiveslowmode.command()
     async def enable(self, ctx):
-        """Enable dynamic slowmode for this server."""
+        """Enable adaptive slowmode for this server."""
         await self.config.guild(ctx.guild).enabled.set(True)
         embed = discord.Embed(
             title="Adaptive slowmode",
@@ -73,7 +73,7 @@ class AdaptiveSlowmode(commands.Cog):
     @checks.admin_or_permissions(manage_guild=True)
     @adaptiveslowmode.command()
     async def disable(self, ctx):
-        """Disable dynamic slowmode for this server."""
+        """Disable adaptive slowmode for this server."""
         await self.config.guild(ctx.guild).enabled.set(False)
         embed = discord.Embed(
             title="Adaptive slowmode",
@@ -121,7 +121,7 @@ class AdaptiveSlowmode(commands.Cog):
     @checks.admin_or_permissions(manage_guild=True)
     @adaptiveslowmode.command()
     async def add(self, ctx, channel: discord.TextChannel):
-        """Add a channel to dynamic slowmode."""
+        """Add a channel to adaptive slowmode."""
         async with self.config.guild(ctx.guild).channels() as chans:
             if channel.id not in chans:
                 chans.append(channel.id)
@@ -135,7 +135,7 @@ class AdaptiveSlowmode(commands.Cog):
     @checks.admin_or_permissions(manage_guild=True)
     @adaptiveslowmode.command()
     async def remove(self, ctx, channel: discord.TextChannel):
-        """Remove a channel from dynamic slowmode."""
+        """Remove a channel from adaptive slowmode."""
         async with self.config.guild(ctx.guild).channels() as chans:
             if channel.id in chans:
                 chans.remove(channel.id)
@@ -149,7 +149,7 @@ class AdaptiveSlowmode(commands.Cog):
     @checks.admin_or_permissions(manage_guild=True)
     @adaptiveslowmode.command(name="settings")
     async def _settings(self, ctx):
-        """Show current dynamic slowmode settings and status."""
+        """Show current adaptive slowmode settings and status."""
         conf = await self.config.guild(ctx.guild).all()
         enabled = conf["enabled"]
         min_slowmode = conf["min_slowmode"]
@@ -178,7 +178,7 @@ class AdaptiveSlowmode(commands.Cog):
     @adaptiveslowmode.command()
     async def logs(self, ctx, channel: discord.TextChannel = None):
         """
-        Set the logging channel for dynamic slowmode events.
+        Set the logging channel for adaptive slowmode events.
         Use without a channel to clear the log channel.
         """
         if channel is None:
@@ -259,7 +259,7 @@ class AdaptiveSlowmode(commands.Cog):
     @adaptiveslowmode.command()
     async def survey(self, ctx, channel: discord.TextChannel = None):
         """
-        Calibrate dynamic slowmode for a channel by measuring 5 minutes of activity.
+        Calibrate adaptive slowmode for a channel by measuring 5 minutes of activity.
         Sets the target messages per minute and suggests min/max slowmode.
         """
         channel = channel or ctx.channel
