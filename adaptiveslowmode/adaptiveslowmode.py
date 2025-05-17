@@ -51,7 +51,7 @@ class AdaptiveSlowmode(commands.Cog):
         if hasattr(self, "_slowmode_task"):
             self._slowmode_task.cancel()
 
-    @commands.group(aliases=["dsm"])
+    @commands.group()
     @commands.guild_only()
     @checks.admin_or_permissions(manage_guild=True)
     async def adaptiveslowmode(self, ctx):
