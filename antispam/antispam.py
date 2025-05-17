@@ -72,7 +72,7 @@ class AntiSpam(commands.Cog):
         await ctx.send("AntiSpam disabled.")
 
     @antispam.command()
-    async def setlimit(self, ctx, messages: int, seconds: int):
+    async def limit(self, ctx, messages: int, seconds: int):
         """Set message limit and interval (messages, seconds)."""
         if messages < 1 or seconds < 1:
             await ctx.send("Both messages and seconds must be greater than 0.")
@@ -122,7 +122,7 @@ class AntiSpam(commands.Cog):
         await self.config.guild(ctx.guild).similarity_threshold.set(threshold)
         await ctx.send(f"Similarity threshold set to {threshold:.2f}.")
 
-    @antispam.command(name="setlogchannel")
+    @antispam.command(name="logs")
     async def logs(self, ctx, channel: discord.TextChannel = None):
         """Set the channel where antispam logs are sent. Use without argument to clear."""
         if channel is None:
@@ -138,7 +138,7 @@ class AntiSpam(commands.Cog):
         if ctx.invoked_subcommand is None:
             await ctx.send_help()
 
-    @whitelist.command(name="channel")
+    @whitelist.command(name="addchannel")
     async def whitelist_channel(self, ctx, channel: discord.TextChannel):
         """Whitelist a channel from antispam."""
         async with self.config.guild(ctx.guild).ignored_channels() as chans:
@@ -154,7 +154,7 @@ class AntiSpam(commands.Cog):
                 chans.remove(channel.id)
         await ctx.send(f"Removed channel from whitelist: {channel.mention}")
 
-    @whitelist.command(name="role")
+    @whitelist.command(name="addrole")
     async def whitelist_role(self, ctx, role: discord.Role):
         """Whitelist a role from antispam."""
         async with self.config.guild(ctx.guild).ignored_roles() as roles:
@@ -170,7 +170,7 @@ class AntiSpam(commands.Cog):
                 roles.remove(role.id)
         await ctx.send(f"Removed role from whitelist: {role.name}")
 
-    @whitelist.command(name="user")
+    @whitelist.command(name="adduser")
     async def whitelist_user(self, ctx, user: discord.Member):
         """Whitelist a user from antispam."""
         async with self.config.guild(ctx.guild).ignored_users() as users:
@@ -190,7 +190,7 @@ class AntiSpam(commands.Cog):
     async def signatures(self, ctx):
         """Show detection signature codes and their descriptions."""
         embed = discord.Embed(
-            title="AntiSpam Detection Signatures",
+            title="AntiSpam signatures",
             color=0x00bfff,
             description="These are the detection codes used in AntiSpam logs and punishments."
         )
@@ -269,8 +269,8 @@ class AntiSpam(commands.Cog):
             if similar_count >= 2:
                 reason = "Spam:Repeat.Copypasta.B!msg"
                 evidence = (
-                    f"Latest message:\n{last[:400]}\n\n"
-                    f"Previous similar messages:\n" +
+                    f"{last[:400]}"
+                    f"\n" +
                     "\n".join(
                         f"<t:{int(ts)}:f>: {msg[:400]}"
                         for ts, msg in zip(similar_msgs_timestamps, similar_msgs)
