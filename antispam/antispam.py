@@ -580,21 +580,21 @@ class AntiSpam(commands.Cog):
                 log_channel = self.bot.get_channel(log_channel_id)
         embed = discord.Embed(title="AntiSpam settings", color=0xfffffe)
         embed.add_field(name="Enabled", value=str(enabled))
-        embed.add_field(name="Message Limit", value=f"{message_limit} per {interval}s")
+        embed.add_field(name="Message limit", value=f"{message_limit} per {interval}s")
         embed.add_field(name="Punishment", value=punishment)
         if punishment == "timeout":
             embed.add_field(name="Timeout Time", value=f"{timeout_time}s")
-        embed.add_field(name="Emoji Spam Threshold", value=f"{emoji_spam_threshold} total, {emoji_spam_unique_threshold} unique", inline=False)
-        embed.add_field(name="Similarity Threshold", value=f"{similarity_threshold:.2f}", inline=False)
+        embed.add_field(name="Emoji Spam threshold", value=f"{emoji_spam_threshold} total, {emoji_spam_unique_threshold} unique", inline=False)
+        embed.add_field(name="Similarity threshold", value=f"{similarity_threshold:.2f}", inline=False)
         if log_channel:
-            embed.add_field(name="Log Channel", value=log_channel.mention, inline=False)
+            embed.add_field(name="Log channel", value=log_channel.mention, inline=False)
         if ignored_channels:
             chans = [f"<#{cid}>" for cid in ignored_channels]
-            embed.add_field(name="Whitelisted Channels", value=", ".join(chans), inline=False)
+            embed.add_field(name="Whitelisted channels", value=", ".join(chans), inline=False)
         if ignored_roles:
             roles = [f"<@&{rid}>" for rid in ignored_roles]
-            embed.add_field(name="Whitelisted Roles", value=", ".join(roles), inline=False)
+            embed.add_field(name="Whitelisted roles", value=", ".join(roles), inline=False)
         if ignored_users:
             users = [f"<@{uid}>" for uid in ignored_users]
-            embed.add_field(name="Whitelisted Users", value=", ".join(users), inline=False)
+            embed.add_field(name="Whitelisted users", value=", ".join(users), inline=False)
         await ctx.send(embed=embed)
