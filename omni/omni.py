@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import timezone, timedelta
 
+from . import views
+
 class Omni(commands.Cog):
     """AI-powered automatic text moderation provided by frontier moderation models"""
 
@@ -601,7 +603,10 @@ class Omni(commands.Cog):
                     embed = await self._create_moderation_embed(
                         message, category_scores, "AI moderator detected potential misbehavior", action_taken, flagged_image_url=flagged_image_url
                     )
-                    view = await self._create_action_view(message, category_scores, timeout_issued=timeout_issued)
+                    # Use the ModerationActionView from views.py instead of the local class
+                    timeout_issued_val = timeout_issued
+                    timeout_duration_val = await self.config.guild(message.guild).timeout_duration()
+                    view = views.ModerationActionView(self, message, timeout_issued_val, timeout_duration=timeout_duration_val)
                     await log_channel.send(embed=embed, view=view)
         except Exception as e:
             raise RuntimeError(f"Failed to handle moderation: {e}")
@@ -637,528 +642,13 @@ class Omni(commands.Cog):
                         break
         return embed
 
-    class _ModerationActionView(discord.ui.View):
-        def __init__(self, cog, message, timeout_issued, *, timeout_duration):
-            super().__init__(timeout=None)
-            self.cog = cog
-            self.message = message
-            self.timeout_issued = timeout_issued
-            self.timeout_duration = timeout_duration
-
-            # Store the ID of the user who was moderated (the message author)
-            self.moderated_user_id = message.author.id
-
-            # Add Untimeout button only if a timeout was issued
-            if timeout_issued:
-                self.add_item(self.UntimeoutButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
-
-            # Add Restore button if message was deleted and info is available
-            if message.id in cog._deleted_messages:
-                self.add_item(self.RestoreButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
-
-            # Add Warn button (always on row 1)
-            self.add_item(self.WarnButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
-
-            # Only show Timeout button if timeouts are enabled (timeout_duration > 0)
-            if self.timeout_duration == 0:
-                self.add_item(self.TimeoutButton(cog, message, timeout_duration, row=1, moderated_user_id=self.moderated_user_id))
-
-            # Add kick and ban buttons (always on row 1)
-            self.add_item(self.KickButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
-            self.add_item(self.BanButton(cog, message, row=1, moderated_user_id=self.moderated_user_id))
-
-            # Add Dismiss button to delete the log message (row 2)
-            self.add_item(self.DismissButton(cog, message, row=2, moderated_user_id=self.moderated_user_id))
-
-            # Add Translate button (always on row 1)
-            self.add_item(self.TranslateButton(cog, message, row=2, moderated_user_id=self.moderated_user_id))
-
-            # Add Explain button (always on row 2)
-            self.add_item(self.ExplainButton(cog, message, row=2, moderated_user_id=self.moderated_user_id))
-
-            # Add jump to conversation button LAST (so it appears underneath, on row 2)
-            self.add_item(discord.ui.Button(label="See conversation", url=message.jump_url, row=2))
-
-        class TimeoutButton(discord.ui.Button):
-            def __init__(self, cog, message, timeout_duration, row=1, moderated_user_id=None):
-                super().__init__(label="Timeout", style=discord.ButtonStyle.grey, custom_id=f"timeout_{message.author.id}_{message.id}", emoji="⏳", row=row)
-                self.cog = cog
-                self.message = message
-                self.timeout_duration = timeout_duration
-                self.moderated_user_id = moderated_user_id
-
-            async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log unless they are an administrator
-                if (
-                    interaction.user.id == self.moderated_user_id
-                    and not getattr(interaction.user.guild_permissions, "administrator", False)
-                ):
-                    await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
-                    return
-                try:
-                    member = self.message.guild.get_member(self.message.author.id)
-                    if not member:
-                        await interaction.response.send_message("User not found in this server.", ephemeral=True)
-                        return
-                    # Check if already timed out
-                    if hasattr(member, "timed_out_until") and getattr(member, "timed_out_until", None):
-                        await interaction.response.send_message("User is already timed out.", ephemeral=True)
-                        return
-                    reason = f"Manual timeout via Omni log button. Message: {self.message.content}"
-                    await member.timeout(timedelta(minutes=self.timeout_duration), reason=reason)
-                    # Mark as timed out for this message
-                    self.cog._timeout_issued_for_message[self.message.id] = True
-                    await interaction.response.send_message(f"User {member.mention} has been timed out for {self.timeout_duration} minutes.", ephemeral=True)
-                except Exception as e:
-                    await interaction.response.send_message(f"Failed to timeout user: {e}", ephemeral=True)
-
-        class UntimeoutButton(discord.ui.Button):
-            def __init__(self, cog, message, row=1, moderated_user_id=None):
-                super().__init__(label="Untimeout", style=discord.ButtonStyle.grey, custom_id=f"untimeout_{message.author.id}_{message.id}", emoji="✅", row=row)
-                self.cog = cog
-                self.message = message
-                self.moderated_user_id = moderated_user_id
-
-            async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log unless they are an administrator
-                if (
-                    interaction.user.id == self.moderated_user_id
-                    and not getattr(interaction.user.guild_permissions, "administrator", False)
-                ):
-                    await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
-                    return
-                try:
-                    member = self.message.guild.get_member(self.message.author.id)
-                    if not member:
-                        await interaction.response.send_message("User not found in this server.", ephemeral=True)
-                        return
-
-                    # Remove timeout by setting duration to None
-                    await member.timeout(None, reason="Staff member removed a timeout issued by Omni")
-                    self.cog._timeout_issued_for_message[self.message.id] = False
-                    # Update the button: change label and disable it
-                    self.label = "Timeout lifted"
-                    self.disabled = True
-                    # Defer the interaction before editing the message to avoid errors
-                    await interaction.response.defer()
-                    # Try to update the view to reflect the new label and disabled state
-                    try:
-                        await interaction.message.edit(view=self.view)
-                    except Exception:
-                        pass
-                except Exception as e:
-                    await interaction.response.send_message(f"Failed to untimeout user: {e}", ephemeral=True)
-
-        class WarnButton(discord.ui.Button):
-            def __init__(self, cog, message, row=1, moderated_user_id=None):
-                super().__init__(label="Warn", style=discord.ButtonStyle.grey, custom_id=f"warn_{message.author.id}_{message.id}", emoji="⚠️", row=row)
-                self.cog = cog
-                self.message = message
-                self.moderated_user_id = moderated_user_id
-
-            async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log unless they are an administrator
-                if (
-                    interaction.user.id == self.moderated_user_id
-                    and not getattr(interaction.user.guild_permissions, "administrator", False)
-                ):
-                    embed = discord.Embed(
-                        description="You cannot interact with moderation logs of your own actions.",
-                        color=discord.Color.orange()
-                    )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
-                    return
-                member = self.message.guild.get_member(self.message.author.id)
-                if not member:
-                    embed = discord.Embed(
-                        description="User not found in this server.",
-                        color=discord.Color.red()
-                    )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
-                    return
-                # Compose warning embed for DM
-                warning_embed = discord.Embed(
-                    title="Conduct warning",
-                    description=(
-                        f"Your message was flagged by the AI moderator in **{self.message.guild.name}**. A human moderator later reviewed this alert, agreed the AI's decision, and has issued you a conduct warning as a result."
-                    ),
-                    color=0xff4545
-                )
-                warning_embed.add_field(
-                    name="Your message",
-                    value=f"`{self.message.content}`" or "*No content*",
-                    inline=False
-                )
-                warning_embed.add_field(
-                    name="Next steps",
-                    value="Please review the server rules and Discord's [Terms of Service](https://discord.com/terms) and [Community Guidelines](https://discord.com/guidelines). Further violations of the server's rules may lead to additional punishments, like timeouts, documented warnings, kicks, and bans.",
-                    inline=False
-                )
-                warning_embed.set_footer(text="We appreciate your cooperation in making the server a safe place")
-                # Try to send DM only
-                try:
-                    await member.send(embed=warning_embed)
-                    self.label = "Warning sent"
-                except Exception:
-                    self.label = "DM's closed"
-                self.disabled = True
-                await interaction.response.defer()
-                try:
-                    await interaction.message.edit(view=self.view)
-                except Exception:
-                    pass
-
-                # --- Log warning count for user in memory and config ---
-                guild_id = self.message.guild.id
-                user_id = self.message.author.id
-                # Increment in-memory warning count
-                self.cog.memory_user_warnings[guild_id][user_id] += 1
-                # Also increment persistent warning count
-                guild_conf = self.cog.config.guild(self.message.guild)
-                user_warnings = await guild_conf.user_warnings()
-                user_warnings[str(user_id)] = user_warnings.get(str(user_id), 0) + 1
-                await guild_conf.user_warnings.set(user_warnings)
-
-        class TranslateButton(discord.ui.Button):
-            def __init__(self, cog, message, row=2, moderated_user_id=None):
-                super().__init__(label="Translate content", style=discord.ButtonStyle.grey, custom_id=f"translate_{message.author.id}_{message.id}", emoji="🔡", row=row)
-                self.cog = cog
-                self.message = message
-                self.moderated_user_id = moderated_user_id
-
-            async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log unless they are an administrator
-                if (
-                    interaction.user.id == self.moderated_user_id
-                    and not getattr(interaction.user.guild_permissions, "administrator", False)
-                ):
-                    await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
-                    return
-
-                # Open a modal to ask for the target language
-                class LanguageModal(discord.ui.Modal, title="Translating moderated content"):
-                    language = discord.ui.TextInput(
-                        label="Language to translate to",
-                        placeholder="e.g. French, Spanish, Japanese, etc.",
-                        required=True,
-                        max_length=50,
-                    )
-
-                    async def on_submit(self, modal_interaction: discord.Interaction):
-                        # Disable the button while processing
-                        self_view = self.cog._ModerationActionView.TranslateButton
-                        # Actually, we can't access the button instance here, so we just proceed
-                        await modal_interaction.response.defer(thinking=True)
-                        language_value = self.language.value.strip()
-                        if not language_value:
-                            await modal_interaction.followup.send("No language provided.", ephemeral=True)
-                            return
-                        # Call the translation function
-                        translated = await self.cog.translate_to_language(self.message.content, language_value)
-                        if translated:
-                            embed = discord.Embed(
-                                title=f"Moderated content translated to {language_value}",
-                                description=translated,
-                                color=0xfffffe
-                            )
-                            await modal_interaction.followup.send(embed=embed, ephemeral=False)
-                        else:
-                            await modal_interaction.followup.send(
-                                f"Failed to translate the message or no translation available.",
-                                ephemeral=True
-                            )
-
-                    def __init__(self, cog, message):
-                        super().__init__()
-                        self.cog = cog
-                        self.message = message
-
-                # Show the modal
-                await interaction.response.send_modal(LanguageModal(self.cog, self.message))
-
-        class ExplainButton(discord.ui.Button):
-            def __init__(self, cog, message, row=2, moderated_user_id=None):
-                super().__init__(label="Explain decision", style=discord.ButtonStyle.grey, custom_id=f"explain_{message.author.id}_{message.id}", emoji="💡", row=row)
-                self.cog = cog
-                self.message = message
-                self.moderated_user_id = moderated_user_id
-
-            async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log unless they are an administrator
-                if (
-                    interaction.user.id == self.moderated_user_id
-                    and not getattr(interaction.user.guild_permissions, "administrator", False)
-                ):
-                    await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
-                    return
-                # Only allow users with manage_guild or admin
-                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
-                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
-                    return
-                # Disable the button while processing
-                self.disabled = True
-                self.label = "AI working..."
-                await interaction.response.defer()
-                try:
-                    await interaction.message.edit(view=self.view)
-                except Exception:
-                    pass
-
-                # Re-run the moderation endpoint for the message content
-                try:
-                    api_key = (await self.cog.bot.get_shared_api_tokens("openai")).get("api_key")
-                    if not api_key:
-                        await interaction.followup.send("No OpenAI API key configured.", ephemeral=True)
-                        self.disabled = False
-                        self.label = "Explain"
-                        try:
-                            await interaction.message.edit(view=self.view)
-                        except Exception:
-                            pass
-                        return
-                    normalized_content = self.cog.normalize_text(self.message.content)
-                    input_data = [{"type": "text", "text": normalized_content}]
-                    scores = await self.cog.analyze_content(input_data, api_key, self.message)
-                    if not scores:
-                        await interaction.followup.send("Failed to get moderation scores for this message.", ephemeral=True)
-                        self.disabled = False
-                        self.label = "Explain"
-                        try:
-                            await interaction.message.edit(view=self.view)
-                        except Exception:
-                            pass
-                        return
-                except Exception as e:
-                    await interaction.followup.send(f"Failed to get moderation scores: {e}", ephemeral=True)
-                    self.disabled = False
-                    self.label = "Explain"
-                    try:
-                        await interaction.message.edit(view=self.view)
-                    except Exception:
-                        pass
-                    return
-
-                # Call the explanation function
-                explanation = await self.cog.explain_moderation(self.message.content, scores)
-
-                # Restore the button state
-                self.disabled = False
-                self.label = "Explain"
-
-                if explanation:
-                    embed = discord.Embed(
-                        title="Why was this message flagged?",
-                        description=explanation,
-                        color=0x45ABF5
-                    )
-                    # Show the top 6 scores in the embed for reference
-                    sorted_scores = sorted(scores.items(), key=lambda item: item[1], reverse=True)[:6]
-                    for cat, score in sorted_scores:
-                        embed.add_field(name=cat.capitalize(), value=f"{score*100:.1f}%", inline=True)
-                    await interaction.followup.send(embed=embed, ephemeral=False)
-                else:
-                    await interaction.followup.send(
-                        "Failed to generate an explanation for this message.",
-                        ephemeral=True
-                    )
-
-                self.disabled = True
-                try:
-                    await interaction.message.edit(view=self.view)
-                except Exception:
-                    pass
-
-        class KickButton(discord.ui.Button):
-            def __init__(self, cog, message, row=1, moderated_user_id=None):
-                super().__init__(label="Kick", style=discord.ButtonStyle.grey, custom_id=f"kick_{message.author.id}_{message.id}", emoji="👢", row=row)
-                self.cog = cog
-                self.message = message
-                self.moderated_user_id = moderated_user_id
-                self.awaiting_confirmation = False
-
-            async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log unless they are an administrator
-                if (
-                    interaction.user.id == self.moderated_user_id
-                    and not getattr(interaction.user.guild_permissions, "administrator", False)
-                ):
-                    await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
-                    return
-
-                # Double-tap confirmation logic, no followup message
-                if not self.awaiting_confirmation:
-                    self.awaiting_confirmation = True
-                    self.label = "Confirm kick"
-                    self.style = discord.ButtonStyle.danger
-                    try:
-                        await interaction.response.edit_message(view=self.view)
-                    except Exception:
-                        pass
-                    return
-                else:
-                    self.disabled = True
-                    try:
-                        await interaction.response.edit_message(view=self.view)
-                    except Exception:
-                        pass
-                    await self.cog.kick_user(interaction)
-
-        class BanButton(discord.ui.Button):
-            def __init__(self, cog, message, row=1, moderated_user_id=None):
-                super().__init__(label="Ban", style=discord.ButtonStyle.grey, custom_id=f"ban_{message.author.id}_{message.id}", emoji="🔨", row=row)
-                self.cog = cog
-                self.message = message
-                self.moderated_user_id = moderated_user_id
-                self.awaiting_confirmation = False
-
-            async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log unless they are an administrator
-                if (
-                    interaction.user.id == self.moderated_user_id
-                    and not getattr(interaction.user.guild_permissions, "administrator", False)
-                ):
-                    await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
-                    return
-
-                # Double-tap confirmation logic, no followup message
-                if not self.awaiting_confirmation:
-                    self.awaiting_confirmation = True
-                    self.label = "Confirm ban"
-                    self.style = discord.ButtonStyle.danger
-                    try:
-                        await interaction.response.edit_message(view=self.view)
-                    except Exception:
-                        pass
-                    return
-                else:
-                    self.disabled = True
-                    try:
-                        await interaction.response.edit_message(view=self.view)
-                    except Exception:
-                        pass
-                    await self.cog.ban_user(interaction)
-
-        class RestoreButton(discord.ui.Button):
-            def __init__(self, cog, message, row=1, moderated_user_id=None):
-                super().__init__(label="Resend", style=discord.ButtonStyle.grey, custom_id=f"restore_{message.author.id}_{message.id}", emoji="♻️", row=row)
-                self.cog = cog
-                self.message = message
-                self.moderated_user_id = moderated_user_id
-
-            async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log unless they are an administrator
-                if (
-                    interaction.user.id == self.moderated_user_id
-                    and not getattr(interaction.user.guild_permissions, "administrator", False)
-                ):
-                    await interaction.response.send_message("You cannot interact with moderation logs of your own actions.", ephemeral=True)
-                    return
-                msg_id = self.message.id
-                deleted_info = self.cog._deleted_messages.get(msg_id)
-                if not deleted_info:
-                    await interaction.response.send_message("No deleted message data found to restore.", ephemeral=True)
-                    return
-                guild = interaction.guild
-                channel = guild.get_channel(deleted_info["channel_id"])
-                if not channel:
-                    await interaction.response.send_message("Original channel not found.", ephemeral=True)
-                    return
-
-                # Prepare content and attachments
-                content = deleted_info.get("content", "")
-                attachments = deleted_info.get("attachments", [])
-                if not isinstance(attachments, list):
-                    attachments = []
-
-                # Get the original message timestamp, if available
-                timestamp = deleted_info.get("created_at")
-                # If not present, fallback to self.message.created_at if possible
-                if not timestamp and hasattr(self.message, "created_at"):
-                    timestamp = self.message.created_at
-                # Format the timestamp for Discord (dynamic)
-                timestamp_str = ""
-                if timestamp:
-                    # If it's a datetime object, convert to unix timestamp
-                    import datetime
-                    if isinstance(timestamp, datetime.datetime):
-                        unix_ts = int(timestamp.timestamp())
-                    else:
-                        try:
-                            unix_ts = int(timestamp)
-                        except Exception:
-                            unix_ts = None
-                    if unix_ts:
-                        timestamp_str = f"<t:{unix_ts}:R>"
-                # Compose the description with timestamp
-                if content and timestamp_str:
-                    description = f"{content}\n*Originally sent {timestamp_str}*"
-                elif content:
-                    description = content
-                elif timestamp_str:
-                    description = f"*Originally sent {timestamp_str}*"
-                else:
-                    description = ""
-
-                try:
-                    if description.strip():
-                        author = self.message.author
-                        embed = discord.Embed(
-                            title=f"",
-                            description=description,
-                            color=0xfffffe
-                        )
-                        if author.avatar:
-                            embed.set_author(name=f"{author.display_name} said", icon_url=author.avatar.url)
-                        else:
-                            embed.set_author(name=f"{author.display_name} said")
-                        embed.set_footer(text=f"This message was flagged by the AI moderator, but a staff member subsequently approved it to be sent.")
-                        await channel.send(embed=embed)
-                    # If there are image attachments, send them as separate messages
-                    for img_url in attachments:
-                        if img_url:
-                            embed = discord.Embed().set_image(url=img_url)
-                            await channel.send(embed=embed)
-                    # After restoring, disable the button and change the label
-                    self.label = "Message re-sent"
-                    self.disabled = True
-                    await interaction.response.defer()
-                    try:
-                        await interaction.message.edit(view=self.view)
-                    except Exception:
-                        pass
-                except Exception as e:
-                    await interaction.response.send_message(f"Failed to restore message: {e}", ephemeral=True)
-
-        class DismissButton(discord.ui.Button):
-            def __init__(self, cog, message, row=2, moderated_user_id=None):
-                super().__init__(label="Dismiss alert", style=discord.ButtonStyle.grey, custom_id=f"dismiss_{message.id}", emoji="🗑️", row=row)
-                self.cog = cog
-                self.message = message
-                self.moderated_user_id = moderated_user_id
-
-            async def callback(self, interaction: discord.Interaction):
-                # Prevent the moderated user from interacting with their own log unless they are an administrator
-                if (
-                    interaction.user.id == self.moderated_user_id
-                    and not getattr(interaction.user.guild_permissions, "administrator", False)
-                ):
-                    await interaction.response.send_message("You cannot dismiss moderation logs of your own actions.", ephemeral=True)
-                    return
-                # Only allow users with manage_guild or admin
-                if not (getattr(interaction.user.guild_permissions, "administrator", False) or getattr(interaction.user.guild_permissions, "manage_guild", False)):
-                    await interaction.response.send_message("You do not have permission to use this button.", ephemeral=True)
-                    return
-                try:
-                    await interaction.message.delete()
-                except Exception as e:
-                    await interaction.response.send_message(f"Failed to delete log message: {e}", ephemeral=True)
-
     async def _create_action_view(self, message, category_scores, timeout_issued=None):
         # Determine if a timeout was issued for this message
         if timeout_issued is None:
             timeout_issued = self._timeout_issued_for_message.get(message.id, False)
         timeout_duration = await self.config.guild(message.guild).timeout_duration()
-        return self._ModerationActionView(self, message, timeout_issued, timeout_duration=timeout_duration)
+        # Use the ModerationActionView from views.py
+        return views.ModerationActionView(self, message, timeout_issued, timeout_duration=timeout_duration)
 
     async def _get_previous_message(self, message):
         try:
@@ -1233,6 +723,7 @@ class Omni(commands.Cog):
                     )
                     if error_code:
                         embed.add_field(name="Error", value=f":x: `{error_code}` Failed to send to moderation endpoint.", inline=False)
+                    # Use the ModerationActionView from views.py
                     view = await self._create_action_view(message, category_scores)
                     await log_channel.send(embed=embed, view=view)
         except Exception as e:
@@ -1481,18 +972,18 @@ class Omni(commands.Cog):
         """
         Show the violation history for a user in this server.
         If no user is provided, shows your own history (if you are not a bot).
-        Shows 9 violations per page, with buttons to scroll if there are more.
+        Shows 9 violations per page, with emoji reactions to scroll if there are more.
         Also includes a graph of abuse trends over time.
         """
         try:
-            # Ensure required imports for View and Button
+            # Ensure required imports for plotting and file handling
             import math
             import tempfile
             from datetime import datetime, timezone, timedelta
             import matplotlib.pyplot as plt
             from collections import Counter
             import discord
-            from discord.ui import View, Button
+            import asyncio
 
             guild = ctx.guild
             if user is None:
@@ -1641,75 +1132,82 @@ class Omni(commands.Cog):
                         pass
                 return
 
-            class ViolationHistoryView(View):
-                def __init__(self, author: discord.User, timeout=120):
-                    super().__init__(timeout=timeout)
-                    self.page = 0
-                    self.author = author
+            # Emoji-based pagination
+            FIRST_EMOJI = "⏮️"
+            PREV_EMOJI = "⬅️"
+            NEXT_EMOJI = "➡️"
+            LAST_EMOJI = "⏭️"
+            STOP_EMOJI = "⏹️"
+            PAGINATION_EMOJIS = [FIRST_EMOJI, PREV_EMOJI, NEXT_EMOJI, LAST_EMOJI, STOP_EMOJI]
 
-                async def update_message(self, interaction):
-                    embed = make_embed(self.page)
-                    if file:
-                        await interaction.response.edit_message(embed=embed, view=self, attachments=[file])
-                    else:
-                        await interaction.response.edit_message(embed=embed, view=self)
-
-                @discord.ui.button(label="⏮️", style=discord.ButtonStyle.secondary, custom_id="first_page")
-                async def first_page(self, interaction: discord.Interaction, button: Button):
-                    if interaction.user != self.author:
-                        await interaction.response.send_message("You can't control this menu.", ephemeral=True)
-                        return
-                    if self.page != 0:
-                        self.page = 0
-                        await self.update_message(interaction)
-                    else:
-                        await interaction.response.defer()
-
-                @discord.ui.button(label="⬅️", style=discord.ButtonStyle.secondary, custom_id="prev_page")
-                async def prev_page(self, interaction: discord.Interaction, button: Button):
-                    if interaction.user != self.author:
-                        await interaction.response.send_message("You can't control this menu.", ephemeral=True)
-                        return
-                    if self.page > 0:
-                        self.page -= 1
-                        await self.update_message(interaction)
-                    else:
-                        await interaction.response.defer()
-
-                @discord.ui.button(label="➡️", style=discord.ButtonStyle.secondary, custom_id="next_page")
-                async def next_page(self, interaction: discord.Interaction, button: Button):
-                    if interaction.user != self.author:
-                        await interaction.response.send_message("You can't control this menu.", ephemeral=True)
-                        return
-                    if self.page < total_pages - 1:
-                        self.page += 1
-                        await self.update_message(interaction)
-                    else:
-                        await interaction.response.defer()
-
-                @discord.ui.button(label="⏭️", style=discord.ButtonStyle.secondary, custom_id="last_page")
-                async def last_page(self, interaction: discord.Interaction, button: Button):
-                    if interaction.user != self.author:
-                        await interaction.response.send_message("You can't control this menu.", ephemeral=True)
-                        return
-                    if self.page != total_pages - 1:
-                        self.page = total_pages - 1
-                        await self.update_message(interaction)
-                    else:
-                        await interaction.response.defer()
-
-            view = ViolationHistoryView(ctx.author)
-            embed = make_embed(0)
+            page = 0
+            embed = make_embed(page)
             if file:
-                await ctx.send(embed=embed, view=view, file=file)
+                message = await ctx.send(embed=embed, file=file)
             else:
-                await ctx.send(embed=embed, view=view)
-            if temp_file:
-                import os
+                message = await ctx.send(embed=embed)
+
+            for emoji in PAGINATION_EMOJIS:
                 try:
-                    os.remove(temp_file)
+                    await message.add_reaction(emoji)
                 except Exception:
                     pass
+
+            def check(reaction, user_):
+                return (
+                    reaction.message.id == message.id
+                    and user_.id == ctx.author.id
+                    and str(reaction.emoji) in PAGINATION_EMOJIS
+                )
+
+            try:
+                while True:
+                    try:
+                        reaction, user_ = await ctx.bot.wait_for("reaction_add", timeout=120.0, check=check)
+                    except asyncio.TimeoutError:
+                        break
+
+                    emoji = str(reaction.emoji)
+                    old_page = page
+                    if emoji == FIRST_EMOJI:
+                        page = 0
+                    elif emoji == PREV_EMOJI:
+                        if page > 0:
+                            page -= 1
+                    elif emoji == NEXT_EMOJI:
+                        if page < total_pages - 1:
+                            page += 1
+                    elif emoji == LAST_EMOJI:
+                        page = total_pages - 1
+                    elif emoji == STOP_EMOJI:
+                        break
+
+                    # Remove user's reaction to keep UI clean
+                    try:
+                        await message.remove_reaction(reaction.emoji, user_)
+                    except Exception:
+                        pass
+
+                    if page != old_page or emoji == STOP_EMOJI:
+                        embed = make_embed(page)
+                        if file:
+                            await message.edit(embed=embed, attachments=[file])
+                        else:
+                            await message.edit(embed=embed)
+                    if emoji == STOP_EMOJI:
+                        break
+            finally:
+                # Clean up reactions
+                try:
+                    await message.clear_reactions()
+                except Exception:
+                    pass
+                if temp_file:
+                    import os
+                    try:
+                        os.remove(temp_file)
+                    except Exception:
+                        pass
         except Exception as e:
             raise RuntimeError(f"Failed to display violation history: {e}")
 
