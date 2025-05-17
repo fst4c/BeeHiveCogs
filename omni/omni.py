@@ -1,8 +1,6 @@
 import discord
 from redbot.core import commands, Config
-import math
 import aiohttp
-from datetime import timedelta, datetime
 from collections import Counter, defaultdict
 import unicodedata
 import re
@@ -10,7 +8,9 @@ import asyncio
 import tempfile
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from datetime import timezone, timedelta
+import math
+from datetime import datetime, timezone, timedelta
+import asyncio
 
 from . import views
 
@@ -976,14 +976,6 @@ class Omni(commands.Cog):
         Also includes a graph of abuse trends over time.
         """
         try:
-            # Ensure required imports for plotting and file handling
-            import math
-            import tempfile
-            from datetime import datetime, timezone, timedelta
-            import matplotlib.pyplot as plt
-            from collections import Counter
-            import discord
-            import asyncio
 
             guild = ctx.guild
             if user is None:
