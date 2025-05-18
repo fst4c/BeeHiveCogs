@@ -11,6 +11,8 @@ import matplotlib.dates as mdates # type: ignore
 import math
 from datetime import datetime, timezone, timedelta
 import asyncio
+import io
+import os
 
 from . import views
 
@@ -543,6 +545,29 @@ class AutoMod(commands.Cog):
             delete_violatory_messages = await guild_conf.delete_violatory_messages()
 
             message_deleted = False
+            flagged_image_tempfile = None
+            flagged_image_filename = None
+
+            # If a flagged image is present, download it before deletion using tempfile
+            if flagged_image_url:
+                try:
+                    if self.session is None or getattr(self.session, "closed", True):
+                        self.session = aiohttp.ClientSession()
+                    async with self.session.get(flagged_image_url) as resp:
+                        if resp.status == 200:
+                            # Try to get the filename from the URL
+                            flagged_image_filename = flagged_image_url.split("/")[-1]
+                            if not flagged_image_filename or "." not in flagged_image_filename:
+                                flagged_image_filename = "flagged_image.png"
+                            # Write to a NamedTemporaryFile
+                            flagged_image_tempfile = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(flagged_image_filename)[-1])
+                            flagged_image_tempfile.write(await resp.read())
+                            flagged_image_tempfile.flush()
+                            flagged_image_tempfile.close()
+                except Exception:
+                    flagged_image_tempfile = None
+                    flagged_image_filename = None
+
             if delete_violatory_messages:
                 try:
                     # Store deleted message info for restoration
@@ -641,7 +666,21 @@ class AutoMod(commands.Cog):
                     timeout_issued_val = timeout_issued
                     timeout_duration_val = await guild_conf.timeout_duration()
                     view = views.ModerationActionView(self, message, timeout_issued_val, timeout_duration=timeout_duration_val)
-                    await log_channel.send(embed=embed, view=view)
+                    # If a flagged image was present and we have the tempfile, send as a file
+                    if flagged_image_tempfile and flagged_image_filename:
+                        # Set the embed image to the attachment
+                        embed.set_image(url=f"attachment://{flagged_image_filename}")
+                        try:
+                            with open(flagged_image_tempfile.name, "rb") as f:
+                                file = discord.File(f, filename=flagged_image_filename)
+                                await log_channel.send(embed=embed, view=view, file=file)
+                        finally:
+                            try:
+                                os.unlink(flagged_image_tempfile.name)
+                            except Exception:
+                                pass
+                    else:
+                        await log_channel.send(embed=embed, view=view)
         except Exception as e:
             raise RuntimeError(f"Failed to handle moderation: {e}")
 
@@ -666,6 +705,7 @@ class AutoMod(commands.Cog):
 
         # If a flagged_image_url is provided, use it as the embed image
         if flagged_image_url:
+            # If the image will be attached as a file, the url will be set to attachment:// in handle_moderation
             embed.set_image(url=flagged_image_url)
         else:
             # Fallback: if not provided, use the first image attachment (as before)
