@@ -869,7 +869,7 @@ class AutoMod(commands.Cog):
     @commands.group()
     async def automod(self, ctx):
         """
-        Automated AI moderation for chats, images, and emotes powered by the latest frontier moderation models.
+        An automatic, AI-powered moderator that handles text and image content
         
         **[Visit the docs to learn more](<https://sentri.beehive.systems/features/agentic-moderator>)**
         """
