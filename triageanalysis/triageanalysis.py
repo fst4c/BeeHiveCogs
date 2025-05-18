@@ -222,7 +222,7 @@ class TriageAnalysis(commands.Cog):
     @triage.command()
     async def url(self, ctx, url: str):
         """
-        Donate file from URL for analysis.
+        Donate file from URL for analysis
         
         [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-url>)
         """
@@ -246,7 +246,7 @@ class TriageAnalysis(commands.Cog):
     @triage.command()
     async def sample(self, ctx, sample_id: str):
         """
-        Get info about a sample by ID.
+        Get info about a sample by ID
         
         [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-sample>)
         """
@@ -272,7 +272,7 @@ class TriageAnalysis(commands.Cog):
     @triage.command()
     async def search(self, ctx, *, query: str):
         """
-        Search for samples.
+        Search for samples
         
         [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-search>)
         """
@@ -326,7 +326,7 @@ class TriageAnalysis(commands.Cog):
     @triage.command()
     async def overview(self, ctx, sample_id: str):
         """
-        Get the overview report for a sample.
+        Get the overview report for a sample
         
         [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-overview>)
         """
@@ -351,7 +351,7 @@ class TriageAnalysis(commands.Cog):
     @triage.command()
     async def download(self, ctx, sample_id: str):
         """
-        Download the sample file.
+        Download the sample file
         
         [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-download>)
         """
@@ -386,7 +386,11 @@ class TriageAnalysis(commands.Cog):
 
     @triage.command()
     async def events(self, ctx, sample_id: str):
-        """Stream events of a running sample"""
+        """
+        Stream events of a running sample
+        
+        [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-events>)
+        """
         try:
             client = await self.get_client(ctx.guild)
             events = client.sample_events(sample_id)
@@ -415,7 +419,11 @@ class TriageAnalysis(commands.Cog):
 
     @triage.command()
     async def file(self, ctx):
-        """Donate a file for analysis."""
+        """
+        Donate a file for analysis
+        
+        [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-file>)
+        """
         if not ctx.message.attachments:
             embed = discord.Embed(
                 title="Include a file",
@@ -449,6 +457,8 @@ class TriageAnalysis(commands.Cog):
     async def analyze(self, ctx):
         """
         Analyze and return info about a file
+
+        [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-analyze>)
         """
         if not ctx.message.attachments:
             embed = discord.Embed(
