@@ -608,7 +608,7 @@ class TriageAnalysis(commands.Cog):
             # Compose embed
             embed = discord.Embed(
                 title="Analysis complete",
-                description=f"Sample ID: `{sample_id}`\nStatus: `{status}`",
+                description=f"Dynamic sandbox analysis of your file has finished",
                 color=0xff4545 if score and score >= 7 else 0x2bbd8e if score and score < 5 else discord.Color.orange()
             )
             if target_name:
