@@ -4,12 +4,12 @@ from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import box
 import asyncio
 
-# Use the hatchling-triage package
-from hatchling_triage import TriageAsync
+# Use the triage package (https://pypi.org/project/triage/)
+from triage import Client as TriageClient
 
 class Triage(commands.Cog):
     """
-    Malware analysis for files using hatchling-triage.
+    Malware analysis for files using tria.ge API.
     Analyze files manually and automatically for malware.
     """
 
@@ -27,9 +27,7 @@ class Triage(commands.Cog):
         self._triage_clients = {}
 
     async def cog_unload(self):
-        # Close all TriageAsync clients
-        for client in self._triage_clients.values():
-            await client.close()
+        # No explicit close needed for triage.Client
         self._triage_clients.clear()
 
     async def _get_api_key(self, guild):
@@ -47,9 +45,9 @@ class Triage(commands.Cog):
         return None
 
     def _get_triage_client(self, api_key):
-        # Cache TriageAsync clients per API key
+        # Cache TriageClient per API key
         if api_key not in self._triage_clients:
-            self._triage_clients[api_key] = TriageAsync(api_key)
+            self._triage_clients[api_key] = TriageClient(token=api_key)
         return self._triage_clients[api_key]
 
     async def _submit_file(
@@ -58,41 +56,31 @@ class Triage(commands.Cog):
         file_bytes,
         filename,
         *,
-        target=None,
-        password=None,
-        user_tags=None,
-        timeout=None,
-        network=None,
         interactive=None,
         profiles=None,
     ):
         """
-        Submit a file to Triage with optional parameters using hatchling-triage.
+        Submit a file to Triage using triage.Client.
         """
         triage = self._get_triage_client(api_key)
-        kwargs = {}
-        if target:
-            kwargs["target"] = target
-        if password:
-            kwargs["password"] = password
-        if user_tags:
-            kwargs["user_tags"] = user_tags
-        if timeout is not None:
-            kwargs["timeout"] = timeout
-        if network:
-            kwargs["network"] = network
-        if interactive is not None:
-            kwargs["interactive"] = interactive
-        if profiles:
-            kwargs["profiles"] = profiles
-
-        # hatchling-triage expects a file-like object, so wrap bytes in BytesIO
         import io
         file_obj = io.BytesIO(file_bytes)
+        # triage.Client expects a file-like object with a name attribute
         file_obj.name = filename
 
-        # Returns a dict with at least an "id" key
-        return await triage.submit_file(file_obj, **kwargs)
+        # triage.Client.submit_sample_file expects: filename, file, interactive, profiles
+        # interactive: bool, default False
+        # profiles: list of str, default []
+        kwargs = {}
+        if interactive is not None:
+            kwargs["interactive"] = bool(interactive)
+        if profiles:
+            kwargs["profiles"] = profiles
+        else:
+            kwargs["profiles"] = []
+
+        # submit_sample_file is a coroutine
+        return await triage.submit_sample_file(filename, file_obj, **kwargs)
 
     async def _wait_for_reported(self, api_key, sample_id, poll_interval=10, timeout=300):
         """
@@ -101,7 +89,7 @@ class Triage(commands.Cog):
         triage = self._get_triage_client(api_key)
         elapsed = 0
         while elapsed < timeout:
-            sample = await triage.get_sample(sample_id)
+            sample = await triage.sample_by_id(sample_id)
             status = sample.get("status")
             if status == "reported":
                 return True
@@ -117,7 +105,7 @@ class Triage(commands.Cog):
         """
         triage = self._get_triage_client(api_key)
         try:
-            return await triage.get_static_report(sample_id)
+            return await triage.static_report(sample_id)
         except Exception as e:
             raise RuntimeError(f"Triage API static report error: {e}")
 
@@ -127,11 +115,6 @@ class Triage(commands.Cog):
         attachment,
         submitter=None,
         *,
-        target=None,
-        password=None,
-        user_tags=None,
-        timeout=None,
-        network=None,
         interactive=None,
         profiles=None,
     ):
@@ -147,11 +130,6 @@ class Triage(commands.Cog):
                 api_key,
                 file_bytes,
                 attachment.filename,
-                target=target,
-                password=password,
-                user_tags=user_tags,
-                timeout=timeout,
-                network=network,
                 interactive=interactive,
                 profiles=profiles,
             )
@@ -246,7 +224,7 @@ class Triage(commands.Cog):
     @commands.group(name="triage", invoke_without_command=True)
     async def triage(self, ctx):
         """
-        Analyze files for malware using hatchling-triage.
+        Analyze files for malware using tria.ge API.
         """
         await ctx.send_help()
 
@@ -331,21 +309,17 @@ class Triage(commands.Cog):
         self,
         ctx,
         *,
-        target: str = None,
-        password: str = None,
-        user_tags: str = None,
-        timeout: int = None,
-        network: str = None,
         interactive: bool = None,
+        profiles: str = None,
     ):
         """
         Manually scan attachments in your message for malware.
 
         Optional arguments:
-        [--target FILENAME] [--password PASSWORD] [--user_tags TAG1,TAG2,...] [--timeout SECONDS] [--network internet|drop|tor] [--interactive true|false]
+        [--interactive true|false] [--profiles prof1,prof2,...]
 
         Example:
-        [p]triage scan --target myfile.exe --user_tags id:123,source:smtp --timeout 60 --network tor
+        [p]triage scan --interactive true --profiles win7,win10
         """
         if not ctx.message.attachments:
             await ctx.send("Please attach a file to scan.")
@@ -355,10 +329,12 @@ class Triage(commands.Cog):
             await ctx.send("Triage API key not set in Red's keystore. Use `[p]triage apikey <key>` to set it.")
             return
 
-        # Parse user_tags if provided as comma-separated string
-        tags = None
-        if user_tags:
-            tags = [t.strip() for t in user_tags.split(",") if t.strip()]
+        # Parse profiles if provided as comma-separated string
+        profiles_list = None
+        if profiles:
+            profiles_list = [p.strip() for p in profiles.split(",") if p.strip()]
+        else:
+            profiles_list = []
 
         # Parse interactive if provided as string
         interactive_bool = None
@@ -374,11 +350,7 @@ class Triage(commands.Cog):
                 ctx.guild,
                 attachment,
                 submitter=ctx.author,
-                target=target,
-                password=password,
-                user_tags=tags,
-                timeout=timeout,
-                network=network,
                 interactive=interactive_bool,
+                profiles=profiles_list,
             )
             await ctx.send(result)
