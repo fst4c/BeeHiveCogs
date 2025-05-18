@@ -94,10 +94,11 @@ class TriageAnalysis(commands.Cog):
 
     @triage.command(name="threshold")
     @commands.mod_or_permissions(manage_guild=True)
-    async def triage_autoscan_threshold(self, ctx, score: int):
+    async def triage_threshold(self, ctx, score: int):
         """
         Set a detection threshold for automatic actions
         
+        [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-threshold>)
         """
         if score < 0 or score > 10:
             embed = discord.Embed(
