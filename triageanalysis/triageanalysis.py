@@ -609,7 +609,7 @@ class TriageAnalysis(commands.Cog):
             embed = discord.Embed(
                 title="Analysis complete",
                 description=f"Sample ID: `{sample_id}`\nStatus: `{status}`",
-                color=discord.Color.orange() if score and score >= 5 else 0x2bbd8e if score and score < 5 else discord.Color.default()
+                color=0xff4545 if score and score >= 7 else 0x2bbd8e if score and score < 5 else discord.Color.orange()
             )
             if target_name:
                 embed.add_field(name="Target", value=target_name, inline=True)
@@ -725,9 +725,9 @@ class TriageAnalysis(commands.Cog):
             if log_channel:
                 try:
                     embed = discord.Embed(
-                        title="Scanning File",
-                        description=f"🔎 Scanning file `{filename}` from {message.author.mention} for malware...",
-                        color=discord.Color.blurple() if hasattr(discord.Color, "blurple") else discord.Color.blue()
+                        title="Analyzing file in the background",
+                        description=f"Scanning file `{filename}` from {message.author.mention} for malware...",
+                        color=0xfffffe
                     )
                     notify_msg = await log_channel.send(embed=embed)
                 except Exception:
