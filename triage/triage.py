@@ -2,9 +2,10 @@ import discord
 from redbot.core import commands, Config, checks
 from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import box
-import aiohttp
 import asyncio
-import json
+
+# Use the hatchling-triage package
+from hatchling_triage import TriageAsync
 
 class Triage(commands.Cog):
     """
@@ -23,18 +24,17 @@ class Triage(commands.Cog):
             log_channel=None,
             submission_history={},
         )
-        self.session = aiohttp.ClientSession()
-        self.triage_api_url = "https://api.tria.ge/v0/samples"
+        self._triage_clients = {}
 
     async def cog_unload(self):
-        await self.session.close()
+        # Close all TriageAsync clients
+        for client in self._triage_clients.values():
+            await client.close()
+        self._triage_clients.clear()
 
     async def _get_api_key(self, guild):
         # Use the global keystore for the triage apikey
-        # The key is stored as "triage" -> "apikey"
-        # This is a global key, not per-guild
         tokens = await self.bot.get_shared_api_tokens("triage")
-        # Triage expects the API key as a string, not None or empty
         api_key = tokens.get("apikey")
         if not api_key or not isinstance(api_key, str) or not api_key.strip():
             return None
@@ -45,6 +45,12 @@ class Triage(commands.Cog):
         if channel_id:
             return guild.get_channel(channel_id)
         return None
+
+    def _get_triage_client(self, api_key):
+        # Cache TriageAsync clients per API key
+        if api_key not in self._triage_clients:
+            self._triage_clients[api_key] = TriageAsync(api_key)
+        return self._triage_clients[api_key]
 
     async def _submit_file(
         self,
@@ -61,119 +67,46 @@ class Triage(commands.Cog):
         profiles=None,
     ):
         """
-        Submit a file to Triage with optional parameters.
-
-        :param api_key: Triage API key
-        :param file_bytes: File content (bytes)
-        :param filename: Name of the file
-        :param target: Optional custom filename for the sample
-        :param password: Optional password for archive
-        :param user_tags: Optional list of user tags
-        :param timeout: Optional timeout (int, seconds)
-        :param network: Optional network type ("internet", "drop", "tor")
-        :param interactive: Optional bool, if true, manual profile selection
-        :param profiles: Optional list of profiles
+        Submit a file to Triage with optional parameters using hatchling-triage.
         """
-        # Triage expects the Authorization header as "Bearer <API_KEY>"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-        }
-        data = aiohttp.FormData()
-        data.add_field("file", file_bytes, filename=filename)
+        triage = self._get_triage_client(api_key)
+        kwargs = {}
+        if target:
+            kwargs["target"] = target
+        if password:
+            kwargs["password"] = password
+        if user_tags:
+            kwargs["user_tags"] = user_tags
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        if network:
+            kwargs["network"] = network
+        if interactive is not None:
+            kwargs["interactive"] = interactive
+        if profiles:
+            kwargs["profiles"] = profiles
 
-        # If any nested/complex fields are present, use _json
-        use_json = profiles is not None
+        # hatchling-triage expects a file-like object, so wrap bytes in BytesIO
+        import io
+        file_obj = io.BytesIO(file_bytes)
+        file_obj.name = filename
 
-        if use_json:
-            # Build the JSON payload
-            payload = {"kind": "file"}
-            if target:
-                payload["target"] = target
-            if password:
-                payload["password"] = password
-            if user_tags:
-                payload["user_tags"] = user_tags
-            if interactive is not None:
-                payload["interactive"] = interactive
-            if profiles:
-                payload["profiles"] = profiles
-            defaults = {}
-            if timeout is not None:
-                defaults["timeout"] = timeout
-            if network:
-                defaults["network"] = network
-            if defaults:
-                payload["defaults"] = defaults
-            data.add_field("_json", json.dumps(payload))
-        else:
-            # Use simple form fields
-            data.add_field("kind", "file")
-            if target:
-                data.add_field("target", target)
-            if password:
-                data.add_field("password", password)
-            if user_tags:
-                for tag in user_tags:
-                    data.add_field("user_tags", tag)
-            if interactive is not None:
-                data.add_field("interactive", str(interactive).lower())
-            if timeout is not None:
-                data.add_field("defaults.timeout", str(timeout))
-            if network:
-                data.add_field("defaults.network", network)
-
-        # Triage expects the Authorization header and the API key to be valid.
-        # If you get a 401, the key is likely invalid or for the wrong endpoint.
-        async with self.session.post(self.triage_api_url, headers=headers, data=data) as resp:
-            if resp.status in (201, 200):
-                return await resp.json()
-            elif resp.status == 401:
-                text = await resp.text()
-                raise RuntimeError(
-                    "Triage API error: 401 Unauthorized. "
-                    "Check your API key and endpoint. "
-                    "See https://tria.ge/docs/ for details. "
-                    f"Response: {text}"
-                )
-            else:
-                text = await resp.text()
-                raise RuntimeError(f"Triage API error: {resp.status} {text}")
+        # Returns a dict with at least an "id" key
+        return await triage.submit_file(file_obj, **kwargs)
 
     async def _wait_for_reported(self, api_key, sample_id, poll_interval=10, timeout=300):
         """
         Polls the Triage API for the sample status until it is 'reported' or timeout is reached.
-
-        :param api_key: Triage API key
-        :param sample_id: The sample ID to poll
-        :param poll_interval: How often to poll (seconds)
-        :param timeout: Maximum time to wait (seconds)
-        :return: True if status is 'reported', else False
         """
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-        }
-        url = f"{self.triage_api_url}/{sample_id}"
+        triage = self._get_triage_client(api_key)
         elapsed = 0
         while elapsed < timeout:
-            async with self.session.get(url, headers=headers) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    status = data.get("status")
-                    if status == "reported":
-                        return True
-                    elif status in ("failed", "error"):
-                        raise RuntimeError(f"Triage analysis failed: {status}")
-                elif resp.status == 401:
-                    text = await resp.text()
-                    raise RuntimeError(
-                        "Triage API polling error: 401 Unauthorized. "
-                        "Check your API key and endpoint. "
-                        "See https://tria.ge/docs/ for details. "
-                        f"Response: {text}"
-                    )
-                else:
-                    text = await resp.text()
-                    raise RuntimeError(f"Triage API polling error: {resp.status} {text}")
+            sample = await triage.get_sample(sample_id)
+            status = sample.get("status")
+            if status == "reported":
+                return True
+            elif status in ("failed", "error"):
+                raise RuntimeError(f"Triage analysis failed: {status}")
             await asyncio.sleep(poll_interval)
             elapsed += poll_interval
         raise RuntimeError("Timed out waiting for Triage analysis to complete.")
@@ -182,26 +115,11 @@ class Triage(commands.Cog):
         """
         Fetches the static report for the sample.
         """
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-        }
-        url = f"{self.triage_api_url}/{sample_id}/static.json"
-        async with self.session.get(url, headers=headers) as resp:
-            if resp.status == 200:
-                return await resp.json()
-            elif resp.status == 404:
-                raise RuntimeError("Sample not found in Triage static report.")
-            elif resp.status == 401:
-                text = await resp.text()
-                raise RuntimeError(
-                    "Triage API static report error: 401 Unauthorized. "
-                    "Check your API key and endpoint. "
-                    "See https://tria.ge/docs/ for details. "
-                    f"Response: {text}"
-                )
-            else:
-                text = await resp.text()
-                raise RuntimeError(f"Triage API static report error: {resp.status} {text}")
+        triage = self._get_triage_client(api_key)
+        try:
+            return await triage.get_static_report(sample_id)
+        except Exception as e:
+            raise RuntimeError(f"Triage API static report error: {e}")
 
     async def _analyze_attachment(
         self,
@@ -219,17 +137,6 @@ class Triage(commands.Cog):
     ):
         """
         Analyze a Discord attachment using Triage.
-
-        :param guild: Discord guild
-        :param attachment: Discord attachment
-        :param submitter: User who submitted
-        :param target: Optional custom filename
-        :param password: Optional password for archive
-        :param user_tags: Optional list of user tags
-        :param timeout: Optional timeout (int, seconds)
-        :param network: Optional network type
-        :param interactive: Optional bool
-        :param profiles: Optional list of profiles
         """
         api_key = await self._get_api_key(guild)
         if not api_key:
@@ -342,16 +249,6 @@ class Triage(commands.Cog):
         Analyze files for malware using hatchling-triage.
         """
         await ctx.send_help()
-
-    @triage.command(name="apikey")
-    @commands.admin_or_permissions(manage_guild=True)
-    async def triage_apikey(self, ctx, api_key: str):
-        """
-        Set the Triage API key for this bot (global, Red keystore).
-        """
-        # Store the API key in Red's keystore, not in config
-        await self.bot.set_shared_api_tokens("triage", apikey=api_key.strip())
-        await ctx.send("Triage API key set in Red's keystore (global).")
 
     @triage.command(name="autolog")
     @commands.admin_or_permissions(manage_guild=True)
