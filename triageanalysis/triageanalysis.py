@@ -18,6 +18,7 @@ import json
 import os
 import platform
 import asyncio
+import aiohttp
 
 import datetime
 import re
@@ -163,6 +164,8 @@ class TriageAnalysis(commands.Cog):
     async def triage_autoscan_logchannel(self, ctx, channel: discord.TextChannel = None):
         """
         Set the log channel
+
+        [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-logs>)
         """
         if channel is None:
             await self.config.guild(ctx.guild).autoscan_log_channel.set(None)
@@ -184,7 +187,11 @@ class TriageAnalysis(commands.Cog):
     @triage.command(name="settings")
     @commands.mod_or_permissions(manage_guild=True)
     async def triage_autoscan_status(self, ctx):
-        """Show the current settings"""
+        """
+        Show the current settings
+        
+        [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-settings>)
+        """
         conf = await self.config.guild(ctx.guild).all()
         enabled = conf.get("autoscan_enabled", False)
         threshold = conf.get("autoscan_score_threshold", 5)
@@ -214,7 +221,11 @@ class TriageAnalysis(commands.Cog):
     # --- All users commands ---
     @triage.command()
     async def url(self, ctx, url: str):
-        """Donate file from URL for analysis."""
+        """
+        Donate file from URL for analysis.
+        
+        [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-url>)
+        """
         try:
             client = await self.get_client(ctx.guild)
             data = client.submit_sample_url(url)
@@ -234,7 +245,11 @@ class TriageAnalysis(commands.Cog):
 
     @triage.command()
     async def sample(self, ctx, sample_id: str):
-        """Get info about a sample by ID."""
+        """
+        Get info about a sample by ID.
+        
+        [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-sample>)
+        """
         try:
             client = await self.get_client(ctx.guild)
             data = client.sample_by_id(sample_id)
@@ -256,7 +271,11 @@ class TriageAnalysis(commands.Cog):
 
     @triage.command()
     async def search(self, ctx, *, query: str):
-        """Search for samples."""
+        """
+        Search for samples.
+        
+        [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-search>)
+        """
         try:
             client = await self.get_client(ctx.guild)
             paginator = client.search(query)
@@ -281,7 +300,11 @@ class TriageAnalysis(commands.Cog):
 
     @triage.command()
     async def static(self, ctx, sample_id: str):
-        """Get the static report for a sample."""
+        """
+        Get the static report for a sample
+        
+        [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-static>)
+        """
         try:
             client = await self.get_client(ctx.guild)
             data = client.static_report(sample_id)
@@ -302,7 +325,11 @@ class TriageAnalysis(commands.Cog):
 
     @triage.command()
     async def overview(self, ctx, sample_id: str):
-        """Get the overview report for a sample."""
+        """
+        Get the overview report for a sample.
+        
+        [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-overview>)
+        """
         try:
             client = await self.get_client(ctx.guild)
             data = client.overview_report(sample_id)
@@ -323,16 +350,32 @@ class TriageAnalysis(commands.Cog):
 
     @triage.command()
     async def download(self, ctx, sample_id: str):
-        """Download the sample file."""
+        """
+        Download the sample file.
+        
+        [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-download>)
+        """
         try:
             client = await self.get_client(ctx.guild)
             file_bytes = client.get_sample_file(sample_id)
+            # Upload to temp.sh
+            temp_url = None
+            async with aiohttp.ClientSession() as session:
+                data = aiohttp.FormData()
+                data.add_field('file', BytesIO(file_bytes), filename=f"{sample_id}.bin")
+                async with session.post("https://temp.sh/upload", data=data) as resp:
+                    if resp.status == 200:
+                        temp_url = (await resp.text()).strip()
+                    else:
+                        raise RuntimeError(f"Failed to upload to temp.sh (status {resp.status})")
+            if not temp_url or not temp_url.startswith("https://temp.sh/"):
+                raise RuntimeError("Failed to upload file to temp.sh")
             embed = discord.Embed(
                 title="Sample Download",
-                description=f"Here is the file for sample `{sample_id}`.",
+                description=f"Here is the download link for sample `{sample_id}`:\n{temp_url}",
                 color=0x2bbd8e
             )
-            await ctx.send(embed=embed, file=discord.File(BytesIO(file_bytes), filename=f"{sample_id}.bin"))
+            await ctx.send(embed=embed)
         except Exception as e:
             embed = discord.Embed(
                 title="Error",
