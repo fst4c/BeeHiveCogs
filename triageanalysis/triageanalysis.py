@@ -118,10 +118,11 @@ class TriageAnalysis(commands.Cog):
 
     @triage.command(name="action")
     @commands.admin_or_permissions(administrator=True)
-    async def triage_autoscan_punishment(self, ctx, punishment: str, timeout_seconds: int = 600):
+    async def triage_action(self, ctx, punishment: str, timeout_seconds: int = 600):
         """
         Set a punishment for sharing malware
 
+        [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-action>)
         """
         punishment = punishment.lower()
         if punishment not in ("none", "kick", "ban", "timeout"):
