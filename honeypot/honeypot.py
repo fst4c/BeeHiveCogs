@@ -747,7 +747,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         Set the automated action to take when a user triggers the honeypot.
 
         Valid actions:
-        - timeout: Timeout the user for a configurable number of days (see `[p]honeypot timeoutdays`).
+        - timeout: Timeout the user for a configurable number of days (see `[p]honeypot days`).
         - kick: Kick the user from the server.
         - ban: Ban the user from the server.
 
@@ -772,8 +772,8 @@ class Honeypot(commands.Cog, name="Honeypot"):
             await ctx.send(embed=embed)
 
     @commands.admin_or_permissions(manage_guild=True)
-    @honeypot.command(name="timeoutdays")
-    async def timeoutdays(self, ctx: commands.Context, days: int) -> None:
+    @honeypot.command(name="days")
+    async def days(self, ctx: commands.Context, days: int) -> None:
         """
         Set the number of days for the timeout punishment (1-28).
 
