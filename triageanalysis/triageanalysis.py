@@ -464,11 +464,6 @@ class TriageAnalysis(commands.Cog):
                 await ctx.send(embed=embed)
                 return
 
-            # Send the entire overview as a JSON file
-            overview_json = json.dumps(overview, indent=2)
-            overview_bytes = BytesIO(overview_json.encode("utf-8"))
-            overview_bytes.seek(0)
-
             # --- Compose the embed with rich info ---
             # Try to extract as much as possible from the overview structure
             sample_info = overview.get("sample", {})
@@ -601,13 +596,29 @@ class TriageAnalysis(commands.Cog):
             if ips:
                 embed.add_field(name="IPs", value=", ".join(ips[:5]) + (f", ...and {len(ips)-5} more" if len(ips) > 5 else ""), inline=False)
 
-            embed.set_footer(text="Full overview report attached as JSON.")
+            embed.set_footer(text="Full overview report available on tria.ge.")
 
-            await ctx.send(
-                content="Analysis complete! See below for summary and attached overview report.",
-                embed=embed,
-                file=discord.File(overview_bytes, filename=f"{sample_id}_overview.json")
-            )
+            # Add a URL button to view the report on tria.ge
+            try:
+                view = ui.View()
+                view.add_item(
+                    ui.Button(
+                        label="View on tria.ge",
+                        url=f"https://tria.ge/{sample_id}",
+                        style=ButtonStyle.link
+                    )
+                )
+                await ctx.send(
+                    content="Analysis complete! See below for summary.",
+                    embed=embed,
+                    view=view
+                )
+            except Exception:
+                # Fallback if discord.ui is not available or fails
+                await ctx.send(
+                    content=f"Analysis complete! See below for summary.\nView on tria.ge: https://tria.ge/{sample_id}",
+                    embed=embed
+                )
         except Exception as e:
             embed = discord.Embed(
                 title="Error",
