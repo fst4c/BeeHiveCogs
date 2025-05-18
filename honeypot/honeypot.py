@@ -556,8 +556,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         """
         Create a honeypot channel in your server.
 
-        This will create a new text channel named 'honeypot' with special instructions and permissions.
-        Only one honeypot channel can exist per server.
+        [View command documentation](<https://sentri.beehive.systems/features/honeypot-channels#honeypot-create>)
         """
         async with ctx.typing():
             honeypot_channel_id = await self.config.guild(ctx.guild).honeypot_channel()
