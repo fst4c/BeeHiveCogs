@@ -505,7 +505,7 @@ class TriageAnalysis(commands.Cog):
                     if dt.tzinfo is None:
                         dt = dt.replace(tzinfo=datetime.timezone.utc)
                     unix_ts = int(dt.timestamp())
-                    return f"<t:{unix_ts}:F>"
+                    return f"<t:{unix_ts}:R>"
                 except Exception:
                     return dtstr
 
