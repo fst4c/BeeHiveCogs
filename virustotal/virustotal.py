@@ -308,8 +308,19 @@ class VirusTotal(commands.Cog):
                                             await ctx.send(f":warning: Failed to {malware_action} {member.mention}: {e}")
 
                                     if malicious > 0 or suspicious > 0:
-                                        # Alert in context channel
-                                        await ctx.send(f"Alert: The file `{file_name}` is flagged as malicious or suspicious.")
+                                        # Attempt to delete the file message if possible
+                                        if message:
+                                            try:
+                                                await message.delete()
+                                            except Exception:
+                                                pass
+                                        # Send alert as an embed
+                                        alert_embed = discord.Embed(
+                                            title="Malware detected",
+                                            description=f"Malware or suspicious behavor was detected in file `{file_name}`",
+                                            color=0xfffffe
+                                        )
+                                        await ctx.send(embed=alert_embed)
                                         # Log to log channel if set
                                         if log_channel:
                                             try:
