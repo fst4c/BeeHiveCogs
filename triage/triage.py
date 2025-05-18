@@ -178,30 +178,30 @@ class Triage(commands.Cog):
             elapsed += poll_interval
         raise RuntimeError("Timed out waiting for Triage analysis to complete.")
 
-    async def _get_overview(self, api_key, sample_id):
+    async def _get_static_report(self, api_key, sample_id):
         """
-        Fetches the overview report for the sample.
+        Fetches the static report for the sample.
         """
         headers = {
             "Authorization": f"Bearer {api_key}",
         }
-        url = f"{self.triage_api_url}/{sample_id}/overview.json"
+        url = f"{self.triage_api_url}/{sample_id}/static.json"
         async with self.session.get(url, headers=headers) as resp:
             if resp.status == 200:
                 return await resp.json()
             elif resp.status == 404:
-                raise RuntimeError("Sample not found in Triage overview.")
+                raise RuntimeError("Sample not found in Triage static report.")
             elif resp.status == 401:
                 text = await resp.text()
                 raise RuntimeError(
-                    "Triage API overview error: 401 Unauthorized. "
+                    "Triage API static report error: 401 Unauthorized. "
                     "Check your API key and endpoint. "
                     "See https://tria.ge/docs/ for details. "
                     f"Response: {text}"
                 )
             else:
                 text = await resp.text()
-                raise RuntimeError(f"Triage API overview error: {resp.status} {text}")
+                raise RuntimeError(f"Triage API static report error: {resp.status} {text}")
 
     async def _analyze_attachment(
         self,
@@ -258,19 +258,22 @@ class Triage(commands.Cog):
             except Exception as e:
                 return f"Error waiting for analysis: {e}"
 
-            # Fetch overview
+            # Fetch static report
             try:
-                overview = await self._get_overview(api_key, sample_id)
+                static_report = await self._get_static_report(api_key, sample_id)
             except Exception as e:
-                return f"Error fetching overview: {e}"
+                return f"Error fetching static report: {e}"
 
-            # Parse overview for summary
+            # Parse static report for summary
             summary_lines = []
-            sample_info = overview.get("sample", {})
-            analysis = overview.get("analysis", {})
-            targets = overview.get("targets", [])
-            extracted = overview.get("extracted", [])
-            tasks = overview.get("tasks", {})
+            sample_info = static_report.get("sample", {})
+            static = static_report.get("static", {})
+            pe = static.get("pe", {})
+            elf = static.get("elf", {})
+            macho = static.get("macho", {})
+            tags = static_report.get("tags", [])
+            verdict = static_report.get("verdict", "unknown")
+            score = static_report.get("score", "unknown")
 
             # Basic info
             summary_lines.append(f"**Sample ID:** `{sample_id}`")
@@ -282,59 +285,51 @@ class Triage(commands.Cog):
                 summary_lines.append(f"**MD5:** `{sample_info.get('md5')}`")
             if "size" in sample_info:
                 summary_lines.append(f"**Size:** `{sample_info.get('size')} bytes`")
-            if "score" in analysis:
-                summary_lines.append(f"**Analysis Score:** `{analysis.get('score')}`")
+            summary_lines.append(f"**Verdict:** `{verdict}`")
+            summary_lines.append(f"**Score:** `{score}`")
 
-            # Tags, families, signatures
-            if targets:
-                t = targets[0]
-                tags = t.get("tags", [])
-                family = t.get("family", [])
-                signatures = t.get("signatures", [])
-                if tags:
-                    summary_lines.append("**Tags:** " + ", ".join(f"`{tag}`" for tag in tags))
-                if family:
-                    summary_lines.append("**Family:** " + ", ".join(f"`{fam}`" for fam in family))
-                if signatures:
-                    sig_lines = []
-                    for sig in signatures[:3]:  # Show up to 3 signatures
-                        label = sig.get("label", "")
-                        name = sig.get("name", "")
-                        score = sig.get("score", "")
-                        desc = sig.get("desc", "")
-                        sig_lines.append(f"- **{name}** (`{label}`), Score: `{score}`\n  {desc}")
-                    summary_lines.append("**Signatures:**\n" + "\n".join(sig_lines))
-            # Extracted configs
-            if extracted:
-                for ex in extracted:
-                    config = ex.get("config")
-                    if config:
-                        family = config.get("family", "")
-                        rule = config.get("rule", "")
-                        c2s = config.get("c2", [])
-                        version = config.get("version", "")
-                        botnet = config.get("botnet", "")
-                        summary_lines.append(f"**Extracted Config:** Family: `{family}` Rule: `{rule}` Version: `{version}` Botnet: `{botnet}`")
-                        if c2s:
-                            summary_lines.append("**C2s:**\n" + "\n".join(f"`{c2}`" for c2 in c2s[:10]))  # Show up to 10 C2s
-                        break  # Only show first config for brevity
+            # Tags
+            if tags:
+                summary_lines.append("**Tags:** " + ", ".join(f"`{tag}`" for tag in tags))
 
-            # Tasks and their tags/scores
-            if tasks:
-                task_lines = []
-                for task_id, task in tasks.items():
-                    kind = task.get("kind", "")
-                    status = task.get("status", "")
-                    score = task.get("score", "")
-                    tags = task.get("tags", [])
-                    task_lines.append(f"- **{task_id}**: Kind: `{kind}` Status: `{status}` Score: `{score}` Tags: {', '.join(f'`{tag}`' for tag in tags)}")
-                summary_lines.append("**Tasks:**\n" + "\n".join(task_lines[:5]))  # Show up to 5 tasks
+            # PE info
+            if pe:
+                imphash = pe.get("imphash")
+                entrypoint = pe.get("entrypoint")
+                compile_ts = pe.get("compile_ts")
+                sections = pe.get("sections", [])
+                if imphash:
+                    summary_lines.append(f"**PE Imphash:** `{imphash}`")
+                if entrypoint:
+                    summary_lines.append(f"**PE Entrypoint:** `{entrypoint}`")
+                if compile_ts:
+                    summary_lines.append(f"**PE Compile Time:** `{compile_ts}`")
+                if sections:
+                    summary_lines.append(f"**PE Sections:** {', '.join(s.get('name', '') for s in sections[:5])}")
+
+            # ELF info
+            if elf:
+                entrypoint = elf.get("entrypoint")
+                arch = elf.get("arch")
+                if entrypoint:
+                    summary_lines.append(f"**ELF Entrypoint:** `{entrypoint}`")
+                if arch:
+                    summary_lines.append(f"**ELF Arch:** `{arch}`")
+
+            # Mach-O info
+            if macho:
+                entrypoint = macho.get("entrypoint")
+                arch = macho.get("arch")
+                if entrypoint:
+                    summary_lines.append(f"**Mach-O Entrypoint:** `{entrypoint}`")
+                if arch:
+                    summary_lines.append(f"**Mach-O Arch:** `{arch}`")
 
             # Save to submission history
             async with self.config.guild(guild).submission_history() as history:
                 history[attachment.filename] = {
                     "sample_id": sample_id,
-                    "overview": overview,
+                    "static_report": static_report,
                     "submitter": str(submitter) if submitter else None,
                 }
             return "\n".join(summary_lines)
@@ -392,14 +387,15 @@ class Triage(commands.Cog):
         items = list(history.items())[-5:]
         lines = []
         for filename, data in items:
-            overview = data.get("overview")
-            if overview:
-                analysis = overview.get("analysis", {})
-                verdict = f"Score: {analysis.get('score', 'unknown')}"
+            static_report = data.get("static_report")
+            if static_report:
+                score = static_report.get("score", "unknown")
+                verdict = static_report.get("verdict", "unknown")
+                verdict_str = f"Score: {score}, Verdict: {verdict}"
             else:
-                verdict = data.get("verdict", "unknown")
+                verdict_str = data.get("verdict", "unknown")
             submitter = data.get("submitter", "unknown")
-            lines.append(f"**{filename}** - `{verdict}` (by {submitter})")
+            lines.append(f"**{filename}** - `{verdict_str}` (by {submitter})")
         await ctx.send("\n".join(lines))
 
     @commands.Cog.listener()
