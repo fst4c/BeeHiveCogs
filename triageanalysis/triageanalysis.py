@@ -248,10 +248,11 @@ class TriageAnalysis(commands.Cog):
                 else:
                     ttps_str = ""
                 if score_ is not None and text:
-                    sigs.append(f"**{score_}** | *{text}*{ttps_str}\n")
+                    sigs.append(f"**{score_}** | *{text}*{ttps_str}")
                 elif text:
                     sigs.append(f"{text}{ttps_str}")
-            sigs_str = humanize_list(sigs) if sigs else "None"
+            # Join signatures with newlines, not commas
+            sigs_str = "\n".join(sigs) if sigs else "None"
 
             # Compose IOC summary (URLs, domains, IPs)
             iocs = {}
