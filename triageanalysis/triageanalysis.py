@@ -535,8 +535,26 @@ class TriageAnalysis(commands.Cog):
                     sigs.append(f"**{score_}** | *{text}*{ttps_str}")
                 elif text:
                     sigs.append(f"{text}{ttps_str}")
-            # Join signatures with newlines, not commas
-            sigs_str = "\n".join(sigs) if sigs else "None"
+
+            # Add signature fields, splitting into multiple fields if needed
+            # Each field value must be <= 1024 chars
+            sig_field_values = []
+            if sigs:
+                current_value = ""
+                for sig in sigs:
+                    # +1 for newline if not first
+                    add_len = len(sig) + (1 if current_value else 0)
+                    if len(current_value) + add_len > 1024:
+                        sig_field_values.append(current_value)
+                        current_value = sig
+                    else:
+                        if current_value:
+                            current_value += "\n"
+                        current_value += sig
+                if current_value or not sig_field_values:
+                    sig_field_values.append(current_value if current_value else "None")
+            else:
+                sig_field_values = ["None"]
 
             # Compose IOC summary (URLs, domains, IPs)
             iocs = {}
@@ -548,6 +566,8 @@ class TriageAnalysis(commands.Cog):
 
             # Compose tags
             tags_str = ", ".join(tags) if tags else "None"
+            if len(tags_str) > 1024:
+                tags_str = tags_str[:1021] + "..."
 
             # Compose tasks summary
             task_lines = []
@@ -558,6 +578,32 @@ class TriageAnalysis(commands.Cog):
                 t_tags = ", ".join(t.get("tags", [])) if t.get("tags") else ""
                 task_lines.append(f"{t_name} ({t_kind}) - Score: {t_score}" + (f" | Tags: {t_tags}" if t_tags else ""))
             tasks_str = "\n".join(task_lines) if task_lines else "None"
+            if len(tasks_str) > 1024:
+                cutoff = tasks_str.rfind('\n', 0, 1024)
+                if cutoff == -1:
+                    tasks_str = tasks_str[:1021] + "..."
+                else:
+                    tasks_str = tasks_str[:cutoff] + "\n... (truncated)"
+
+            # Compose URLs, Domains, IPs fields, each max 1024 chars
+            def join_and_truncate(items, sep, max_items=5, field_limit=1024):
+                if not items:
+                    return None
+                joined = sep.join(items[:max_items])
+                if len(items) > max_items:
+                    joined += f"{sep}...and {len(items)-max_items} more"
+                if len(joined) > field_limit:
+                    # Truncate at a separator before limit if possible
+                    cutoff = joined.rfind(sep, 0, field_limit)
+                    if cutoff == -1:
+                        joined = joined[:field_limit-3] + "..."
+                    else:
+                        joined = joined[:cutoff] + f"{sep}...(truncated)"
+                return joined
+
+            urls_str = join_and_truncate(urls, "\n", 5, 1024)
+            domains_str = join_and_truncate(domains, ", ", 5, 1024)
+            ips_str = join_and_truncate(ips, ", ", 5, 1024)
 
             # Compose embed
             embed = discord.Embed(
@@ -591,14 +637,16 @@ class TriageAnalysis(commands.Cog):
                 embed.add_field(name="Completed", value=completed_disp, inline=True)
             if tasks_str:
                 embed.add_field(name="Tasks", value=tasks_str, inline=False)
-            if sigs_str:
-                embed.add_field(name="Signatures", value=sigs_str, inline=False)
-            if urls:
-                embed.add_field(name="URLs", value="\n".join(urls[:5]) + (f"\n...and {len(urls)-5} more" if len(urls) > 5 else ""), inline=False)
-            if domains:
-                embed.add_field(name="Domains", value=", ".join(domains[:5]) + (f", ...and {len(domains)-5} more" if len(domains) > 5 else ""), inline=False)
-            if ips:
-                embed.add_field(name="IPs", value=", ".join(ips[:5]) + (f", ...and {len(ips)-5} more" if len(ips) > 5 else ""), inline=False)
+            # Add all signature fields, splitting as needed
+            for i, sig_field in enumerate(sig_field_values):
+                field_name = "Signatures" if i == 0 else f"Signatures (cont. {i})"
+                embed.add_field(name=field_name, value=sig_field, inline=False)
+            if urls_str:
+                embed.add_field(name="URLs", value=urls_str, inline=False)
+            if domains_str:
+                embed.add_field(name="Domains", value=domains_str, inline=False)
+            if ips_str:
+                embed.add_field(name="IPs", value=ips_str, inline=False)
 
             embed.set_footer(text="Full overview report available on tria.ge.")
 
