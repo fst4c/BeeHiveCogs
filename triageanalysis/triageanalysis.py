@@ -4,7 +4,7 @@
 import discord
 from redbot.core import commands, Config, app_commands
 from redbot.core.bot import Red
-from redbot.core.utils.chat_formatting import box, pagify
+from redbot.core.utils.chat_formatting import box, pagify, humanize_list
 
 from io import BytesIO
 from triage.pagination import Paginator
@@ -209,65 +209,110 @@ class TriageAnalysis(commands.Cog):
             overview_json = json.dumps(overview, indent=2)
             overview_bytes = BytesIO(overview_json.encode("utf-8"))
             overview_bytes.seek(0)
-            await ctx.send(
-                content="Analysis complete! See attached overview report.",
-                file=discord.File(overview_bytes, filename=f"{sample_id}_overview.json")
-            )
 
-            # Extract score, tags, etc
-            # The Triage API overview report returns a structure like:
-            # {
-            #   "score": ...,
-            #   "verdict": ...,
-            #   "family": ...,
-            #   "tags": [...],
-            #   "tasks": [
-            #       {
-            #           "score": ...,
-            #           "tags": [...],
-            #           ...
-            #       },
-            #       ...
-            #   ]
-            # }
-            # Sometimes, the top-level "score" and "tags" may be missing or empty.
-            # In that case, aggregate from tasks.
+            # --- Compose the embed with rich info ---
+            # Try to extract as much as possible from the overview structure
+            sample_info = overview.get("sample", {})
+            analysis_info = overview.get("analysis", {})
+            targets = overview.get("targets", [])
+            signatures = overview.get("signatures", [])
+            tasks = overview.get("tasks", [])
 
-            score = overview.get("score")
+            # Fallbacks for top-level info
+            score = analysis_info.get("score") or overview.get("score")
+            tags = analysis_info.get("tags") or overview.get("tags", [])
             verdict = overview.get("verdict", "N/A")
             family = overview.get("family", "N/A")
-            tags = overview.get("tags", [])
+            target_name = sample_info.get("target") or (targets[0].get("target") if targets else None)
+            sample_size = sample_info.get("size") or (targets[0].get("size") if targets else None)
+            md5 = sample_info.get("md5") or (targets[0].get("md5") if targets else None)
+            sha1 = sample_info.get("sha1") or (targets[0].get("sha1") if targets else None)
+            sha256 = sample_info.get("sha256") or (targets[0].get("sha256") if targets else None)
+            ssdeep = sample_info.get("ssdeep") or (targets[0].get("ssdeep") if targets else None)
+            created = sample_info.get("created")
+            completed = sample_info.get("completed")
+            sample_id = sample_info.get("id") or sample_id
 
-            # If score is None or 0, try to get the max score from tasks
-            if not score and "tasks" in overview and overview["tasks"]:
-                task_scores = [t.get("score") for t in overview["tasks"] if t.get("score") is not None]
-                if task_scores:
-                    score = max(task_scores)
-                else:
-                    score = "N/A"
-            elif score is None:
-                score = "N/A"
+            # Compose signatures summary
+            sigs = []
+            for sig in signatures:
+                name = sig.get("name")
+                score_ = sig.get("score")
+                if name and score_ is not None:
+                    sigs.append(f"{name} (score: {score_})")
+                elif name:
+                    sigs.append(name)
+            sigs_str = humanize_list(sigs) if sigs else "None"
 
-            # If tags is empty, aggregate tags from all tasks
-            if (not tags or not isinstance(tags, list) or len(tags) == 0) and "tasks" in overview and overview["tasks"]:
-                tags_set = set()
-                for t in overview["tasks"]:
-                    t_tags = t.get("tags", [])
-                    if isinstance(t_tags, list):
-                        tags_set.update(t_tags)
-                tags = list(tags_set)
+            # Compose IOC summary (URLs, domains, IPs)
+            iocs = {}
+            if targets and "iocs" in targets[0]:
+                iocs = targets[0]["iocs"]
+            urls = iocs.get("urls", []) if iocs else []
+            domains = iocs.get("domains", []) if iocs else []
+            ips = iocs.get("ips", []) if iocs else []
 
-            # Compose a summary
-            summary = (
-                f"**Triage Analysis Results**\n"
-                f"Sample ID: `{sample_id}`\n"
-                f"Status: `{status}`\n"
-                f"Score: `{score}`\n"
-                f"Verdict: `{verdict}`\n"
-                f"Family: `{family}`\n"
-                f"Tags: `{', '.join(tags) if tags else 'None'}`"
+            # Compose tags
+            tags_str = ", ".join(tags) if tags else "None"
+
+            # Compose tasks summary
+            task_lines = []
+            for t in tasks:
+                t_name = t.get("name", "N/A")
+                t_kind = t.get("kind", "N/A")
+                t_score = t.get("score", "N/A")
+                t_tags = ", ".join(t.get("tags", [])) if t.get("tags") else ""
+                task_lines.append(f"{t_name} ({t_kind}) - Score: {t_score}" + (f" | Tags: {t_tags}" if t_tags else ""))
+            tasks_str = "\n".join(task_lines) if task_lines else "None"
+
+            # Compose embed
+            embed = discord.Embed(
+                title="Triage Analysis Results",
+                description=f"Sample ID: `{sample_id}`\nStatus: `{status}`",
+                color=discord.Color.orange() if score and score >= 5 else discord.Color.green() if score and score < 5 else discord.Color.default()
             )
-            await ctx.send(summary)
+            if target_name:
+                embed.add_field(name="Target", value=target_name, inline=True)
+            if sample_size:
+                embed.add_field(name="Size", value=f"{sample_size:,} bytes", inline=True)
+            if score is not None:
+                embed.add_field(name="Score", value=str(score), inline=True)
+            if verdict:
+                embed.add_field(name="Verdict", value=verdict, inline=True)
+            if family:
+                embed.add_field(name="Family", value=family, inline=True)
+            if tags_str:
+                embed.add_field(name="Tags", value=tags_str, inline=False)
+            if md5:
+                embed.add_field(name="MD5", value=md5, inline=False)
+            if sha1:
+                embed.add_field(name="SHA1", value=sha1, inline=False)
+            if sha256:
+                embed.add_field(name="SHA256", value=sha256, inline=False)
+            if ssdeep:
+                embed.add_field(name="SSDEEP", value=ssdeep, inline=False)
+            if created:
+                embed.add_field(name="Created", value=created, inline=True)
+            if completed:
+                embed.add_field(name="Completed", value=completed, inline=True)
+            if tasks_str:
+                embed.add_field(name="Tasks", value=tasks_str, inline=False)
+            if sigs_str:
+                embed.add_field(name="Signatures", value=sigs_str, inline=False)
+            if urls:
+                embed.add_field(name="URLs", value="\n".join(urls[:5]) + (f"\n...and {len(urls)-5} more" if len(urls) > 5 else ""), inline=False)
+            if domains:
+                embed.add_field(name="Domains", value=", ".join(domains[:5]) + (f", ...and {len(domains)-5} more" if len(domains) > 5 else ""), inline=False)
+            if ips:
+                embed.add_field(name="IPs", value=", ".join(ips[:5]) + (f", ...and {len(ips)-5} more" if len(ips) > 5 else ""), inline=False)
+
+            embed.set_footer(text="Full overview report attached as JSON.")
+
+            await ctx.send(
+                content="Analysis complete! See below for summary and attached overview report.",
+                embed=embed,
+                file=discord.File(overview_bytes, filename=f"{sample_id}_overview.json")
+            )
         except Exception as e:
             await ctx.send(f"Error: {e}")
 
