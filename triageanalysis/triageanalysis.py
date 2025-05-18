@@ -612,7 +612,7 @@ class TriageAnalysis(commands.Cog):
                 color=0xff4545 if score and score >= 7 else 0x2bbd8e if score and score < 5 else discord.Color.orange()
             )
             if target_name:
-                embed.add_field(name="Target", value=target_name, inline=True)
+                embed.add_field(name="File name", value=target_name, inline=True)
             if sample_size:
                 embed.add_field(name="Size", value=f"{sample_size:,} bytes", inline=True)
             if score is not None:
