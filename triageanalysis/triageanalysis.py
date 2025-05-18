@@ -638,7 +638,7 @@ class TriageAnalysis(commands.Cog):
                 embed.add_field(name="Tasks", value=tasks_str, inline=False)
             # Add all signature fields, splitting as needed
             for i, sig_field in enumerate(sig_field_values):
-                field_name = "Signatures" if i == 0 else f"Signatures (cont. {i})"
+                field_name = "Signatures" if i == 0 else f"Signatures ({i})"
                 embed.add_field(name=field_name, value=sig_field, inline=False)
             if urls_str:
                 embed.add_field(name="URLs", value=urls_str, inline=False)
