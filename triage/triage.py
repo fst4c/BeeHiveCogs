@@ -124,19 +124,23 @@ class Triage(commands.Cog):
                 text = await resp.text()
                 raise RuntimeError(f"Triage API error: {resp.status} {text}")
 
-    async def _get_report(self, api_key, sample_id):
+    async def _get_overview(self, api_key, sample_id):
+        """
+        Waits 3 minutes, then fetches the overview report for the sample.
+        """
+        await asyncio.sleep(180)  # Wait 3 minutes
         headers = {
             "Authorization": f"Bearer {api_key}",
         }
-        url = f"{self.triage_api_url}/{sample_id}/report"
-        for _ in range(30):  # Wait up to 3 minutes
-            async with self.session.get(url, headers=headers) as resp:
-                if resp.status == 200:
-                    report = await resp.json()
-                    if report.get("status") == "reported":
-                        return report
-                await asyncio.sleep(6)
-        raise RuntimeError("Timed out waiting for Triage report.")
+        url = f"{self.triage_api_url}/{sample_id}/overview.json"
+        async with self.session.get(url, headers=headers) as resp:
+            if resp.status == 200:
+                return await resp.json()
+            elif resp.status == 404:
+                raise RuntimeError("Sample not found in Triage overview.")
+            else:
+                text = await resp.text()
+                raise RuntimeError(f"Triage API overview error: {resp.status} {text}")
 
     async def _analyze_attachment(
         self,
@@ -186,23 +190,87 @@ class Triage(commands.Cog):
             sample_id = submit_result.get("id")
             if not sample_id:
                 return "Failed to submit file to Triage."
-            report = await self._get_report(api_key, sample_id)
-            verdict = report.get("verdict", "unknown")
-            threats = report.get("threats", [])
-            summary = f"**Triage verdict:** `{verdict}`\n"
-            if threats:
-                summary += "**Threats:**\n" + "\n".join(f"- {t}" for t in threats)
-            else:
-                summary += "No threats detected."
+
+            # Wait 3 minutes and fetch overview
+            try:
+                overview = await self._get_overview(api_key, sample_id)
+            except Exception as e:
+                return f"Error fetching overview: {e}"
+
+            # Parse overview for summary
+            summary_lines = []
+            sample_info = overview.get("sample", {})
+            analysis = overview.get("analysis", {})
+            targets = overview.get("targets", [])
+            extracted = overview.get("extracted", [])
+            tasks = overview.get("tasks", {})
+
+            # Basic info
+            summary_lines.append(f"**Sample ID:** `{sample_id}`")
+            if "target" in sample_info:
+                summary_lines.append(f"**Target:** `{sample_info.get('target')}`")
+            if "sha256" in sample_info:
+                summary_lines.append(f"**SHA256:** `{sample_info.get('sha256')}`")
+            if "md5" in sample_info:
+                summary_lines.append(f"**MD5:** `{sample_info.get('md5')}`")
+            if "size" in sample_info:
+                summary_lines.append(f"**Size:** `{sample_info.get('size')} bytes`")
+            if "score" in analysis:
+                summary_lines.append(f"**Analysis Score:** `{analysis.get('score')}`")
+
+            # Tags, families, signatures
+            if targets:
+                t = targets[0]
+                tags = t.get("tags", [])
+                family = t.get("family", [])
+                signatures = t.get("signatures", [])
+                if tags:
+                    summary_lines.append("**Tags:** " + ", ".join(f"`{tag}`" for tag in tags))
+                if family:
+                    summary_lines.append("**Family:** " + ", ".join(f"`{fam}`" for fam in family))
+                if signatures:
+                    sig_lines = []
+                    for sig in signatures[:3]:  # Show up to 3 signatures
+                        label = sig.get("label", "")
+                        name = sig.get("name", "")
+                        score = sig.get("score", "")
+                        desc = sig.get("desc", "")
+                        sig_lines.append(f"- **{name}** (`{label}`), Score: `{score}`\n  {desc}")
+                    summary_lines.append("**Signatures:**\n" + "\n".join(sig_lines))
+            # Extracted configs
+            if extracted:
+                for ex in extracted:
+                    config = ex.get("config")
+                    if config:
+                        family = config.get("family", "")
+                        rule = config.get("rule", "")
+                        c2s = config.get("c2", [])
+                        version = config.get("version", "")
+                        botnet = config.get("botnet", "")
+                        summary_lines.append(f"**Extracted Config:** Family: `{family}` Rule: `{rule}` Version: `{version}` Botnet: `{botnet}`")
+                        if c2s:
+                            summary_lines.append("**C2s:**\n" + "\n".join(f"`{c2}`" for c2 in c2s[:10]))  # Show up to 10 C2s
+                        break  # Only show first config for brevity
+
+            # Tasks and their tags/scores
+            if tasks:
+                task_lines = []
+                for task_id, task in tasks.items():
+                    kind = task.get("kind", "")
+                    status = task.get("status", "")
+                    score = task.get("score", "")
+                    tags = task.get("tags", [])
+                    task_lines.append(f"- **{task_id}**: Kind: `{kind}` Status: `{status}` Score: `{score}` Tags: {', '.join(f'`{tag}`' for tag in tags)}")
+                summary_lines.append("**Tasks:**\n" + "\n".join(task_lines[:5]))  # Show up to 5 tasks
+
             # Save to submission history
             async with self.config.guild(guild).submission_history() as history:
                 history[attachment.filename] = {
                     "sample_id": sample_id,
-                    "verdict": verdict,
-                    "threats": threats,
+                    "overview": overview,
                     "submitter": str(submitter) if submitter else None,
                 }
-            return summary
+            return "\n".join(summary_lines)
         except Exception as e:
             return f"Error analyzing file: {e}"
 
@@ -257,7 +325,12 @@ class Triage(commands.Cog):
         items = list(history.items())[-5:]
         lines = []
         for filename, data in items:
-            verdict = data.get("verdict", "unknown")
+            overview = data.get("overview")
+            if overview:
+                analysis = overview.get("analysis", {})
+                verdict = f"Score: {analysis.get('score', 'unknown')}"
+            else:
+                verdict = data.get("verdict", "unknown")
             submitter = data.get("submitter", "unknown")
             lines.append(f"**{filename}** - `{verdict}` (by {submitter})")
         await ctx.send("\n".join(lines))
@@ -281,7 +354,7 @@ class Triage(commands.Cog):
             embed = discord.Embed(
                 title="Triage Malware Scan Result",
                 description=result,
-                color=discord.Color.red() if "malicious" in result.lower() else discord.Color.green(),
+                color=discord.Color.red() if "malicious" in result.lower() or "score: 10" in result.lower() else discord.Color.green(),
             )
             embed.add_field(name="File", value=attachment.filename)
             embed.add_field(name="User", value=message.author.mention)
