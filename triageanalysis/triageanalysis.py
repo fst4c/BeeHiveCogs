@@ -154,7 +154,7 @@ class TriageAnalysis(commands.Cog):
             )
             await ctx.send(embed=embed)
 
-    @triage_autoscan.command(name="logchannel")
+    @triage.command(name="logs")
     async def triage_autoscan_logchannel(self, ctx, channel: discord.TextChannel = None):
         """
         Set the log channel for autoscan events. If no channel is provided, disables logging.
