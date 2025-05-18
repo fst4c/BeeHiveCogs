@@ -4,8 +4,8 @@ from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import box
 import asyncio
 
-# Do NOT import triage.Client at module level to avoid circular import.
-# We'll import it inside the method where it's needed.
+# Do NOT import the "Triage" package as "triage" at module level to avoid shadowing the cog.
+# We'll import it as "triage_api" inside the method where it's needed.
 
 class Triage(commands.Cog):
     """
@@ -45,9 +45,22 @@ class Triage(commands.Cog):
         return None
 
     def _get_triage_client(self, api_key):
-        # Import triage.Client here to avoid circular import at module level
+        # Import the Triage API package as triage_api to avoid shadowing the cog name
         if api_key not in self._triage_clients:
-            from triage import Client as TriageClient
+            try:
+                import triage as triage_api
+                TriageClient = triage_api.Client
+            except ImportError:
+                try:
+                    from triage.client import Client as TriageClient
+                except ImportError as e:
+                    raise RuntimeError(
+                        f"Could not import Triage Client: {e}. "
+                        "Please ensure the triage Python package is installed and up to date."
+                    )
+            else:
+                # If import triage as triage_api worked, use triage_api.Client
+                pass
             self._triage_clients[api_key] = TriageClient(token=api_key)
         return self._triage_clients[api_key]
 
@@ -63,7 +76,7 @@ class Triage(commands.Cog):
         """
         Submit a file to Triage using triage.Client.
         """
-        triage = self._get_triage_client(api_key)
+        triage_client = self._get_triage_client(api_key)
         import io
         file_obj = io.BytesIO(file_bytes)
         # triage.Client expects a file-like object with a name attribute
@@ -81,16 +94,16 @@ class Triage(commands.Cog):
             kwargs["profiles"] = []
 
         # submit_sample_file is a coroutine
-        return await triage.submit_sample_file(filename, file_obj, **kwargs)
+        return await triage_client.submit_sample_file(filename, file_obj, **kwargs)
 
     async def _wait_for_reported(self, api_key, sample_id, poll_interval=10, timeout=300):
         """
         Polls the Triage API for the sample status until it is 'reported' or timeout is reached.
         """
-        triage = self._get_triage_client(api_key)
+        triage_client = self._get_triage_client(api_key)
         elapsed = 0
         while elapsed < timeout:
-            sample = await triage.sample_by_id(sample_id)
+            sample = await triage_client.sample_by_id(sample_id)
             status = sample.get("status")
             if status == "reported":
                 return True
@@ -104,9 +117,9 @@ class Triage(commands.Cog):
         """
         Fetches the static report for the sample.
         """
-        triage = self._get_triage_client(api_key)
+        triage_client = self._get_triage_client(api_key)
         try:
-            return await triage.static_report(sample_id)
+            return await triage_client.static_report(sample_id)
         except Exception as e:
             raise RuntimeError(f"Triage API static report error: {e}")
 
