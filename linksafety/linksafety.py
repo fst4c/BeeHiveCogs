@@ -82,7 +82,7 @@ class LinkSafety(commands.Cog):
         """
         Scan links sent in your server's chats automatically to see if they're known malicious or not
 
-        [Check the docs to learn more](<https://sentri.beehive.systems/features/link-scanning>)
+        **[Check the docs to learn more](<https://sentri.beehive.systems/features/link-scanning>)**
         """
 
     @commands.admin_or_permissions()
@@ -148,7 +148,7 @@ class LinkSafety(commands.Cog):
         **`delete`** - Deletes the message
         **`kick`** - Delete message and kick sender
         **`ban`** - Delete message and ban sender (recommended)
-        **`timeout`** - Temporarily mute the user
+        **`timeout`** - Time the user out
         """
         valid_actions = ["ignore", "notify", "delete", "kick", "ban", "timeout"]
         if action not in valid_actions:
@@ -161,7 +161,7 @@ class LinkSafety(commands.Cog):
                     "`delete` - Deletes the message\n"
                     "`kick` - Delete message and kick sender\n"
                     "`ban` - Delete message and ban sender (recommended)\n"
-                    "`timeout` - Temporarily mute the user\n\n"
+                    "`timeout` - Time the user out\n\n"
                     "Retry that command with one of the above options."
                 ),
                 colour=16729413,
@@ -195,11 +195,11 @@ class LinkSafety(commands.Cog):
 
     @commands.admin_or_permissions()
     @linksafety.command()
-    async def timeoutduration(self, ctx: Context, minutes: int):
+    async def duration(self, ctx: Context, minutes: int):
         """
         Set the timeout duration (in minutes) for the timeout action.
 
-        Example: `[p]linksafety timeoutduration 60` will timeout users for 60 minutes.
+        Example: `[p]linksafety duration 60` will timeout users for 60 minutes.
         """
         if minutes < 1 or minutes > 10080:  # 1 minute to 7 days
             await ctx.send("Timeout duration must be between 1 and 10080 minutes (7 days).")
