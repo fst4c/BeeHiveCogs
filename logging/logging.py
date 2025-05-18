@@ -81,7 +81,7 @@ class Logging(EventMixin, commands.Cog):
         Thanks Sinbad!
         """
         pre_processed = super().format_help_for_context(ctx)
-        return f"{pre_processed}\n\nCog Version: {self.__version__}"
+        return f"{pre_processed}\n\nVersion: {self.__version__}"
 
     async def cog_unload(self):
         self.invite_links_loop.stop()
