@@ -623,8 +623,6 @@ class TriageAnalysis(commands.Cog):
                 embed.add_field(name="Family", value=family, inline=True)
             if tags_str:
                 embed.add_field(name="Tags", value=tags_str, inline=False)
-            if md5:
-                embed.add_field(name="MD5", value=md5, inline=False)
             if sha1:
                 embed.add_field(name="SHA1", value=sha1, inline=False)
             if sha256:
