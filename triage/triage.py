@@ -118,17 +118,48 @@ class Triage(commands.Cog):
                 data.add_field("defaults.network", network)
 
         async with self.session.post(self.triage_api_url, headers=headers, data=data) as resp:
-            if resp.status == 201:
+            # Accept both 201 (created) and 200 (pending) as valid responses
+            if resp.status in (201, 200):
                 return await resp.json()
             else:
                 text = await resp.text()
                 raise RuntimeError(f"Triage API error: {resp.status} {text}")
 
+    async def _wait_for_reported(self, api_key, sample_id, poll_interval=10, timeout=300):
+        """
+        Polls the Triage API for the sample status until it is 'reported' or timeout is reached.
+
+        :param api_key: Triage API key
+        :param sample_id: The sample ID to poll
+        :param poll_interval: How often to poll (seconds)
+        :param timeout: Maximum time to wait (seconds)
+        :return: True if status is 'reported', else False
+        """
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+        }
+        url = f"{self.triage_api_url}/{sample_id}"
+        elapsed = 0
+        while elapsed < timeout:
+            async with self.session.get(url, headers=headers) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    status = data.get("status")
+                    if status == "reported":
+                        return True
+                    elif status in ("failed", "error"):
+                        raise RuntimeError(f"Triage analysis failed: {status}")
+                else:
+                    text = await resp.text()
+                    raise RuntimeError(f"Triage API polling error: {resp.status} {text}")
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
+        raise RuntimeError("Timed out waiting for Triage analysis to complete.")
+
     async def _get_overview(self, api_key, sample_id):
         """
-        Waits 3 minutes, then fetches the overview report for the sample.
+        Fetches the overview report for the sample.
         """
-        await asyncio.sleep(180)  # Wait 3 minutes
         headers = {
             "Authorization": f"Bearer {api_key}",
         }
@@ -191,7 +222,13 @@ class Triage(commands.Cog):
             if not sample_id:
                 return "Failed to submit file to Triage."
 
-            # Wait 3 minutes and fetch overview
+            # Wait for the sample to be fully analyzed (status == "reported")
+            try:
+                await self._wait_for_reported(api_key, sample_id)
+            except Exception as e:
+                return f"Error waiting for analysis: {e}"
+
+            # Fetch overview
             try:
                 overview = await self._get_overview(api_key, sample_id)
             except Exception as e:
