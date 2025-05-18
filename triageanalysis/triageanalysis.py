@@ -373,17 +373,22 @@ class TriageAnalysis(commands.Cog):
                         raise RuntimeError(f"Failed to upload to tmpfiles.org (status {resp.status})")
             if not tmpfiles_url or not tmpfiles_url.startswith("https://tmpfiles.org/"):
                 raise RuntimeError("Failed to upload file to tmpfiles.org")
-            warning_message = (
-                f":warning: **Malware Download Warning** :warning:\n\n"
-                f"You requested a download link for sample `{sample_id}`. "
-                f"This file is almost certainly **malicious** and is provided **strictly for research and analysis purposes**.\n\n"
-                f"**Do not run this file on your computer unless you know exactly what you are doing.**\n"
-                f"Open only in a secure, isolated environment (sandbox/VM) and never on a production or personal system.\n\n"
-                f"**Download link:**\n{tmpfiles_url}\n\n"
-                f"By downloading, you accept all risk and responsibility. If you are not sure, do not proceed."
+            # Compose the warning as an embed
+            warning_embed = discord.Embed(
+                title="Here's the sample you requested",
+                description=(
+                    f"You requested a download link for sample `{sample_id}`. "
+                    f"This file is almost certainly **malicious** and is provided **strictly for research and analysis purposes**.\n\n"
+                    f"**Do not run this file on your computer unless you know exactly what you are doing.**\n"
+                    f"Open only in a secure, isolated environment (sandbox/VM) and never on a production or personal system.\n\n"
+                    f"**[Download sample]({tmpfiles_url})**\n\n"
+                    f"By downloading, you accept all risk and responsibility. If you are not sure, do not proceed."
+                ),
+                color=discord.Color.red()
             )
+            warning_embed.set_footer(text="If you are not sure, do not proceed.")
             try:
-                await ctx.author.send(warning_message)
+                await ctx.author.send(embed=warning_embed)
                 await ctx.send(f":mailbox_with_mail: Check your DMs for the download link and warning, {ctx.author.mention}.")
             except discord.Forbidden:
                 await ctx.send(
