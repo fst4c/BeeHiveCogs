@@ -268,6 +268,7 @@ class AutoMod(commands.Cog):
                     await self.update_moderation_stats(guild.id, message, image_category_scores)
                     # Track which image was flagged for this message
                     self._flagged_image_for_message[message.id] = attachment.url
+                    # Always pass the flagged image url to handle_moderation for logging
                     await self.handle_moderation(message, image_category_scores, flagged_image_url=attachment.url)
                 else:
                     # If not flagged, ensure we don't leave a stale value
@@ -285,7 +286,9 @@ class AutoMod(commands.Cog):
                 await self.handle_moderation(message, text_category_scores, flagged_image_url=None)
 
             if await guild_conf.debug_mode():
-                await self.log_message(message, text_category_scores)
+                # For debug logging, also use the flagged image if present
+                flagged_image_url = self._flagged_image_for_message.get(message.id)
+                await self.log_message(message, text_category_scores, flagged_image_url=flagged_image_url)
         except Exception as e:
             raise RuntimeError(f"Error processing message: {e}")
 
@@ -739,7 +742,7 @@ class AutoMod(commands.Cog):
             except Exception:
                 await interaction.response.send_message("Failed to ban user.", ephemeral=True)
 
-    async def log_message(self, message, category_scores, error_code=None):
+    async def log_message(self, message, category_scores, error_code=None, flagged_image_url=None):
         try:
             guild = message.guild
             log_channel_id = await self.config.guild(guild).log_channel()
@@ -748,9 +751,10 @@ class AutoMod(commands.Cog):
                 log_channel = guild.get_channel(log_channel_id)
                 if log_channel:
                     # If an image was flagged for this message, use it in the embed
-                    flagged_image_url = self._flagged_image_for_message.get(message.id)
+                    # Give priority to the flagged_image_url argument, then fallback to self._flagged_image_for_message
+                    image_url = flagged_image_url if flagged_image_url else self._flagged_image_for_message.get(message.id)
                     embed = await self._create_moderation_embed(
-                        message, category_scores, "Message processed by Omni", "No action taken", flagged_image_url=flagged_image_url
+                        message, category_scores, "Message processed by Omni", "No action taken", flagged_image_url=image_url
                     )
                     if error_code:
                         embed.add_field(name="Error", value=f":x: `{error_code}` Failed to send to moderation endpoint.", inline=False)
