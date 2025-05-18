@@ -277,7 +277,7 @@ class Transcriber(commands.Cog):
                     embeds = []
                     max_length = 4096
                     for i in range(0, len(transcription), max_length):
-                        embed = discord.Embed(title="", description=transcription[i:i+max_length], color=highest_role_color)
+                        embed = discord.Embed(title="", description=f"### {transcription[i:i+max_length]}", color=highest_role_color)
                         embed.set_author(name=f"{message.author.display_name} said...", icon_url=message.author.avatar.url)
                         word_count = len(transcription.split())
                         footer_text = f"{transcription_time_display} to transcribe {word_count} words"
