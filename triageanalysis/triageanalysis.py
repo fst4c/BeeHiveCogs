@@ -1,8 +1,8 @@
-# Copyright (C) 2020-2023 Hatching B.V
+# Portions of this code copyright (C) 2020-2023 Hatching B.V
 # All rights reserved.
 
 import discord
-from discord import ui  # <-- Needed for discord.ui.View and discord.ui.Button
+from discord import ui
 from redbot.core import commands, Config, app_commands
 from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import box, pagify, humanize_list
