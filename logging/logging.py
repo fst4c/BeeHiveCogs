@@ -149,7 +149,7 @@ class Logging(EventMixin, commands.Cog):
             "thread_delete": _("Thread deleted"),
             "thread_change": _("Thread changed"),
         }
-        msg = _("Setting for {guild}\n Modlog Channel {channel}\n\n").format(
+        msg = _("Logging settings for {guild}\nCurrent logging channel: {channel}\n\n").format(
             guild=guild.name, channel=modlog_channel
         )
         if guild.id not in self.settings:
@@ -220,7 +220,7 @@ class Logging(EventMixin, commands.Cog):
         self, ctx: commands.Context, colour: discord.Colour, *events: EventChooser
     ):
         """
-        Set custom colours for modlog events
+        Set custom colours for logging events
 
         - `<colour>` must be a hex code or a [built colour.](https://discordpy.readthedocs.io/en/latest/api.html#colour)
         """
@@ -245,7 +245,7 @@ class Logging(EventMixin, commands.Cog):
         self, ctx: commands.Context, true_or_false: bool, *events: EventChooser
     ) -> None:
         """
-        Set modlog events to use embeds or text
+        Set logging events to use embeds or text
 
         - `<true_or_false>` The desired embed setting either on or off.
         """
@@ -273,7 +273,7 @@ class Logging(EventMixin, commands.Cog):
         *events: EventChooser,
     ) -> None:
         """
-        Set the emoji used in text modlogs.
+        Set the emoji used in text logging.
 
         - `<new_emoji>` can be any discord emoji or unicode emoji the bot has access to use.
         """
@@ -306,7 +306,7 @@ class Logging(EventMixin, commands.Cog):
         *events: EventChooser,
     ) -> None:
         """
-        Turn on and off specific modlog actions
+        Turn on and off specific logging actions
 
         - `<true_or_false>` Either on or off.
         """
@@ -333,7 +333,7 @@ class Logging(EventMixin, commands.Cog):
         *events: str,
     ) -> None:
         """
-        Set the channel for modlogs.
+        Set the channel for logging.
 
         - `<channel>` The text channel to send the events to.
         - `[events...]` The events to set, or use `all` to set all logging types.
@@ -376,7 +376,7 @@ class Logging(EventMixin, commands.Cog):
         *events: EventChooser,
     ) -> None:
         """
-        Reset the modlog event to the default modlog channel.
+        Reset the logging event to the default logging channel.
         """
         if not events:
             return await ctx.send(_("You must provide which events should be included."))
