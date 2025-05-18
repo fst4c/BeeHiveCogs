@@ -536,6 +536,25 @@ class AutoMod(commands.Cog):
         except Exception:
             return None
 
+    async def _upload_to_tmpfiles(self, file_path):
+        """
+        Upload a file to tmpfiles.org and return the URL.
+        """
+        try:
+            if self.session is None or getattr(self.session, "closed", True):
+                self.session = aiohttp.ClientSession()
+            with open(file_path, "rb") as f:
+                data = aiohttp.FormData()
+                data.add_field("file", f, filename=os.path.basename(file_path))
+                async with self.session.post("https://tmpfiles.org/api/v1/upload", data=data) as resp:
+                    if resp.status == 200:
+                        resp_json = await resp.json()
+                        tmpfiles_url = resp_json.get("data", {}).get("url")
+                        return tmpfiles_url
+        except Exception:
+            return None
+        return None
+
     async def handle_moderation(self, message, category_scores, flagged_image_url=None):
         try:
             guild = message.guild
@@ -547,6 +566,7 @@ class AutoMod(commands.Cog):
             message_deleted = False
             flagged_image_tempfile = None
             flagged_image_filename = None
+            flagged_image_tmpfiles_url = None
 
             # If a flagged image is present, download it before deletion using tempfile
             if flagged_image_url:
@@ -589,6 +609,12 @@ class AutoMod(commands.Cog):
                     pass
                 except discord.Forbidden:
                     pass
+
+            # If the message was deleted and we have a flagged image tempfile, upload it to tmpfiles
+            if message_deleted and flagged_image_tempfile and flagged_image_filename:
+                flagged_image_tmpfiles_url = await self._upload_to_tmpfiles(flagged_image_tempfile.name)
+            else:
+                flagged_image_tmpfiles_url = None
 
             timeout_issued = False
             if timeout_duration > 0:
@@ -659,8 +685,17 @@ class AutoMod(commands.Cog):
             if log_channel_id:
                 log_channel = guild.get_channel(log_channel_id)
                 if log_channel:
+                    # Use the tmpfiles url if the message was deleted and we have a flagged image tempfile
+                    embed_image_url = None
+                    if message_deleted and flagged_image_tmpfiles_url:
+                        embed_image_url = flagged_image_tmpfiles_url
+                    elif flagged_image_url:
+                        embed_image_url = flagged_image_url
+                    else:
+                        embed_image_url = None
+
                     embed = await self._create_moderation_embed(
-                        message, category_scores, "AI moderator detected potential misbehavior", action_taken, flagged_image_url=flagged_image_url
+                        message, category_scores, "AI moderator detected potential misbehavior", action_taken, flagged_image_url=embed_image_url
                     )
                     # Use the ModerationActionView from views.py instead of the local class
                     timeout_issued_val = timeout_issued
@@ -668,8 +703,9 @@ class AutoMod(commands.Cog):
                     view = views.ModerationActionView(self, message, timeout_issued_val, timeout_duration=timeout_duration_val)
                     # If a flagged image was present and we have the tempfile, send as a file
                     if flagged_image_tempfile and flagged_image_filename:
-                        # Set the embed image to the attachment
-                        embed.set_image(url=f"attachment://{flagged_image_filename}")
+                        # Set the embed image to the attachment if not using tmpfiles url
+                        if not (message_deleted and flagged_image_tmpfiles_url):
+                            embed.set_image(url=f"attachment://{flagged_image_filename}")
                         try:
                             with open(flagged_image_tempfile.name, "rb") as f:
                                 file = discord.File(f, filename=flagged_image_filename)
@@ -705,7 +741,6 @@ class AutoMod(commands.Cog):
 
         # If a flagged_image_url is provided, use it as the embed image
         if flagged_image_url:
-            # If the image will be attached as a file, the url will be set to attachment:// in handle_moderation
             embed.set_image(url=flagged_image_url)
         else:
             # Fallback: if not provided, use the first image attachment (as before)
@@ -793,6 +828,32 @@ class AutoMod(commands.Cog):
                     # If an image was flagged for this message, use it in the embed
                     # Give priority to the flagged_image_url argument, then fallback to self._flagged_image_for_message
                     image_url = flagged_image_url if flagged_image_url else self._flagged_image_for_message.get(message.id)
+                    # If the message was deleted and the image_url is a Discord CDN url, try to upload it to tmpfiles
+                    if image_url and isinstance(image_url, str) and image_url.startswith("https://cdn.discordapp.com/"):
+                        # Download and upload to tmpfiles
+                        tmpfiles_url = None
+                        try:
+                            if self.session is None or getattr(self.session, "closed", True):
+                                self.session = aiohttp.ClientSession()
+                            async with self.session.get(image_url) as resp:
+                                if resp.status == 200:
+                                    # Try to get the filename from the URL
+                                    filename = image_url.split("/")[-1]
+                                    if not filename or "." not in filename:
+                                        filename = "flagged_image.png"
+                                    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(filename)[-1]) as tmpf:
+                                        tmpf.write(await resp.read())
+                                        tmpf.flush()
+                                        tmpf.close()
+                                        tmpfiles_url = await self._upload_to_tmpfiles(tmpf.name)
+                                    try:
+                                        os.unlink(tmpf.name)
+                                    except Exception:
+                                        pass
+                        except Exception:
+                            tmpfiles_url = None
+                        if tmpfiles_url:
+                            image_url = tmpfiles_url
                     embed = await self._create_moderation_embed(
                         message, category_scores, "Message processed by Omni", "No action taken", flagged_image_url=image_url
                     )
