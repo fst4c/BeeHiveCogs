@@ -36,7 +36,8 @@ class LinkSafety(commands.Cog):
             timeouts=0,
             last_updated=None,
             vendor_server_id=None,
-            log_channel=None
+            log_channel=None,
+            timeout_duration=30,  # Default timeout duration in minutes
         )
         self.config.register_member(caught=0)
         self.session = aiohttp.ClientSession()
@@ -79,7 +80,9 @@ class LinkSafety(commands.Cog):
     @commands.guild_only()
     async def linksafety(self, ctx: Context):
         """
-        Configurable options to help keep known malicious links out of your community's conversations.
+        Scan links sent in your server's chats automatically to see if they're known malicious or not
+
+        [Check the docs to learn more](<https://sentri.beehive.systems/features/link-scanning>)
         """
 
     @commands.admin_or_permissions()
@@ -115,6 +118,7 @@ class LinkSafety(commands.Cog):
         guild_data = await self.config.guild(ctx.guild).all()
         vendor_server_id = guild_data.get('vendor_server_id', None)
         log_channel_id = guild_data.get('log_channel', None)
+        timeout_duration = guild_data.get('timeout_duration', 30)
         vendor_status = "Not connected"
         if vendor_server_id:
             vendor_server = self.bot.get_guild(vendor_server_id)
@@ -129,6 +133,7 @@ class LinkSafety(commands.Cog):
         embed.add_field(name="Action", value=f"{guild_data.get('action', 'Not set').title()}", inline=False)
         embed.add_field(name="Security vendor", value=vendor_status, inline=False)
         embed.add_field(name="Log channel", value=log_channel_status, inline=False)
+        embed.add_field(name="Timeout duration", value=f"{timeout_duration} minute(s)", inline=False)
         await ctx.send(embed=embed)
 
     @commands.admin_or_permissions()
@@ -187,6 +192,20 @@ class LinkSafety(commands.Cog):
 
         embed = discord.Embed(title='Settings changed', description=description, colour=colour)
         await ctx.send(embed=embed)
+
+    @commands.admin_or_permissions()
+    @linksafety.command()
+    async def timeoutduration(self, ctx: Context, minutes: int):
+        """
+        Set the timeout duration (in minutes) for the timeout action.
+
+        Example: `[p]linksafety timeoutduration 60` will timeout users for 60 minutes.
+        """
+        if minutes < 1 or minutes > 10080:  # 1 minute to 7 days
+            await ctx.send("Timeout duration must be between 1 and 10080 minutes (7 days).")
+            return
+        await self.config.guild(ctx.guild).timeout_duration.set(minutes)
+        await ctx.send(f"Timeout duration set to **{minutes}** minute(s).")
 
     @linksafety.command()
     async def stats(self, ctx: Context):
@@ -469,8 +488,11 @@ class LinkSafety(commands.Cog):
                     ):
                         return
 
-                    # Timeout the user for 10 minutes
-                    timeout_duration = datetime.timedelta(minutes=30)
+                    # Timeout the user for the configured duration
+                    minutes = await self.config.guild(message.guild).timeout_duration()
+                    if not isinstance(minutes, int) or minutes < 1:
+                        minutes = 30  # fallback to default if not set or invalid
+                    timeout_duration = datetime.timedelta(minutes=minutes)
                     await message.author.timeout_for(timeout_duration, reason="Shared a known dangerous link")
 
                 timeouts = await self.config.guild(message.guild).timeouts()  # Retrieve current timeout count
