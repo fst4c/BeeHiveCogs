@@ -617,9 +617,9 @@ class TriageAnalysis(commands.Cog):
                 embed.add_field(name="Size", value=f"{sample_size:,} bytes", inline=True)
             if score is not None:
                 embed.add_field(name="Score", value=str(score), inline=True)
-            if verdict:
+            if verdict and verdict != "N/A":
                 embed.add_field(name="Verdict", value=verdict, inline=True)
-            if family:
+            if family and family != "N/A":
                 embed.add_field(name="Family", value=family, inline=True)
             if tags_str:
                 embed.add_field(name="Tags", value=tags_str, inline=False)
