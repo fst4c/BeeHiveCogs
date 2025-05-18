@@ -411,9 +411,9 @@ class TriageAnalysis(commands.Cog):
             file_bytes = await attachment.read()
             filename = attachment.filename
             embed = discord.Embed(
-                title="Submitting File",
-                description="Submitting file for analysis...",
-                color=discord.Color.blurple() if hasattr(discord.Color, "blurple") else discord.Color.blue()
+                title="Uploading file",
+                description="Your sample is uploading, please wait...",
+                color=0xfffffe
             )
             await ctx.send(embed=embed)
             data = client.submit_sample_file(filename, BytesIO(file_bytes))
@@ -427,9 +427,9 @@ class TriageAnalysis(commands.Cog):
                 await ctx.send(embed=embed)
                 return
             embed = discord.Embed(
-                title="Sample Submitted",
-                description=f"Sample submitted! ID: `{sample_id}`. Waiting for analysis to complete...",
-                color=discord.Color.blurple() if hasattr(discord.Color, "blurple") else discord.Color.blue()
+                title="Analysis starting",
+                description=f"File was uploaded successfully, and an analysis environment is being created.\n- Please wait, your results will be ready momentarily.",
+                color=0xfffffe
             )
             await ctx.send(embed=embed)
 
@@ -561,7 +561,7 @@ class TriageAnalysis(commands.Cog):
 
             # Compose embed
             embed = discord.Embed(
-                title="Triage Analysis Results",
+                title="Analysis complete",
                 description=f"Sample ID: `{sample_id}`\nStatus: `{status}`",
                 color=discord.Color.orange() if score and score >= 5 else 0x2bbd8e if score and score < 5 else discord.Color.default()
             )
