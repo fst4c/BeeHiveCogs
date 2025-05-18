@@ -1,0 +1,486 @@
+# Copyright (C) 2020-2023 Hatching B.V
+# All rights reserved.
+
+import discord
+from red_commands import commands, checks
+from redbot.core import commands as redcommands, Config, app_commands
+from redbot.core.bot import Red
+from redbot.core.utils.chat_formatting import box, pagify
+
+from io import BytesIO
+from triage.pagination import Paginator
+from .__version__ import __version__
+from requests import Request, Session, exceptions, utils
+
+import binascii
+import urllib3
+import json
+import os
+import platform
+import asyncio
+
+urllib3.disable_warnings()
+
+class TriageAnalysis(commands.Cog):
+    """
+    Triage Analysis - Interact with the Triage API from Discord.
+    """
+
+    def __init__(self, bot: Red):
+        self.bot = bot
+        self.config = Config.get_conf(self, identifier=0xDEADBEEF, force_registration=True)
+        default_guild = {
+            "token": None
+        }
+        self.config.register_guild(**default_guild)
+
+    async def get_client(self, guild):
+        token = await self.config.guild(guild).token()
+        if not token:
+            raise RuntimeError("Triage API token not set for this server. Use `[p]triage settoken <token>`.")
+        return Client(token)
+
+    @redcommands.group()
+    async def triage(self, ctx):
+        """Triage API commands."""
+        pass
+
+    @triage.command()
+    @checks.admin_or_permissions(manage_guild=True)
+    async def settoken(self, ctx, token: str):
+        """Set the Triage API token for this server."""
+        await self.config.guild(ctx.guild).token.set(token)
+        await ctx.send("Triage API token set for this server.")
+
+    @triage.command()
+    async def submiturl(self, ctx, url: str):
+        """Submit a URL for analysis."""
+        try:
+            client = await self.get_client(ctx.guild)
+            data = client.submit_sample_url(url)
+            await ctx.send(f"Sample submitted! ID: `{data.get('id')}` Status: `{data.get('status')}`")
+        except Exception as e:
+            await ctx.send(f"Error: {e}")
+
+    @triage.command()
+    async def sample(self, ctx, sample_id: str):
+        """Get info about a sample by ID."""
+        try:
+            client = await self.get_client(ctx.guild)
+            data = client.sample_by_id(sample_id)
+            await ctx.send(box(json.dumps(data, indent=2), lang="json"))
+        except Exception as e:
+            await ctx.send(f"Error: {e}")
+
+    @triage.command()
+    async def search(self, ctx, *, query: str):
+        """Search for samples."""
+        try:
+            client = await self.get_client(ctx.guild)
+            paginator = client.search(query)
+            results = []
+            for i, sample in enumerate(paginator):
+                if i >= 10:
+                    break
+                results.append(f"{sample.get('id', 'N/A')}: {sample.get('status', 'N/A')}")
+            if results:
+                await ctx.send(box("\n".join(results)))
+            else:
+                await ctx.send("No results found.")
+        except Exception as e:
+            await ctx.send(f"Error: {e}")
+
+    @triage.command()
+    async def staticreport(self, ctx, sample_id: str):
+        """Get the static report for a sample."""
+        try:
+            client = await self.get_client(ctx.guild)
+            data = client.static_report(sample_id)
+            for page in pagify(json.dumps(data, indent=2), page_length=1900):
+                await ctx.send(box(page, lang="json"))
+        except Exception as e:
+            await ctx.send(f"Error: {e}")
+
+    @triage.command()
+    async def overview(self, ctx, sample_id: str):
+        """Get the overview report for a sample."""
+        try:
+            client = await self.get_client(ctx.guild)
+            data = client.overview_report(sample_id)
+            for page in pagify(json.dumps(data, indent=2), page_length=1900):
+                await ctx.send(box(page, lang="json"))
+        except Exception as e:
+            await ctx.send(f"Error: {e}")
+
+    @triage.command()
+    async def download(self, ctx, sample_id: str):
+        """Download the sample file."""
+        try:
+            client = await self.get_client(ctx.guild)
+            file_bytes = client.get_sample_file(sample_id)
+            await ctx.send(file=discord.File(BytesIO(file_bytes), filename=f"{sample_id}.bin"))
+        except Exception as e:
+            await ctx.send(f"Error: {e}")
+
+    @triage.command()
+    async def events(self, ctx, sample_id: str):
+        """Stream events of a running sample (first 10 events)."""
+        try:
+            client = await self.get_client(ctx.guild)
+            events = client.sample_events(sample_id)
+            lines = []
+            for i, event in enumerate(events):
+                if i >= 10:
+                    break
+                lines.append(json.dumps(event))
+            if lines:
+                await ctx.send(box("\n".join(lines), lang="json"))
+            else:
+                await ctx.send("No events found.")
+        except Exception as e:
+            await ctx.send(f"Error: {e}")
+
+    @triage.command()
+    async def submitfile(self, ctx):
+        """Submit a file for analysis. Attach a file to this command."""
+        if not ctx.message.attachments:
+            await ctx.send("Please attach a file to submit.")
+            return
+        attachment = ctx.message.attachments[0]
+        try:
+            client = await self.get_client(ctx.guild)
+            file_bytes = await attachment.read()
+            filename = attachment.filename
+            # Use BytesIO for file-like object
+            data = client.submit_sample_file(filename, BytesIO(file_bytes))
+            await ctx.send(f"Sample submitted! ID: `{data.get('id')}` Status: `{data.get('status')}`")
+        except Exception as e:
+            await ctx.send(f"Error: {e}")
+
+    @triage.command()
+    async def analyze(self, ctx):
+        """
+        Submit a file for analysis and return the results (score, tags, etc) after analysis is complete.
+        Attach a file to this command.
+        """
+        if not ctx.message.attachments:
+            await ctx.send("Please attach a file to analyze.")
+            return
+        attachment = ctx.message.attachments[0]
+        try:
+            client = await self.get_client(ctx.guild)
+            file_bytes = await attachment.read()
+            filename = attachment.filename
+            await ctx.send("Submitting file for analysis...")
+            data = client.submit_sample_file(filename, BytesIO(file_bytes))
+            sample_id = data.get("id")
+            if not sample_id:
+                await ctx.send("Failed to submit file for analysis.")
+                return
+            await ctx.send(f"Sample submitted! ID: `{sample_id}`. Waiting for analysis to complete...")
+
+            # Poll for analysis completion
+            max_wait = 300  # seconds
+            poll_interval = 5  # seconds
+            waited = 0
+            status = None
+            while waited < max_wait:
+                sample_info = client.sample_by_id(sample_id)
+                status = sample_info.get("status")
+                if status in ("reported", "failed", "finished", "complete"):
+                    break
+                await asyncio.sleep(poll_interval)
+                waited += poll_interval
+
+            if status not in ("reported", "finished", "complete"):
+                await ctx.send(f"Analysis did not complete in {max_wait} seconds. Status: `{status}`")
+                return
+
+            # Try to get overview report
+            try:
+                overview = client.overview_report(sample_id)
+            except Exception as e:
+                await ctx.send(f"Analysis finished, but failed to fetch overview report: {e}")
+                return
+
+            # Extract score, tags, etc
+            score = overview.get("score", "N/A")
+            tags = overview.get("tags", [])
+            verdict = overview.get("verdict", "N/A")
+            family = overview.get("family", "N/A")
+            # Compose a summary
+            summary = (
+                f"**Triage Analysis Results**\n"
+                f"Sample ID: `{sample_id}`\n"
+                f"Status: `{status}`\n"
+                f"Score: `{score}`\n"
+                f"Verdict: `{verdict}`\n"
+                f"Family: `{family}`\n"
+                f"Tags: `{', '.join(tags) if tags else 'None'}`"
+            )
+            await ctx.send(summary)
+        except Exception as e:
+            await ctx.send(f"Error: {e}")
+
+# --- Below is the original Client and helpers, unchanged except for moving into the cog file ---
+
+class Client:
+    def __init__(self, token, root_url='https://api.tria.ge'):
+        self.token = token
+        self.root_url = root_url.rstrip('/')
+
+    def _new_request(self, method, path, j=None, b=None, headers=None):
+        if headers is None:
+            headers = {}
+
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "User-Agent": f"Python/{platform.python_version()} "
+                          f"Triage Python Client/{__version__}",
+            **headers
+        }
+        if j:
+            return Request(method, self.root_url + path, data=json.dumps(j), headers=headers)
+        return Request(method, self.root_url + path, data=b, headers=headers)
+
+    def _req_file(self, method, path):
+        r = self._new_request(method, path)
+        with Session() as s:
+            settings = s.merge_environment_settings(r.url, {}, None, False, None)
+            return s.send(r.prepare(), **settings).content
+
+    def _req_json(self, method, path, data=None):
+        if data is None:
+            r = self._new_request(method, path, data)
+        else:
+            r = self._new_request(method, path, data,
+                headers={'Content-Type': 'application/json'})
+
+        try:
+            with Session() as s:
+                settings = s.merge_environment_settings(r.url, {}, None, False, None)
+                res = s.send(r.prepare(), **settings)
+                res.raise_for_status()
+                return res.json()
+        except exceptions.HTTPError as err:
+            raise ServerError(err)
+
+    def submit_sample_file(self, filename, file, interactive=False, profiles=None, password=None, timeout=150, network="internet", escape_filename=True, tags=None):
+        if profiles is None:
+            profiles = []
+
+        d = {
+            'kind': 'file',
+            'interactive': interactive,
+            'profiles': profiles,
+            'defaults': {
+                'timeout': timeout,
+                'network': network
+            }
+        }
+        if tags:
+            d['user_tags'] = tags
+
+        if escape_filename:
+            filename = filename.replace('"', '\\"')
+        if password:
+            d['password'] = password
+        body, content_type = encode_multipart_formdata({
+            '_json': json.dumps(d),
+            'file': (filename, file),
+        })
+        r = self._new_request('POST', '/v0/samples', b=body,
+            headers={"Content-Type": content_type}
+        )
+        try:
+            with Session() as s:
+                settings = s.merge_environment_settings(r.url, {}, None, False, None)
+                res = s.send(r.prepare(), **settings)
+                res.raise_for_status()
+                return res.json()
+        except exceptions.HTTPError as err:
+            raise ServerError(err)
+
+    def submit_sample_url(self, url, interactive=False, profiles=None):
+        if profiles is None:
+            profiles = []
+        return self._req_json('POST', '/v0/samples', {
+            'kind': 'url',
+            'url': url,
+            'interactive': interactive,
+            'profiles': profiles,
+        })
+
+    def set_sample_profile(self, sample_id, profiles):
+        return self._req_json('POST', '/v0/samples/%s/profile' % sample_id, {
+            'auto': False,
+            'profiles': profiles,
+        })
+
+    def set_sample_profile_automatically(self, sample_id, pick=None):
+        if pick is None:
+            pick = []
+        return self._req_json('POST', '/v0/samples/%s/profile' % sample_id, {
+            'auto': True,
+            'pick': pick,
+        })
+
+    def org_samples(self, max=20):
+        return Paginator(self, '/v0/samples?subset=org', max)
+
+    def owned_samples(self, max=20):
+        return Paginator(self, '/v0/samples?subset=owned', max)
+
+    def public_samples(self, max=20):
+        return Paginator(self, '/v0/samples?subset=public', max)
+
+    def sample_by_id(self, sample_id):
+        return self._req_json('GET', '/v0/samples/{0}'.format(sample_id))
+
+    def get_sample_file(self, sample_id):
+        return self._req_file("GET", "/v0/samples/{0}/sample".format(sample_id))
+
+    def delete_sample(self, sample_id):
+        return self._req_json('DELETE', '/v0/samples/{0}'.format(sample_id))
+
+    def search(self, query, max=20):
+        params = utils.quote(query)
+        return Paginator(self, '/v0/search?query={0}'.format(params), max)
+
+    def static_report(self, sample_id):
+        return self._req_json(
+            'GET', '/v0/samples/{0}/reports/static'.format(sample_id)
+        )
+
+    def overview_report(self, sample_id):
+        return self._req_json(
+            'GET', '/v1/samples/{0}/overview.json'.format(sample_id)
+        )
+
+    def kernel_report(self, sample_id, task_id):
+        overview = self.overview_report(sample_id)
+        for t in overview.get("tasks", []):
+            if t.get("name") == task_id:
+                task = t
+                break
+        else:
+            raise ValueError("Task does not exist")
+
+        log_file = None
+        platform = task.get("platform") or task.get("os")
+        if "windows" in platform:
+            log_file = "onemon"
+        elif "linux" in platform or "ubuntu" in platform:
+            log_file = "stahp"
+        elif "macos" in platform:
+            log_file = "bigmac"
+        elif "android" in platform:
+            log_file = "droidy"
+        else:
+            raise ValueError("Platform not supported")
+
+        r = self._new_request(
+            'GET', '/v0/samples/{0}/{1}/logs/{2}.json'.format(
+                sample_id, task_id, log_file)
+        )
+
+        with Session() as s:
+            settings = s.merge_environment_settings(r.url, {}, None, False, None)
+            res = s.send(r.prepare(), **settings)
+            res.raise_for_status()
+            for entry in res.content.split(b"\n"):
+                if entry.strip() == b"":
+                    break
+                yield json.loads(entry)
+
+    def task_report(self, sample_id, task_id):
+        return self._req_json(
+            'GET', '/v0/samples/{0}/{1}/report_triage.json'.format(
+                sample_id, task_id)
+        )
+
+    def sample_task_file(self, sample_id, task_id, filename):
+        return self._req_file(
+            "GET", "/v0/samples/{0}/{1}/{2}".format(
+                sample_id, task_id, filename)
+        )
+
+    def sample_archive_tar(self, sample_id):
+        return self._req_file(
+            "GET", "/v0/samples/{0}/archive".format(sample_id)
+        )
+
+    def sample_archive_zip(self, sample_id):
+        return self._req_file(
+            "GET", "/v0/samples/{0}/archive.zip".format(sample_id)
+        )
+
+    def create_profile(self, name, tags, network, timeout):
+        return self._req_json("POST", "/v0/profiles", data={
+            "name": name,
+            "tags": tags,
+            "network": network,
+            "timeout": timeout
+        })
+
+    def delete_profile(self, profile_id):
+        return self._req_json('DELETE', '/v0/profiles/{0}'.format(profile_id))
+
+    def profiles(self, max=20):
+        return Paginator(self, '/v0/profiles', max)
+
+    def sample_events(self, sample_id):
+        events = self._new_request("GET", "/v0/samples/"+sample_id+"/events")
+        with Session() as s:
+            settings = s.merge_environment_settings(events.url, {}, None, False, None)
+            if 'stream' in settings:
+                del settings['stream']
+            res = s.send(events.prepare(), stream=True, **settings)
+            for line in res.iter_lines():
+                if line:
+                    yield json.loads(line)
+
+def PrivateClient(token):
+    return Client(token, "https://private.tria.ge/api")
+
+class ServerError(Exception):
+    def __init__(self, err):
+        try:
+            b = err.response.json()
+        except json.JSONDecodeError:
+            b = {}
+
+        self.status = err.response.status_code
+        self.kind = b.get("error", "")
+        self.message = b.get("message", "")
+
+    def __str__(self):
+        return 'triage: {0} {1}: {2}'.format(
+            self.status, self.kind, self.message)
+
+
+def encode_multipart_formdata(fields):
+    boundary = binascii.hexlify(os.urandom(16)).decode('ascii')
+
+    body = BytesIO()
+    for field, value in fields.items(): # (name, file)
+        if isinstance(value, tuple):
+            filename, file = value
+            body.write('--{boundary}\r\nContent-Disposition: form-data; '
+                       'filename="{filename}"; name=\"{field}\"\r\n\r\n'
+                .format(boundary=boundary, field=field, filename=filename)
+                .encode('utf-8'))
+            b = file.read()
+            if isinstance(b, str):  # If the file was opened in text mode
+                b = b.encode('ascii')
+            body.write(b)
+            body.write(b'\r\n')
+        else:
+            body.write('--{boundary}\r\nContent-Disposition: form-data;'
+                       'name="{field}"\r\n\r\n{value}\r\n'
+                .format(boundary=boundary, field=field, value=value)
+                .encode('utf-8'))
+    body.write('--{0}--\r\n'.format(boundary).encode('utf-8'))
+    body.seek(0)
+
+    return body, "multipart/form-data; boundary=" + boundary
