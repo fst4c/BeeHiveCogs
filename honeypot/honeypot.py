@@ -145,10 +145,11 @@ class Honeypot(commands.Cog, name="Honeypot"):
             "logs_channel": None,
             "ping_role": None,
             "honeypot_channel": None,
-            "mute_role": None,
+            # Remove mute_role from config, as we no longer use it
             "ban_delete_message_days": 3,
             "scam_stats": scam_stats_default.copy(),
             "honeypot_message_id": None,  # Track the honeypot warning message for reaction triggers
+            "timeout_days": 7,  # Default timeout duration in days, now configurable
         }
         default_global = {
             "global_scam_stats": scam_stats_default.copy(),
@@ -270,11 +271,11 @@ class Honeypot(commands.Cog, name="Honeypot"):
 
                 # Determine the configured action for this guild
                 action = config.get("action")
+                timeout_days = config.get("timeout_days", 7)
                 action_descriptions = {
-                    "mute": "You will be assigned the server's mute role and lose the ability to speak.",
+                    "timeout": f"You will be timed out and unable to interact for {timeout_days} day{'s' if timeout_days != 1 else ''}.",
                     "kick": "You will be kicked from the server immediately.",
                     "ban": "You will be banned from the server immediately.",
-                    "timeout": "You will be timed out and unable to interact for 7 days.",
                     None: "Server staff will be notified of your suspicious activity."
                 }
                 action_text = action_descriptions.get(action, "Server staff will be notified of your suspicious activity.")
@@ -374,6 +375,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         await self.config.global_scam_stats.set(self.global_scam_stats)
 
         action = config["action"]
+        timeout_days = config.get("timeout_days", 7)
         embed = discord.Embed(
             title="Honeypot trap triggered",
             description=f"> {message.content}\n",
@@ -394,26 +396,20 @@ class Honeypot(commands.Cog, name="Honeypot"):
         failed = None
         if action:
             try:
-                if action == "mute":
-                    mute_role_id = config.get("mute_role")
-                    mute_role = message.guild.get_role(mute_role_id) if mute_role_id else None
-                    if mute_role:
-                        await message.author.add_roles(mute_role, reason="User triggered honeypot defenses")
-                    else:
-                        failed = "**Failed:** The mute role is not set or doesn't exist anymore."
-                elif action == "kick":
-                    await message.author.kick(reason="User triggered honeypot defenses")
-                elif action == "ban":
-                    await message.author.ban(reason="User triggered honeypot defenses", delete_message_days=config["ban_delete_message_days"])
-                elif action == "timeout":
-                    timeout_duration = timedelta(days=7)  # 7 day timeout
-                    # Fix: discord.utils.utcnow() is deprecated, use discord.utils.utcnow() if available, else datetime.utcnow
+                if action == "timeout":
+                    # Use configurable timeout duration, default 7, max 28
+                    timeout_days = max(1, min(int(timeout_days), 28))
+                    timeout_duration = timedelta(days=timeout_days)
                     try:
                         now = discord.utils.utcnow()
                     except AttributeError:
                         from datetime import datetime, timezone
                         now = datetime.now(timezone.utc)
                     await message.author.edit(timed_out_until=now + timeout_duration, reason="User triggered honeypot defenses")
+                elif action == "kick":
+                    await message.author.kick(reason="User triggered honeypot defenses")
+                elif action == "ban":
+                    await message.author.ban(reason="User triggered honeypot defenses", delete_message_days=config["ban_delete_message_days"])
             except discord.HTTPException as e:
                 failed = f"**Failed:** An error occurred while trying to take action against the member:\n{e}"
             except Exception as e:
@@ -423,10 +419,9 @@ class Honeypot(commands.Cog, name="Honeypot"):
                 print(f"Action {action} taken against {message.author}")
 
             action_result = {
-                "mute": "I assigned the user the configured mute/suppress role",
+                "timeout": f"The user was timed out for {timeout_days} day{'s' if timeout_days != 1 else ''}",
                 "kick": "The user was kicked from the server",
                 "ban": "The user was banned from the server",
-                "timeout": "The user was timed out for a week"
             }.get(action, "No action taken.")
 
             embed.add_field(name="Action taken", value=failed or action_result, inline=False)
@@ -494,6 +489,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         await self.config.global_scam_stats.set(self.global_scam_stats)
 
         action = config["action"]
+        timeout_days = config.get("timeout_days", 7)
         logs_channel = guild.get_channel(logs_channel_id)
         embed = discord.Embed(
             title="Honeypot trap triggered by reaction",
@@ -512,25 +508,19 @@ class Honeypot(commands.Cog, name="Honeypot"):
         failed = None
         if action:
             try:
-                if action == "mute":
-                    mute_role_id = config.get("mute_role")
-                    mute_role = guild.get_role(mute_role_id) if mute_role_id else None
-                    if mute_role:
-                        await member.add_roles(mute_role, reason="User triggered honeypot defenses (reaction)")
-                    else:
-                        failed = "**Failed:** The mute role is not set or doesn't exist anymore."
-                elif action == "kick":
-                    await member.kick(reason="User triggered honeypot defenses (reaction)")
-                elif action == "ban":
-                    await member.ban(reason="User triggered honeypot defenses (reaction)", delete_message_days=config["ban_delete_message_days"])
-                elif action == "timeout":
-                    timeout_duration = timedelta(days=7)
+                if action == "timeout":
+                    timeout_days = max(1, min(int(timeout_days), 28))
+                    timeout_duration = timedelta(days=timeout_days)
                     try:
                         now = discord.utils.utcnow()
                     except AttributeError:
                         from datetime import datetime, timezone
                         now = datetime.now(timezone.utc)
                     await member.edit(timed_out_until=now + timeout_duration, reason="User triggered honeypot defenses (reaction)")
+                elif action == "kick":
+                    await member.kick(reason="User triggered honeypot defenses (reaction)")
+                elif action == "ban":
+                    await member.ban(reason="User triggered honeypot defenses (reaction)", delete_message_days=config["ban_delete_message_days"])
             except discord.HTTPException as e:
                 failed = f"**Failed:** An error occurred while trying to take action against the member:\n{e}"
             except Exception as e:
@@ -538,10 +528,9 @@ class Honeypot(commands.Cog, name="Honeypot"):
             else:
                 print(f"Action {action} taken against {member} (reaction)")
             action_result = {
-                "mute": "I assigned the user the configured mute/suppress role",
+                "timeout": f"The user was timed out for {timeout_days} day{'s' if timeout_days != 1 else ''}",
                 "kick": "The user was kicked from the server",
                 "ban": "The user was banned from the server",
-                "timeout": "The user was timed out for a week"
             }.get(action, "No action taken.")
             embed.add_field(name="Action taken", value=failed or action_result, inline=False)
         files = []
@@ -625,11 +614,11 @@ class Honeypot(commands.Cog, name="Honeypot"):
             # Determine the configured action for this guild
             config = await self.config.guild(ctx.guild).all()
             action = config.get("action")
+            timeout_days = config.get("timeout_days", 7)
             action_descriptions = {
-                "mute": "You will be assigned the server's suppression role and lose the ability to speak in this server until a staff member removes the role.",
+                "timeout": f"You will be timed out and unable to interact with text or voice channels for {timeout_days} day{'s' if timeout_days != 1 else ''}.",
                 "kick": "You will be kicked from the server immediately.",
                 "ban": "You will be banned from the server immediately.",
-                "timeout": "You will be timed out and unable to interact with text or voice channels for 7 days.",
                 None: "Server staff will be notified of your suspicious activity."
             }
             action_text = action_descriptions.get(action, "Server staff will be notified of your suspicious activity.")
@@ -758,19 +747,18 @@ class Honeypot(commands.Cog, name="Honeypot"):
         Set the automated action to take when a user triggers the honeypot.
 
         Valid actions:
-        - mute: Assign the configured mute/suppress role to the user.
+        - timeout: Timeout the user for a configurable number of days (see `[p]honeypot timeoutdays`).
         - kick: Kick the user from the server.
         - ban: Ban the user from the server.
-        - timeout: Timeout the user for 7 days.
 
         Example:
             `[p]honeypot action ban`
         """
         async with ctx.typing():
-            if action not in ["mute", "kick", "ban", "timeout"]:
+            if action not in ["timeout", "kick", "ban"]:
                 embed = discord.Embed(
                     title="Invalid action",
-                    description="Invalid action. Please choose from: mute, kick, ban, timeout.",
+                    description="Invalid action. Please choose from: timeout, kick, ban.",
                     color=0xff4545
                 )
                 await ctx.send(embed=embed)
@@ -779,6 +767,26 @@ class Honeypot(commands.Cog, name="Honeypot"):
             embed = discord.Embed(
                 title="Action set",
                 description=f"Action has been set to {action}.",
+                color=0x2bbd8e
+            )
+            await ctx.send(embed=embed)
+
+    @commands.admin_or_permissions(manage_guild=True)
+    @honeypot.command(name="timeoutdays")
+    async def timeoutdays(self, ctx: commands.Context, days: int) -> None:
+        """
+        Set the number of days for the timeout punishment (1-28).
+
+        This only applies if the action is set to "timeout".
+        """
+        async with ctx.typing():
+            if not (1 <= days <= 28):
+                await ctx.send("Timeout days must be between 1 and 28.")
+                return
+            await self.config.guild(ctx.guild).timeout_days.set(days)
+            embed = discord.Embed(
+                title="Timeout duration set",
+                description=f"Timeout duration has been set to {days} day{'s' if days != 1 else ''}.",
                 color=0x2bbd8e
             )
             await ctx.send(embed=embed)
@@ -817,13 +825,14 @@ class Honeypot(commands.Cog, name="Honeypot"):
             ping_role_id = config.get("ping_role")
             honeypot_channel_id = config.get("honeypot_channel")
             honeypot_message_id = config.get("honeypot_message_id")
-            mute_role_id = config.get("mute_role")
+            timeout_days = config.get("timeout_days", 7)
+            # Remove mute_role from settings display
             embed.add_field(name="Logs channel", value=f"<#{logs_channel_id}>" if logs_channel_id else "Not set", inline=False)
             embed.add_field(name="Ping role", value=f"<@&{ping_role_id}>" if ping_role_id else "Not set", inline=False)
             embed.add_field(name="Honeypot channel", value=f"<#{honeypot_channel_id}>" if honeypot_channel_id else "Not set", inline=False)
             embed.add_field(name="Honeypot message ID", value=honeypot_message_id or "Not set", inline=False)
-            embed.add_field(name="Mute role", value=f"<@&{mute_role_id}>" if mute_role_id else "Not set", inline=False)
             embed.add_field(name="Days to delete on ban", value=config.get("ban_delete_message_days", 3), inline=False)
+            embed.add_field(name="Timeout duration (days)", value=timeout_days, inline=False)
             await ctx.send(embed=embed)
 
     @honeypot.command()
