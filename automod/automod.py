@@ -766,13 +766,17 @@ class AutoMod(commands.Cog):
         """
         Automated AI moderation for chats, images, and emotes powered by the latest frontier moderation models.
         
-        [Check the documentation to learn more](<https://sentri.beehive.systems/features/agentic-moderator>)
+        **[Visit the docs to learn more](<https://sentri.beehive.systems/features/agentic-moderator>)**
         """
         pass
 
     @automod.command()
     async def stats(self, ctx):
-        """Show statistics of the moderation activity."""
+        """
+        Show statistics of the moderation activity.
+
+        [View command documentation](<https://sentri.beehive.systems/features/agentic-moderator#automod-stats>)
+        """
         try:
             # Local statistics
             message_count = await self.config.guild(ctx.guild).message_count()
@@ -917,10 +921,9 @@ class AutoMod(commands.Cog):
     @commands.admin_or_permissions(manage_guild=True)
     async def history(self, ctx, user: discord.Member = None):
         """
-        Show the violation history for a user in this server.
-        If no user is provided, shows your own history (if you are not a bot).
-        Shows 5 violations per page, with emoji reactions to scroll if there are more.
-        Also includes a graph of abuse trends over time.
+        Show a user's violation history
+
+        [View command documentation](<https://sentri.beehive.systems/features/agentic-moderator#automod-history>)
         """
         temp_file = None
         file = None
@@ -1156,7 +1159,11 @@ class AutoMod(commands.Cog):
     @automod.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def settings(self, ctx):
-        """Show the current settings of the cog."""
+        """
+        Show AI AutoMod settings
+        
+        [View command documentation](<https://sentri.beehive.systems/features/agentic-moderator#automod-settings>)
+        """
         try:
             guild = ctx.guild
             moderation_threshold = await self.config.guild(guild).moderation_threshold()
@@ -1275,16 +1282,7 @@ class AutoMod(commands.Cog):
         """
         Set the moderation threshold for message sensitivity.
 
-        The threshold value should be between 0 and 1, where:
-        - 0.00 represents a very sensitive setting, capturing more messages for moderation.
-        - 1.00 represents a barely sensitive setting, allowing most messages to pass through without moderation.
-
-        Adjust this setting based on your community's needs for moderation sensitivity.
-
-        **Recommendations**
-        - For general communities, a threshold of `0.50` is often effective.
-        - For professional communities (or if stricter moderation is preferred), consider a threshold below `0.40`.
-        - For more lenient settings, a threshold above `0.70` might be suitable.
+        [View command documentation](<https://sentri.beehive.systems/features/agentic-moderator#automod-threshold>)
         """
         try:
             if 0 <= threshold <= 1:
@@ -1298,7 +1296,11 @@ class AutoMod(commands.Cog):
     @commands.cooldown(1, 86400, commands.BucketType.user)
     @automod.command()
     async def vote(self, ctx):
-        """Give feedback on the server's agentic moderation"""
+        """
+        Give feedback on the server's agentic moderation
+        
+        [View command documentation](<https://sentri.beehive.systems/features/agentic-moderator#automod-vote>)
+        """
         try:
             guild = ctx.guild
             log_channel_id = await self.config.guild(guild).log_channel()
@@ -1397,7 +1399,11 @@ class AutoMod(commands.Cog):
     @automod.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def toggle(self, ctx):
-        """Toggle automatic moderation on or off."""
+        """
+        Toggle automatic moderation on or off.
+        
+        [View command documentation](<https://sentri.beehive.systems/features/agentic-moderator#automod-toggle>)
+        """
         try:
             guild = ctx.guild
             current_status = await self.config.guild(guild).moderation_enabled()
@@ -1412,8 +1418,9 @@ class AutoMod(commands.Cog):
     @commands.admin_or_permissions(manage_guild=True)
     async def disclaimer(self, ctx):
         """
-        Toggle the monitoring warning message that is periodically sent to channels.
-        Disabling this warning is not recommended and may have legal or compliance implications.
+        Toggle privacy warning
+
+        [View command documentation](<https://sentri.beehive.systems/features/agentic-moderator#automod-disclaimer>)
         """
         try:
             guild = ctx.guild
@@ -1452,7 +1459,11 @@ class AutoMod(commands.Cog):
 
     @automod.command()
     async def reasons(self, ctx):
-        """Explains how the AI moderator labels and categorizes content"""
+        """
+        Explain content categories
+        
+        [View command documentation](<https://sentri.beehive.systems/features/agentic-moderator#automod-reasons>)
+        """
         try:
             categories = {
                 "harassment": "Content that expresses, incites, or promotes harassing language towards any target.",
@@ -1481,7 +1492,11 @@ class AutoMod(commands.Cog):
     @automod.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def delete(self, ctx):
-        """Toggle whether violatory messages are deleted or not."""
+        """
+        Toggle automatic deletion
+        
+        [View command documentation](<https://sentri.beehive.systems/features/agentic-moderator#automod-delete>)
+        """
         try:
             guild = ctx.guild
             current_status = await self.config.guild(guild).delete_violatory_messages()
@@ -1495,7 +1510,12 @@ class AutoMod(commands.Cog):
     @automod.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def timeout(self, ctx, duration: int):
-        """Set the timeout duration in minutes (0 for no timeout)."""
+        """
+        Set timeout length
+        
+        Disable using `0`
+        [View command documentation](<https://sentri.beehive.systems/features/agentic-moderator#automod-timeout>)
+        """
         try:
             if duration >= 0:
                 await self.config.guild(ctx.guild).timeout_duration.set(duration)
@@ -1508,7 +1528,11 @@ class AutoMod(commands.Cog):
     @automod.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def logs(self, ctx, channel: discord.TextChannel):
-        """Set the channel to log moderated messages."""
+        """
+        Set automod logging channel.
+        
+        [View command documentation](<https://sentri.beehive.systems/features/agentic-moderator#automod-logs>)
+        """
         try:
             await self.config.guild(ctx.guild).log_channel.set(channel.id)
             await ctx.send(f"Log channel set to {channel.mention}.")
@@ -1519,7 +1543,9 @@ class AutoMod(commands.Cog):
     @commands.admin_or_permissions(manage_guild=True)
     async def whitelist(self, ctx):
         """
-        Manage whitelisting/"bypassing" parts of the server from moderation.
+        Control AI AutoMod whitelisting
+
+        [View command documentation](<https://sentri.beehive.systems/features/agentic-moderator#automod-whitelist>)
         """
         pass
 
