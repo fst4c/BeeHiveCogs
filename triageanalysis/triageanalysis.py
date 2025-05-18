@@ -34,9 +34,11 @@ class TriageAnalysis(commands.Cog):
         self.config.register_guild(**default_guild)
 
     async def get_client(self, guild):
-        token = await self.config.guild(guild).token()
+        # Use the triage api_key stored in Red's shared API tokens
+        api_key = await self.bot.get_shared_api_tokens("triage")
+        token = api_key.get("api_key")
         if not token:
-            raise RuntimeError("Triage API token not set for this server. Use `[p]triage settoken <token>`.")
+            raise RuntimeError("Triage API key not set. Use `[p]set api triage api_key,<token>` to set it.")
         return Client(token)
 
     @commands.group()
@@ -47,9 +49,9 @@ class TriageAnalysis(commands.Cog):
     @triage.command()
     @commands.admin_or_permissions(manage_guild=True)
     async def settoken(self, ctx, token: str):
-        """Set the Triage API token for this server."""
+        """Set the Triage API token for this server (deprecated, use `[p]set api triage api_key,<token>` instead)."""
         await self.config.guild(ctx.guild).token.set(token)
-        await ctx.send("Triage API token set for this server.")
+        await ctx.send("Triage API token set for this server. (Note: This is now deprecated, use `[p]set api triage api_key,<token>` instead.)")
 
     @triage.command()
     async def submiturl(self, ctx, url: str):
