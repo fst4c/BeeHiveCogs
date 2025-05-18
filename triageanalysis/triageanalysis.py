@@ -56,7 +56,11 @@ class TriageAnalysis(commands.Cog):
 
     @commands.group()
     async def triage(self, ctx):
-        """Triage API commands."""
+        """
+        Tria.ge is a dynamic analysis sandbox where suspicious files can be safely run in an isolated environment to be checked for malware
+
+        **[Visit the docs to learn more](<https://sentri.beehive.systems/features/tria.ge>)**
+        """
         pass
 
     # --- Admin only commands ---
@@ -75,7 +79,10 @@ class TriageAnalysis(commands.Cog):
     @triage.command(name="disable")
     @commands.admin_or_permissions(administrator=True)
     async def triage_autoscan_disable(self, ctx):
-        """Disable automatic background file scanning in this server. (Admin only)"""
+        """
+        Disable automatic file analysis
+        
+        """
         await self.config.guild(ctx.guild).autoscan_enabled.set(False)
         embed = discord.Embed(
             title="Autoscan Disabled",
