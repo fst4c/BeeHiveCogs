@@ -233,15 +233,20 @@ class TriageAnalysis(commands.Cog):
             completed = sample_info.get("completed")
             sample_id = sample_info.get("id") or sample_id
 
-            # Compose signatures summary
+            # Compose signatures summary as "SCORE | text (TTP's)"
             sigs = []
             for sig in signatures:
-                name = sig.get("name")
                 score_ = sig.get("score")
-                if name and score_ is not None:
-                    sigs.append(f"{name} (score: {score_})")
-                elif name:
-                    sigs.append(name)
+                text = sig.get("name") or sig.get("label") or ""
+                # Try both "ttp" and "ttps" for TTPs
+                ttps = sig.get("ttp") or sig.get("ttps") or []
+                if isinstance(ttps, str):
+                    ttps = [ttps]
+                ttps_str = f" ({', '.join(ttps)})" if ttps else ""
+                if score_ is not None and text:
+                    sigs.append(f"{score_} | {text}{ttps_str}")
+                elif text:
+                    sigs.append(f"{text}{ttps_str}")
             sigs_str = humanize_list(sigs) if sigs else "None"
 
             # Compose IOC summary (URLs, domains, IPs)
