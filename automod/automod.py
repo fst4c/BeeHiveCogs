@@ -1551,7 +1551,11 @@ class AutoMod(commands.Cog):
 
     @whitelist.command(name="channel")
     async def whitelist_channel(self, ctx, channel: discord.TextChannel):
-        """Bypass/unbypass channels"""
+        """
+        Add/remove a channel
+        
+        [View command documentation](<https://sentri.beehive.systems/features/agentic-moderator#automod-whitelist-channel>)
+        """
         try:
             guild = ctx.guild
             whitelisted_channels = await self.config.guild(guild).whitelisted_channels()
@@ -1575,7 +1579,7 @@ class AutoMod(commands.Cog):
 
     @whitelist.command(name="role")
     async def whitelist_role(self, ctx, role: discord.Role):
-        """Bypass/unbypass users in a role"""
+        """Add/remove a role"""
         try:
             guild = ctx.guild
             whitelisted_roles = await self.config.guild(guild).whitelisted_roles()
@@ -1599,7 +1603,7 @@ class AutoMod(commands.Cog):
 
     @whitelist.command(name="user")
     async def whitelist_user(self, ctx, user: discord.User):
-        """Bypass/unbypass a user"""
+        """Add/remove a user"""
         try:
             guild = ctx.guild
             whitelisted_users = await self.config.guild(guild).whitelisted_users()
@@ -1623,7 +1627,7 @@ class AutoMod(commands.Cog):
 
     @whitelist.command(name="category")
     async def whitelist_category(self, ctx, category: discord.CategoryChannel):
-        """Bypass/unbypass a channel category"""
+        """Add/remove a category"""
         try:
             guild = ctx.guild
             whitelisted_categories = await self.config.guild(guild).whitelisted_categories()
@@ -1647,7 +1651,7 @@ class AutoMod(commands.Cog):
 
     @whitelist.command(name="nsfw")
     async def whitelist_nsfw(self, ctx):
-        """Toggle NSFW bypass status"""
+        """Enable/Disable NSFW bypass"""
         try:
             guild = ctx.guild
             current_status = await self.config.guild(guild).bypass_nsfw()
