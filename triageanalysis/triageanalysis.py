@@ -67,7 +67,10 @@ class TriageAnalysis(commands.Cog):
     @triage.command(name="enable")
     @commands.admin_or_permissions(administrator=True)
     async def triage_autoscan_enable(self, ctx):
-        """Enable automatic background file scanning in this server. (Admin only)"""
+        """
+        Enable automatic file analysis
+        
+        """
         await self.config.guild(ctx.guild).autoscan_enabled.set(True)
         embed = discord.Embed(
             title="Autoscan Enabled",
@@ -94,7 +97,10 @@ class TriageAnalysis(commands.Cog):
     @triage.command(name="threshold")
     @commands.mod_or_permissions(manage_guild=True)
     async def triage_autoscan_threshold(self, ctx, score: int):
-        """Set the score threshold for punishment (default: 5). (Mods and above)"""
+        """
+        Set a detection threshold for automatic actions
+        
+        """
         if score < 0 or score > 10:
             embed = discord.Embed(
                 title="Invalid Threshold",
@@ -115,9 +121,8 @@ class TriageAnalysis(commands.Cog):
     @commands.admin_or_permissions(administrator=True)
     async def triage_autoscan_punishment(self, ctx, punishment: str, timeout_seconds: int = 600):
         """
-        Set the punishment for users who upload files that score above the threshold.
-        Punishment can be: none, kick, ban, timeout (timeout_seconds is optional, default 600).
-        (Admin only)
+        Set a punishment for sharing malware
+
         """
         punishment = punishment.lower()
         if punishment not in ("none", "kick", "ban", "timeout"):
@@ -157,8 +162,7 @@ class TriageAnalysis(commands.Cog):
     @commands.admin_or_permissions(administrator=True)
     async def triage_autoscan_logchannel(self, ctx, channel: discord.TextChannel = None):
         """
-        Set the log channel for autoscan events. If no channel is provided, disables logging.
-        (Admin only)
+        Set the log channel
         """
         if channel is None:
             await self.config.guild(ctx.guild).autoscan_log_channel.set(None)
@@ -177,10 +181,10 @@ class TriageAnalysis(commands.Cog):
             )
             await ctx.send(embed=embed)
 
-    @triage.command(name="status")
+    @triage.command(name="settings")
     @commands.mod_or_permissions(manage_guild=True)
     async def triage_autoscan_status(self, ctx):
-        """Show the current autoscan settings. (Mods and above)"""
+        """Show the current settings"""
         conf = await self.config.guild(ctx.guild).all()
         enabled = conf.get("autoscan_enabled", False)
         threshold = conf.get("autoscan_score_threshold", 5)
@@ -425,6 +429,13 @@ class TriageAnalysis(commands.Cog):
             await ctx.send(embed=embed)
             data = client.submit_sample_file(filename, BytesIO(file_bytes))
             sample_id = data.get("id")
+
+            # Delete the file from chat after upload
+            try:
+                await attachment.delete()
+            except Exception:
+                pass  # Ignore if we can't delete (e.g., permissions)
+
             if not sample_id:
                 embed = discord.Embed(
                     title="Submission Failed",
