@@ -55,9 +55,11 @@ class TriageAnalysis(commands.Cog):
         """Triage API commands."""
         pass
 
+    # --- Admin only commands ---
     @triage.command(name="enable")
+    @commands.admin_or_permissions(administrator=True)
     async def triage_autoscan_enable(self, ctx):
-        """Enable automatic background file scanning in this server."""
+        """Enable automatic background file scanning in this server. (Admin only)"""
         await self.config.guild(ctx.guild).autoscan_enabled.set(True)
         embed = discord.Embed(
             title="Autoscan Enabled",
@@ -67,8 +69,9 @@ class TriageAnalysis(commands.Cog):
         await ctx.send(embed=embed)
 
     @triage.command(name="disable")
+    @commands.admin_or_permissions(administrator=True)
     async def triage_autoscan_disable(self, ctx):
-        """Disable automatic background file scanning in this server."""
+        """Disable automatic background file scanning in this server. (Admin only)"""
         await self.config.guild(ctx.guild).autoscan_enabled.set(False)
         embed = discord.Embed(
             title="Autoscan Disabled",
@@ -78,8 +81,9 @@ class TriageAnalysis(commands.Cog):
         await ctx.send(embed=embed)
 
     @triage.command(name="threshold")
+    @commands.mod_or_permissions(manage_guild=True)
     async def triage_autoscan_threshold(self, ctx, score: int):
-        """Set the score threshold for punishment (default: 5)."""
+        """Set the score threshold for punishment (default: 5). (Mods and above)"""
         if score < 0 or score > 10:
             embed = discord.Embed(
                 title="Invalid Threshold",
@@ -97,10 +101,12 @@ class TriageAnalysis(commands.Cog):
         await ctx.send(embed=embed)
 
     @triage.command(name="action")
+    @commands.admin_or_permissions(administrator=True)
     async def triage_autoscan_punishment(self, ctx, punishment: str, timeout_seconds: int = 600):
         """
         Set the punishment for users who upload files that score above the threshold.
         Punishment can be: none, kick, ban, timeout (timeout_seconds is optional, default 600).
+        (Admin only)
         """
         punishment = punishment.lower()
         if punishment not in ("none", "kick", "ban", "timeout"):
@@ -137,9 +143,11 @@ class TriageAnalysis(commands.Cog):
             await ctx.send(embed=embed)
 
     @triage.command(name="logs")
+    @commands.admin_or_permissions(administrator=True)
     async def triage_autoscan_logchannel(self, ctx, channel: discord.TextChannel = None):
         """
         Set the log channel for autoscan events. If no channel is provided, disables logging.
+        (Admin only)
         """
         if channel is None:
             await self.config.guild(ctx.guild).autoscan_log_channel.set(None)
@@ -159,8 +167,9 @@ class TriageAnalysis(commands.Cog):
             await ctx.send(embed=embed)
 
     @triage.command(name="status")
+    @commands.mod_or_permissions(manage_guild=True)
     async def triage_autoscan_status(self, ctx):
-        """Show the current autoscan settings."""
+        """Show the current autoscan settings. (Mods and above)"""
         conf = await self.config.guild(ctx.guild).all()
         enabled = conf.get("autoscan_enabled", False)
         threshold = conf.get("autoscan_score_threshold", 5)
@@ -187,6 +196,7 @@ class TriageAnalysis(commands.Cog):
             embed.add_field(name="Log Channel", value="Not set", inline=False)
         await ctx.send(embed=embed)
 
+    # --- All users commands ---
     @triage.command()
     async def submiturl(self, ctx, url: str):
         """Submit a URL for analysis."""
