@@ -373,12 +373,22 @@ class TriageAnalysis(commands.Cog):
                         raise RuntimeError(f"Failed to upload to tmpfiles.org (status {resp.status})")
             if not tmpfiles_url or not tmpfiles_url.startswith("https://tmpfiles.org/"):
                 raise RuntimeError("Failed to upload file to tmpfiles.org")
-            embed = discord.Embed(
-                title="Sample Download",
-                description=f"Here is the download link for sample `{sample_id}`:\n{tmpfiles_url}",
-                color=0x2bbd8e
+            warning_message = (
+                f":warning: **Malware Download Warning** :warning:\n\n"
+                f"You requested a download link for sample `{sample_id}`. "
+                f"This file is almost certainly **malicious** and is provided **strictly for research and analysis purposes**.\n\n"
+                f"**Do not run this file on your computer unless you know exactly what you are doing.**\n"
+                f"Open only in a secure, isolated environment (sandbox/VM) and never on a production or personal system.\n\n"
+                f"**Download link:**\n{tmpfiles_url}\n\n"
+                f"By downloading, you accept all risk and responsibility. If you are not sure, do not proceed."
             )
-            await ctx.send(embed=embed)
+            try:
+                await ctx.author.send(warning_message)
+                await ctx.send(f":mailbox_with_mail: Check your DMs for the download link and warning, {ctx.author.mention}.")
+            except discord.Forbidden:
+                await ctx.send(
+                    f":warning: I couldn't send you a DM, {ctx.author.mention}. Please enable DMs from server members and try again."
+                )
         except Exception as e:
             embed = discord.Embed(
                 title="Error",
