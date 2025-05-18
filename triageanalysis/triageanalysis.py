@@ -667,7 +667,7 @@ class TriageAnalysis(commands.Cog):
                 view = ui.View()
                 view.add_item(
                     ui.Button(
-                        label="View on tria.ge",
+                        label="View full report",
                         url=f"https://tria.ge/{sample_id}",
                         style=discord.ButtonStyle.link
                     )
