@@ -180,18 +180,19 @@ class TriageAnalysis(commands.Cog):
                 return
             await ctx.send(f"Sample submitted! ID: `{sample_id}`. Waiting for analysis to complete...")
 
-            # Poll for analysis completion
-            max_wait = 300  # seconds
-            poll_interval = 5  # seconds
+            # Send typing while polling for analysis completion
+            max_wait = 600  # seconds
+            poll_interval = 10  # seconds
             waited = 0
             status = None
-            while waited < max_wait:
-                sample_info = client.sample_by_id(sample_id)
-                status = sample_info.get("status")
-                if status in ("reported", "failed", "finished", "complete"):
-                    break
-                await asyncio.sleep(poll_interval)
-                waited += poll_interval
+            async with ctx.typing():
+                while waited < max_wait:
+                    sample_info = client.sample_by_id(sample_id)
+                    status = sample_info.get("status")
+                    if status in ("reported", "failed", "finished", "complete"):
+                        break
+                    await asyncio.sleep(poll_interval)
+                    waited += poll_interval
 
             if status not in ("reported", "finished", "complete"):
                 await ctx.send(f"Analysis did not complete in {max_wait} seconds. Status: `{status}`")
