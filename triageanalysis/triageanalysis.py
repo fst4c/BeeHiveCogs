@@ -206,10 +206,48 @@ class TriageAnalysis(commands.Cog):
                 return
 
             # Extract score, tags, etc
-            score = overview.get("score", "N/A")
-            tags = overview.get("tags", [])
+            # The Triage API overview report returns a structure like:
+            # {
+            #   "score": ...,
+            #   "verdict": ...,
+            #   "family": ...,
+            #   "tags": [...],
+            #   "tasks": [
+            #       {
+            #           "score": ...,
+            #           "tags": [...],
+            #           ...
+            #       },
+            #       ...
+            #   ]
+            # }
+            # Sometimes, the top-level "score" and "tags" may be missing or empty.
+            # In that case, aggregate from tasks.
+
+            score = overview.get("score")
             verdict = overview.get("verdict", "N/A")
             family = overview.get("family", "N/A")
+            tags = overview.get("tags", [])
+
+            # If score is None or 0, try to get the max score from tasks
+            if not score and "tasks" in overview and overview["tasks"]:
+                task_scores = [t.get("score") for t in overview["tasks"] if t.get("score") is not None]
+                if task_scores:
+                    score = max(task_scores)
+                else:
+                    score = "N/A"
+            elif score is None:
+                score = "N/A"
+
+            # If tags is empty, aggregate tags from all tasks
+            if (not tags or not isinstance(tags, list) or len(tags) == 0) and "tasks" in overview and overview["tasks"]:
+                tags_set = set()
+                for t in overview["tasks"]:
+                    t_tags = t.get("tags", [])
+                    if isinstance(t_tags, list):
+                        tags_set.update(t_tags)
+                tags = list(tags_set)
+
             # Compose a summary
             summary = (
                 f"**Triage Analysis Results**\n"
