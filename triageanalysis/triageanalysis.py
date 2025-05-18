@@ -55,25 +55,7 @@ class TriageAnalysis(commands.Cog):
         """Triage API commands."""
         pass
 
-    @triage.command()
-    @commands.admin_or_permissions(manage_guild=True)
-    async def settoken(self, ctx, token: str):
-        """Set the Triage API token for this server (deprecated, use `[p]set api triage api_key,<token>` instead)."""
-        await self.config.guild(ctx.guild).token.set(token)
-        embed = discord.Embed(
-            title="Triage API Token Set",
-            description="Triage API token set for this server. (Note: This is now deprecated, use `[p]set api triage api_key,<token>` instead.)",
-            color=0x2bbd8e
-        )
-        await ctx.send(embed=embed)
-
-    @triage.group(name="autoscan")
-    @commands.admin_or_permissions(manage_guild=True)
-    async def triage_autoscan(self, ctx):
-        """Configure automatic background file scanning."""
-        pass
-
-    @triage_autoscan.command(name="enable")
+    @triage.command(name="enable")
     async def triage_autoscan_enable(self, ctx):
         """Enable automatic background file scanning in this server."""
         await self.config.guild(ctx.guild).autoscan_enabled.set(True)
@@ -84,7 +66,7 @@ class TriageAnalysis(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @triage_autoscan.command(name="disable")
+    @triage.command(name="disable")
     async def triage_autoscan_disable(self, ctx):
         """Disable automatic background file scanning in this server."""
         await self.config.guild(ctx.guild).autoscan_enabled.set(False)
@@ -95,7 +77,7 @@ class TriageAnalysis(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @triage_autoscan.command(name="threshold")
+    @triage.command(name="threshold")
     async def triage_autoscan_threshold(self, ctx, score: int):
         """Set the score threshold for punishment (default: 5)."""
         if score < 0 or score > 10:
@@ -114,7 +96,7 @@ class TriageAnalysis(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @triage_autoscan.command(name="punishment")
+    @triage.command(name="action")
     async def triage_autoscan_punishment(self, ctx, punishment: str, timeout_seconds: int = 600):
         """
         Set the punishment for users who upload files that score above the threshold.
@@ -176,7 +158,7 @@ class TriageAnalysis(commands.Cog):
             )
             await ctx.send(embed=embed)
 
-    @triage_autoscan.command(name="status")
+    @triage.command(name="status")
     async def triage_autoscan_status(self, ctx):
         """Show the current autoscan settings."""
         conf = await self.config.guild(ctx.guild).all()
