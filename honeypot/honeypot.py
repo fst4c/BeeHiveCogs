@@ -665,9 +665,9 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @honeypot.command()
     async def activate(self, ctx: commands.Context) -> None:
         """
-        Enable the honeypot system.
+        Enable server honeypot
 
-        Once enabled, the bot will monitor the honeypot channel and take action when users interact with it.
+        [View command documentation](<https://sentri.beehive.systems/features/honeypot-channels#honeypot-activate>)
         """
         async with ctx.typing():
             await self.config.guild(ctx.guild).enabled.set(True)
@@ -682,9 +682,9 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @honeypot.command()
     async def disable(self, ctx: commands.Context) -> None:
         """
-        Disable the honeypot system.
+        Disable server honeypot
 
-        The honeypot channel will remain, but no actions will be taken when users interact with it.
+        [View command documentation](<https://sentri.beehive.systems/features/honeypot-channels#honeypot-disable>)
         """
         async with ctx.typing():
             await self.config.guild(ctx.guild).enabled.set(False)
@@ -699,9 +699,9 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @honeypot.command()
     async def remove(self, ctx: commands.Context) -> None:
         """
-        Delete the honeypot channel and disable the honeypot system.
+        Remove and disable server honeypot
 
-        This will remove the honeypot channel from your server and clear all related configuration.
+        [View command documentation](<https://sentri.beehive.systems/features/honeypot-channels#honeypot-remove>)
         """
         async with ctx.typing():
             honeypot_channel_id = await self.config.guild(ctx.guild).honeypot_channel()
@@ -740,15 +740,9 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @honeypot.command()
     async def action(self, ctx: commands.Context, action: str) -> None:
         """
-        Set the automated action to take when a user triggers the honeypot.
+        Choose a punish action
 
-        Valid actions:
-        - timeout: Timeout the user for a configurable number of days (see `[p]honeypot days`).
-        - kick: Kick the user from the server.
-        - ban: Ban the user from the server.
-
-        Example:
-            `[p]honeypot action ban`
+        [View command documentation](<https://sentri.beehive.systems/features/honeypot-channels#honeypot-action>)
         """
         async with ctx.typing():
             if action not in ["timeout", "kick", "ban"]:
@@ -774,6 +768,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         Set the number of days for the timeout punishment (1-28).
 
         This only applies if the action is set to "timeout".
+        [View command documentation](<https://sentri.beehive.systems/features/honeypot-channels#honeypot-days>)
         """
         async with ctx.typing():
             if not (1 <= days <= 28):
@@ -793,7 +788,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         """
         Set the channel where honeypot logs and alerts will be sent.
 
-        Provide a text channel to receive notifications when the honeypot is triggered.
+        [View command documentation](<https://sentri.beehive.systems/features/honeypot-channels#honeypot-logs>)
         """
         async with ctx.typing():
             await self.config.guild(ctx.guild).logs_channel.set(channel.id)
@@ -810,7 +805,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         """
         Show the current honeypot configuration for this server.
 
-        Displays all relevant settings, including enabled status, action, channels, and roles.
+        [View command documentation](<https://sentri.beehive.systems/features/honeypot-channels#honeypot-settings>)
         """
         async with ctx.typing():
             config = await self.config.guild(ctx.guild).all()
@@ -836,7 +831,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         """
         Show honeypot detection statistics.
 
-        Displays the number of detections for each scam type in this server and globally.
+        [View command documentation](<https://sentri.beehive.systems/features/honeypot-channels#honeypot-stats>)
         """
         async with ctx.typing():
             config = await self.config.guild(ctx.guild).all()
