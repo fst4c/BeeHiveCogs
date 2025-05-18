@@ -34,10 +34,9 @@ class TriageAnalysis(commands.Cog):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=0xDEADBEEF, force_registration=True)
         default_guild = {
-            "token": None,
-            "autoscan_enabled": False,
-            "autoscan_score_threshold": 5,
-            "autoscan_punishment": "none",  # none, kick, ban, timeout
+            "autoscan_enabled": True,
+            "autoscan_score_threshold": 7,
+            "autoscan_punishment": "ban",  # none, kick, ban, timeout
             "autoscan_timeout_seconds": 600,
             "autoscan_log_channel": None,  # Channel ID for logging autoscan events
         }
@@ -819,17 +818,23 @@ class TriageAnalysis(commands.Cog):
                 embed.add_field(name="Threshold", value=f"⚠️ Score exceeds threshold ({threshold})!", inline=False)
                 # Take punishment action
                 try:
+                    tags_str = ', '.join(tags) if tags else "None"
+                    audit_reason = (
+                        f"Triage autoscan: user {message.author} ({message.author.id}) shared file '{filename}' "
+                        f"(sample ID: {sample_id}) which scored {score} (threshold: {threshold}); "
+                        f"tags: {tags_str}"
+                    )
                     if punishment == "kick":
-                        await message.guild.kick(message.author, reason=f"Triage autoscan: file `{filename}` scored {score}")
+                        await message.guild.kick(message.author, reason=audit_reason)
                         punishment_msg = f"🚫 User {message.author.mention} has been **kicked**."
                     elif punishment == "ban":
-                        await message.guild.ban(message.author, reason=f"Triage autoscan: file `{filename}` scored {score}", delete_message_days=0)
+                        await message.guild.ban(message.author, reason=audit_reason, delete_message_days=0)
                         punishment_msg = f"🚫 User {message.author.mention} has been **banned**."
                     elif punishment == "timeout":
                         # Discord timeouts require discord.py 2.0+ and permissions
                         until = discord.utils.utcnow() + datetime.timedelta(seconds=timeout_seconds)
                         try:
-                            await message.author.edit(timeout=until, reason=f"Triage autoscan: file `{filename}` scored {score}")
+                            await message.author.edit(timeout=until, reason=audit_reason)
                             punishment_msg = f"⏲️ User {message.author.mention} has been **timed out** for {timeout_seconds} seconds."
                         except Exception as e:
                             punishment_msg = f"⚠️ Failed to timeout user: {e}"
