@@ -8,7 +8,7 @@ from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import box, pagify, humanize_list
 
 from io import BytesIO
-from triage.pagination import Paginator
+from .pagination import Paginator
 from .__version__ import __version__
 from requests import Request, Session, exceptions, utils
 
@@ -47,7 +47,7 @@ class TriageAnalysis(commands.Cog):
         api_key = await self.bot.get_shared_api_tokens("triage")
         token = api_key.get("api_key")
         if not token:
-            raise RuntimeError("Triage API key not set. Use `[p]set api triage api_key,<token>` to set it.")
+            raise RuntimeError("Triage API key not set. Use `[p]set api triage api_key,<token>` to set it")
         return Client(token)
 
     @commands.group()
@@ -69,7 +69,7 @@ class TriageAnalysis(commands.Cog):
         """
         await self.config.guild(ctx.guild).autoscan_enabled.set(True)
         embed = discord.Embed(
-            title="Autoscan Enabled",
+            title="Autoscan enabled",
             description="Automatic background file scanning is now **enabled**.",
             color=0x2bbd8e
         )
@@ -84,7 +84,7 @@ class TriageAnalysis(commands.Cog):
         """
         await self.config.guild(ctx.guild).autoscan_enabled.set(False)
         embed = discord.Embed(
-            title="Autoscan Disabled",
+            title="Autoscan disabled",
             description="Automatic background file scanning is now **disabled**.",
             color=0xff4545
         )
@@ -99,7 +99,7 @@ class TriageAnalysis(commands.Cog):
         """
         if score < 0 or score > 10:
             embed = discord.Embed(
-                title="Invalid Threshold",
+                title="Invalid threshold",
                 description="Score threshold must be between 0 and 10.",
                 color=0xff4545
             )
@@ -107,7 +107,7 @@ class TriageAnalysis(commands.Cog):
             return
         await self.config.guild(ctx.guild).autoscan_score_threshold.set(score)
         embed = discord.Embed(
-            title="Threshold Set",
+            title="Threshold set",
             description=f"Score threshold for punishment set to **{score}**.",
             color=0x2bbd8e
         )
@@ -123,7 +123,7 @@ class TriageAnalysis(commands.Cog):
         punishment = punishment.lower()
         if punishment not in ("none", "kick", "ban", "timeout"):
             embed = discord.Embed(
-                title="Invalid Punishment",
+                title="Invalid punishment",
                 description="Punishment must be one of: none, kick, ban, timeout.",
                 color=0xff4545
             )
@@ -133,7 +133,7 @@ class TriageAnalysis(commands.Cog):
         if punishment == "timeout":
             if timeout_seconds < 1 or timeout_seconds > 28 * 24 * 3600:
                 embed = discord.Embed(
-                    title="Invalid Timeout",
+                    title="Invalid timeout",
                     description="Timeout seconds must be between 1 and 2419200 (28 days).",
                     color=0xff4545
                 )
@@ -141,14 +141,14 @@ class TriageAnalysis(commands.Cog):
                 return
             await self.config.guild(ctx.guild).autoscan_timeout_seconds.set(timeout_seconds)
             embed = discord.Embed(
-                title="Punishment Set",
+                title="Punishment set",
                 description=f"Punishment set to **timeout** for {timeout_seconds} seconds.",
                 color=discord.Color.orange()
             )
             await ctx.send(embed=embed)
         else:
             embed = discord.Embed(
-                title="Punishment Set",
+                title="Punishment set",
                 description=f"Punishment set to **{punishment}**.",
                 color=discord.Color.orange()
             )
@@ -163,7 +163,7 @@ class TriageAnalysis(commands.Cog):
         if channel is None:
             await self.config.guild(ctx.guild).autoscan_log_channel.set(None)
             embed = discord.Embed(
-                title="Log Channel Disabled",
+                title="Logging disabled",
                 description="Autoscan log channel disabled.",
                 color=0xff4545
             )
@@ -171,7 +171,7 @@ class TriageAnalysis(commands.Cog):
         else:
             await self.config.guild(ctx.guild).autoscan_log_channel.set(channel.id)
             embed = discord.Embed(
-                title="Log Channel Set",
+                title="Log channel set",
                 description=f"Autoscan log channel set to {channel.mention}.",
                 color=0x2bbd8e
             )
@@ -191,31 +191,31 @@ class TriageAnalysis(commands.Cog):
         if log_channel_id:
             log_channel = ctx.guild.get_channel(log_channel_id)
         embed = discord.Embed(
-            title="Autoscan Settings",
-            color=discord.Color.blue()
+            title="Triage settings",
+            color=0xfffffe
         )
-        embed.add_field(name="Automatic File Scanning", value="Enabled" if enabled else "Disabled", inline=True)
-        embed.add_field(name="Score Threshold", value=str(threshold), inline=True)
+        embed.add_field(name="Automatic file scanning", value="Enabled" if enabled else "Disabled", inline=True)
+        embed.add_field(name="Score threshold", value=str(threshold), inline=True)
         embed.add_field(name="Punishment", value=punishment, inline=True)
         if punishment == "timeout":
-            embed.add_field(name="Timeout Seconds", value=str(timeout_seconds), inline=True)
+            embed.add_field(name="Timeout seconds", value=str(timeout_seconds), inline=True)
         if log_channel:
-            embed.add_field(name="Log Channel", value=log_channel.mention, inline=False)
+            embed.add_field(name="Log channel", value=log_channel.mention, inline=False)
         elif log_channel_id:
-            embed.add_field(name="Log Channel", value=f"(ID: {log_channel_id}, not found)", inline=False)
+            embed.add_field(name="Log channel", value=f"(ID: {log_channel_id}, not found)", inline=False)
         else:
-            embed.add_field(name="Log Channel", value="Not set", inline=False)
+            embed.add_field(name="Log channel", value="Not set", inline=False)
         await ctx.send(embed=embed)
 
     # --- All users commands ---
     @triage.command()
-    async def submiturl(self, ctx, url: str):
-        """Submit a URL for analysis."""
+    async def url(self, ctx, url: str):
+        """Donate file from URL for analysis."""
         try:
             client = await self.get_client(ctx.guild)
             data = client.submit_sample_url(url)
             embed = discord.Embed(
-                title="URL Submitted",
+                title="URL submitted",
                 description=f"Sample submitted!\n**ID:** `{data.get('id')}`\n**Status:** `{data.get('status')}`",
                 color=0x2bbd8e
             )
@@ -276,7 +276,7 @@ class TriageAnalysis(commands.Cog):
             await ctx.send(embed=embed)
 
     @triage.command()
-    async def staticreport(self, ctx, sample_id: str):
+    async def static(self, ctx, sample_id: str):
         """Get the static report for a sample."""
         try:
             client = await self.get_client(ctx.guild)
@@ -339,7 +339,7 @@ class TriageAnalysis(commands.Cog):
 
     @triage.command()
     async def events(self, ctx, sample_id: str):
-        """Stream events of a running sample (first 10 events)."""
+        """Stream events of a running sample"""
         try:
             client = await self.get_client(ctx.guild)
             events = client.sample_events(sample_id)
@@ -367,12 +367,12 @@ class TriageAnalysis(commands.Cog):
             await ctx.send(embed=embed)
 
     @triage.command()
-    async def submitfile(self, ctx):
-        """Submit a file for analysis. Attach a file to this command."""
+    async def file(self, ctx):
+        """Donate a file for analysis."""
         if not ctx.message.attachments:
             embed = discord.Embed(
-                title="No Attachment",
-                description="Please attach a file to submit.",
+                title="Include a file",
+                description="You didn't upload a file for me to analyze. Try again!",
                 color=0xff4545
             )
             await ctx.send(embed=embed)
@@ -385,7 +385,7 @@ class TriageAnalysis(commands.Cog):
             # Use BytesIO for file-like object
             data = client.submit_sample_file(filename, BytesIO(file_bytes))
             embed = discord.Embed(
-                title="File Submitted",
+                title="File submitted",
                 description=f"Sample submitted!\n**ID:** `{data.get('id')}`\n**Status:** `{data.get('status')}`",
                 color=0x2bbd8e
             )
@@ -401,12 +401,11 @@ class TriageAnalysis(commands.Cog):
     @triage.command()
     async def analyze(self, ctx):
         """
-        Submit a file for analysis and return the results (score, tags, etc) after analysis is complete.
-        Attach a file to this command.
+        Analyze and return info about a file
         """
         if not ctx.message.attachments:
             embed = discord.Embed(
-                title="No Attachment",
+                title="No attachment",
                 description="Please attach a file to analyze.",
                 color=0xff4545
             )
@@ -434,15 +433,15 @@ class TriageAnalysis(commands.Cog):
 
             if not sample_id:
                 embed = discord.Embed(
-                    title="Submission Failed",
-                    description="Failed to submit file for analysis.",
+                    title="Submission failed",
+                    description="Failed to submit file for analysis. Please try again later, the service may be experiencing an outage.",
                     color=0xff4545
                 )
                 await ctx.send(embed=embed)
                 return
             embed = discord.Embed(
                 title="Analysis starting",
-                description=f"File was uploaded successfully, and an analysis environment is being created.\n- Please wait, your results will be ready momentarily.",
+                description=f"File was uploaded successfully, and analysis is starting.\n> Please wait, your results will be ready momentarily.",
                 color=0xfffffe
             )
             await ctx.send(embed=embed)
@@ -463,7 +462,7 @@ class TriageAnalysis(commands.Cog):
 
             if status not in ("reported", "finished", "complete"):
                 embed = discord.Embed(
-                    title="Analysis Timeout",
+                    title="There was an issue during analysis",
                     description=f"Analysis did not complete in {max_wait} seconds. Status: `{status}`",
                     color=discord.Color.orange()
                 )
@@ -475,7 +474,7 @@ class TriageAnalysis(commands.Cog):
                 overview = client.overview_report(sample_id)
             except Exception as e:
                 embed = discord.Embed(
-                    title="Overview Fetch Failed",
+                    title="The overview wasn't available",
                     description=f"Analysis finished, but failed to fetch overview report: {e}",
                     color=0xff4545
                 )
@@ -622,7 +621,7 @@ class TriageAnalysis(commands.Cog):
             # Compose embed
             embed = discord.Embed(
                 title="Analysis complete",
-                description=f"Dynamic sandbox analysis of your file has finished",
+                description=f"Static and dynamic analysis of your file has finished",
                 color=0xff4545 if score and score >= 7 else 0x2bbd8e if score and score < 5 else discord.Color.orange()
             )
             if target_name:
@@ -639,11 +638,11 @@ class TriageAnalysis(commands.Cog):
             if tags_str:
                 embed.add_field(name="Tags", value=tags_str, inline=False)
             if sha1:
-                embed.add_field(name="SHA1", value=sha1, inline=False)
+                embed.add_field(name="SHA1", value=f"-# {sha1}", inline=False)
             if sha256:
-                embed.add_field(name="SHA256", value=sha256, inline=False)
+                embed.add_field(name="SHA256", value=f"-# {sha256}", inline=False)
             if ssdeep:
-                embed.add_field(name="SSDEEP", value=ssdeep, inline=False)
+                embed.add_field(name="SSDEEP", value=f"-# {ssdeep}", inline=False)
             if created_disp:
                 embed.add_field(name="Created", value=created_disp, inline=True)
             if completed_disp:
