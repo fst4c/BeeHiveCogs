@@ -33,7 +33,8 @@ class Triage(commands.Cog):
         # Use the global keystore for the triage apikey
         # The key is stored as "triage" -> "apikey"
         # This is a global key, not per-guild
-        return await self.bot.get_shared_api_tokens("triage").get("apikey")
+        tokens = await self.bot.get_shared_api_tokens("triage")
+        return tokens.get("apikey")
 
     async def _get_log_channel(self, guild):
         channel_id = await self.config.guild(guild).log_channel()
