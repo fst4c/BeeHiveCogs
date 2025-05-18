@@ -352,27 +352,30 @@ class TriageAnalysis(commands.Cog):
     async def download(self, ctx, sample_id: str):
         """
         Download the sample file
-        
+
         [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-download>)
         """
         try:
             client = await self.get_client(ctx.guild)
             file_bytes = client.get_sample_file(sample_id)
-            # Upload to temp.sh
-            temp_url = None
+            # Upload to tmpfiles.org
+            tmpfiles_url = None
             async with aiohttp.ClientSession() as session:
                 data = aiohttp.FormData()
                 data.add_field('file', BytesIO(file_bytes), filename=f"{sample_id}.bin")
-                async with session.post("https://temp.sh/upload", data=data) as resp:
+                async with session.post("https://tmpfiles.org/api/v1/upload", data=data) as resp:
                     if resp.status == 200:
-                        temp_url = (await resp.text()).strip()
+                        resp_json = await resp.json()
+                        tmpfiles_url = resp_json.get("data", {}).get("url")
+                        if not tmpfiles_url:
+                            raise RuntimeError("Failed to get download URL from tmpfiles.org response")
                     else:
-                        raise RuntimeError(f"Failed to upload to temp.sh (status {resp.status})")
-            if not temp_url or not temp_url.startswith("https://temp.sh/"):
-                raise RuntimeError("Failed to upload file to temp.sh")
+                        raise RuntimeError(f"Failed to upload to tmpfiles.org (status {resp.status})")
+            if not tmpfiles_url or not tmpfiles_url.startswith("https://tmpfiles.org/"):
+                raise RuntimeError("Failed to upload file to tmpfiles.org")
             embed = discord.Embed(
                 title="Sample Download",
-                description=f"Here is the download link for sample `{sample_id}`:\n{temp_url}",
+                description=f"Here is the download link for sample `{sample_id}`:\n{tmpfiles_url}",
                 color=0x2bbd8e
             )
             await ctx.send(embed=embed)
