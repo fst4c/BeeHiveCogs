@@ -82,14 +82,16 @@ class LinkSafety(commands.Cog):
         """
         Scan links sent in your server's chats automatically to see if they're known malicious or not
 
-        **[Check the docs to learn more](<https://sentri.beehive.systems/features/link-scanning>)**
+        **[Visit the docs to learn more](<https://sentri.beehive.systems/features/link-scanning>)**
         """
 
     @commands.admin_or_permissions()
     @linksafety.command()
     async def vendor(self, ctx: Context, server_id: int):
         """
-        Specify the ID of a server to send phishing alerts to if the bot is in more than one server.
+        Link a vendor by ID
+
+        [View command documentation](<https://sentri.beehive.systems/features/link-scanning#linksafety-vendor>)
         """
         server = self.bot.get_guild(server_id)
         if not server:
@@ -113,7 +115,9 @@ class LinkSafety(commands.Cog):
     @linksafety.command()
     async def settings(self, ctx: Context):
         """
-        Show the current antiphishing settings.
+        Show current settings
+
+        [View command documentation](<https://sentri.beehive.systems/features/link-scanning#linksafety-settings>)
         """
         guild_data = await self.config.guild(ctx.guild).all()
         vendor_server_id = guild_data.get('vendor_server_id', None)
@@ -142,13 +146,7 @@ class LinkSafety(commands.Cog):
         """
         Choose the action that occurs when a user sends a phishing scam.
 
-        Options:
-        **`ignore`** - Disables phishing protection
-        **`notify`** - Alerts in channel when malicious links detected (default)
-        **`delete`** - Deletes the message
-        **`kick`** - Delete message and kick sender
-        **`ban`** - Delete message and ban sender (recommended)
-        **`timeout`** - Time the user out
+        [View command documentation](<https://sentri.beehive.systems/features/link-scanning#linksafety-action>)
         """
         valid_actions = ["ignore", "notify", "delete", "kick", "ban", "timeout"]
         if action not in valid_actions:
@@ -197,9 +195,9 @@ class LinkSafety(commands.Cog):
     @linksafety.command()
     async def duration(self, ctx: Context, minutes: int):
         """
-        Set the timeout duration (in minutes) for the timeout action.
+        Set the timeout duration
 
-        Example: `[p]linksafety duration 60` will timeout users for 60 minutes.
+        [View command documentation](<https://sentri.beehive.systems/features/link-scanning#linksafety-duration>)
         """
         if minutes < 1 or minutes > 10080:  # 1 minute to 7 days
             await ctx.send("Timeout duration must be between 1 and 10080 minutes (7 days).")
@@ -210,7 +208,9 @@ class LinkSafety(commands.Cog):
     @linksafety.command()
     async def stats(self, ctx: Context):
         """
-        Check protection statistics for this server
+        Check link safety statistics
+
+        [View command documentation](<https://sentri.beehive.systems/features/link-scanning#linksafety-stats>)
         """
         caught = await self.config.guild(ctx.guild).caught()
         notifications = await self.config.guild(ctx.guild).notifications()
@@ -289,6 +289,8 @@ class LinkSafety(commands.Cog):
     async def logs(self, ctx: Context, channel: discord.TextChannel):
         """
         Set a logging channel
+
+        [View command documentation](<https://sentri.beehive.systems/features/link-scanning#linksafety-logs>)
         """
         await self.config.guild(ctx.guild).log_channel.set(channel.id)
         embed = discord.Embed(
