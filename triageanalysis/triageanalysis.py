@@ -78,10 +78,11 @@ class TriageAnalysis(commands.Cog):
 
     @triage.command(name="disable")
     @commands.admin_or_permissions(administrator=True)
-    async def triage_autoscan_disable(self, ctx):
+    async def triage_disable(self, ctx):
         """
         Disable automatic file analysis
         
+        [View command documentation](<https://sentri.beehive.systems/integrations/tria.ge#triage-disable>)
         """
         await self.config.guild(ctx.guild).autoscan_enabled.set(False)
         embed = discord.Embed(
