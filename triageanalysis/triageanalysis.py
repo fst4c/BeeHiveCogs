@@ -205,6 +205,15 @@ class TriageAnalysis(commands.Cog):
                 await ctx.send(f"Analysis finished, but failed to fetch overview report: {e}")
                 return
 
+            # Send the entire overview as a JSON file
+            overview_json = json.dumps(overview, indent=2)
+            overview_bytes = BytesIO(overview_json.encode("utf-8"))
+            overview_bytes.seek(0)
+            await ctx.send(
+                content="Analysis complete! See attached overview report.",
+                file=discord.File(overview_bytes, filename=f"{sample_id}_overview.json")
+            )
+
             # Extract score, tags, etc
             # The Triage API overview report returns a structure like:
             # {
