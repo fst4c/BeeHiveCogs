@@ -242,9 +242,9 @@ class TriageAnalysis(commands.Cog):
                 ttps = sig.get("ttp") or sig.get("ttps") or []
                 if isinstance(ttps, str):
                     ttps = [ttps]
-                ttps_str = f" ({', '.join(ttps)})" if ttps else ""
+                ttps_str = f" ({'\n'.join(ttps)})" if ttps else ""
                 if score_ is not None and text:
-                    sigs.append(f"{score_} | {text}{ttps_str}")
+                    sigs.append(f"**{score_}** | *{text}{ttps_str}*")
                 elif text:
                     sigs.append(f"{text}{ttps_str}")
             sigs_str = humanize_list(sigs) if sigs else "None"
