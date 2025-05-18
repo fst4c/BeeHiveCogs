@@ -18,6 +18,10 @@ import os
 import platform
 import asyncio
 
+import datetime
+import re
+import pytz
+
 urllib3.disable_warnings()
 
 class TriageAnalysis(commands.Cog):
@@ -233,6 +237,26 @@ class TriageAnalysis(commands.Cog):
             completed = sample_info.get("completed")
             sample_id = sample_info.get("id") or sample_id
 
+            # Convert created/completed to Discord dynamic timestamps if possible
+            def to_discord_timestamp(dtstr):
+                # dtstr is expected to be ISO8601, e.g. "2024-06-07T12:34:56.789Z"
+                if not dtstr:
+                    return None
+                try:
+                    # Remove Z and microseconds if present
+                    dtstr_clean = re.sub(r"\.\d+", "", dtstr).replace("Z", "")
+                    dt = datetime.datetime.fromisoformat(dtstr_clean)
+                    # If no tzinfo, treat as UTC
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=datetime.timezone.utc)
+                    unix_ts = int(dt.timestamp())
+                    return f"<t:{unix_ts}:F>"
+                except Exception:
+                    return dtstr
+
+            created_disp = to_discord_timestamp(created)
+            completed_disp = to_discord_timestamp(completed)
+
             # Compose signatures summary as "SCORE | text (TTP's)"
             sigs = []
             for sig in signatures:
@@ -307,10 +331,10 @@ class TriageAnalysis(commands.Cog):
                 embed.add_field(name="SHA256", value=sha256, inline=False)
             if ssdeep:
                 embed.add_field(name="SSDEEP", value=ssdeep, inline=False)
-            if created:
-                embed.add_field(name="Created", value=created, inline=True)
-            if completed:
-                embed.add_field(name="Completed", value=completed, inline=True)
+            if created_disp:
+                embed.add_field(name="Created", value=created_disp, inline=True)
+            if completed_disp:
+                embed.add_field(name="Completed", value=completed_disp, inline=True)
             if tasks_str:
                 embed.add_field(name="Tasks", value=tasks_str, inline=False)
             if sigs_str:
