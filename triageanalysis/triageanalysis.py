@@ -237,7 +237,13 @@ class TriageAnalysis(commands.Cog):
             sigs = []
             for sig in signatures:
                 score_ = sig.get("score")
-                text = sig.get("name") or sig.get("label") or ""
+                name = sig.get("name") or sig.get("label") or ""
+                desc = sig.get("desc")
+                # If desc is present, put it next to the name
+                if name and desc:
+                    text = f"{name}: {desc}"
+                else:
+                    text = name
                 # Try both "ttp" and "ttps" for TTPs
                 ttps = sig.get("ttp") or sig.get("ttps") or []
                 if isinstance(ttps, str):
