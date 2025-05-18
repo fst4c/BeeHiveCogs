@@ -15,8 +15,6 @@ TRANSLATION_FAILED = "`Something went wrong while translating. If this keeps hap
 
 CUSTOM_EMOJI = re.compile(r"<a?:\w+:\d+>")
 
-log = logging.getLogger("red.beehive-cogs.translate")
-
 
 class Translate(commands.Cog):
     """Translate messages using Google Translate for free. Supports context menu commands."""
