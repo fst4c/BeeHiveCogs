@@ -614,7 +614,8 @@ class TriageAnalysis(commands.Cog):
             if target_name:
                 embed.add_field(name="File name", value=target_name, inline=True)
             if sample_size:
-                embed.add_field(name="Size", value=f"{sample_size:,} bytes", inline=True)
+                size_mb = sample_size / (1024 * 1024)
+                embed.add_field(name="Size", value=f"{size_mb:.2f} MB", inline=True)
             if score is not None:
                 embed.add_field(name="Score", value=str(score), inline=True)
             if verdict and verdict != "N/A":
