@@ -694,7 +694,7 @@ class TriageAnalysis(commands.Cog):
 
     # --- Background file scan listener ---
     @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
+    async def on_message_without_command(self, message: discord.Message):
         # Only scan in guilds, not DMs, and ignore bots
         if not message.guild or message.author.bot:
             return
