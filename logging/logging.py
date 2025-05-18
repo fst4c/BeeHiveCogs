@@ -330,17 +330,34 @@ class Logging(EventMixin, commands.Cog):
         self,
         ctx: commands.Context,
         channel: discord.TextChannel,
-        *events: EventChooser,
+        *events: str,
     ) -> None:
         """
         Set the channel for modlogs.
 
         - `<channel>` The text channel to send the events to.
+        - `[events...]` The events to set, or use `all` to set all logging types.
         """
         if not events:
-            return await ctx.send(_("You must provide which events should be included."))
+            return await ctx.send(_("You must provide which events should be included, or use `all`."))
         if ctx.guild.id not in self.settings:
             self.settings[ctx.guild.id] = await self.config.guild(ctx.guild).all()
+
+        # If "all" is in events, set all loggable events to this channel
+        if any(str(e).lower() == "all" for e in events):
+            # Only set for keys that are dicts and have a "channel" key
+            changed_events = []
+            for event, value in self.settings[ctx.guild.id].items():
+                if isinstance(value, dict) and "channel" in value:
+                    self.settings[ctx.guild.id][event]["channel"] = channel.id
+                    changed_events.append(event.replace("user_", "member_"))
+            await self.save(ctx.guild)
+            await ctx.send(
+                _("All log events have been set to {channel}").format(channel=channel.mention)
+            )
+            return
+
+        # Otherwise, set only the specified events
         for event in events:
             self.settings[ctx.guild.id][event]["channel"] = channel.id
         await self.save(ctx.guild)
