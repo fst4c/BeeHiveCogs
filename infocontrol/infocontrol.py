@@ -85,14 +85,14 @@ class InfoControl(commands.Cog):
             embed = discord.Embed(
                 title="Error",
                 description="I do not have permission to delete messages.",
-                color=discord.Color.red()
+                color=0xff4545
             )
             await message.channel.send(embed=embed)
         except Exception as e:
             embed = discord.Embed(
                 title="Error",
                 description=f"Failed to delete message: {e}",
-                color=discord.Color.red()
+                color=0xff4545
             )
             await message.channel.send(embed=embed)
 

@@ -194,7 +194,7 @@ class AdaptiveSlowmode(commands.Cog):
             embed = discord.Embed(
                 title="Adaptive slowmode",
                 description=f"Adaptive slowmode log channel set to {channel.mention}.",
-                color=discord.Color.green()
+                color=0x2bbd8e
             )
             await ctx.send(embed=embed)
 
@@ -320,7 +320,7 @@ class AdaptiveSlowmode(commands.Cog):
         embed = discord.Embed(
             title="Engagement survey results",
             description=survey_result,
-            color=discord.Color.green()
+            color=0x2bbd8e
         )
         await ctx.send(embed=embed)
         await self._send_log(ctx.guild, embed)

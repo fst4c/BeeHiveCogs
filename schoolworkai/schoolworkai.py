@@ -533,7 +533,7 @@ class SchoolworkAI(commands.Cog):
         embed = discord.Embed(
             title="Customer ID Set",
             description=f"Customer ID for {user.mention} set to `{customer_id}`.",
-            color=discord.Color.green()
+            color=0x2bbd8e
         )
         await ctx.send(embed=embed)
 
@@ -580,7 +580,7 @@ class SchoolworkAI(commands.Cog):
                 description="⚠️ **Are you sure you want to reset all SchoolworkAI cog data?**\n"
                             "This will erase all stored customer IDs, applications, and configuration for all users and guilds.\n\n"
                             "Type `CONFIRM RESET` within 30 seconds to proceed.",
-                color=discord.Color.red()
+                color=0xff4545
             )
         )
 
@@ -603,7 +603,7 @@ class SchoolworkAI(commands.Cog):
                 embed=discord.Embed(
                     title="SchoolworkAI Data Reset",
                     description="All SchoolworkAI cog data has been erased.",
-                    color=discord.Color.green()
+                    color=0x2bbd8e
                 )
             )
         except Exception as e:
@@ -611,7 +611,7 @@ class SchoolworkAI(commands.Cog):
                 embed=discord.Embed(
                     title="Reset Failed",
                     description=f"An error occurred while resetting data: {e}",
-                    color=discord.Color.red()
+                    color=0xff4545
                 )
             )
 
@@ -777,7 +777,7 @@ class SchoolworkAI(commands.Cog):
             if self.message:
                 try:
                     embed = self.message.embeds[0]
-                    embed.color = discord.Color.green()
+                    embed.color = 0x2bbd8e
                     embed.title = "SchoolworkAI application (Approved)"
                     if subscription_errors:
                         embed.add_field(
@@ -831,7 +831,7 @@ class SchoolworkAI(commands.Cog):
                         embed = discord.Embed(
                             title="SchoolworkAI Application Denied",
                             description=f"Your application was denied for the following reason:\n\n> {self.reason.value}\n\nYou may submit a new application if you wish.",
-                            color=discord.Color.red()
+                            color=0xff4545
                         )
                         await self.user.send(embed=embed)
                     except discord.Forbidden:
@@ -840,7 +840,7 @@ class SchoolworkAI(commands.Cog):
                     if self.message:
                         try:
                             embed = self.message.embeds[0]
-                            embed.color = discord.Color.red()
+                            embed.color = 0xff4545
                             embed.title = "SchoolworkAI Application (Denied)"
                             embed.add_field(name="Denial Reason", value=self.reason.value, inline=False)
                             await self.message.edit(embed=embed, view=None)
@@ -947,7 +947,7 @@ class SchoolworkAI(commands.Cog):
                             embed=discord.Embed(
                                 title="Timeout",
                                 description="You took too long to respond. Application cancelled.",
-                                color=discord.Color.red()
+                                color=0xff4545
                             )
                         )
                         return
@@ -967,7 +967,7 @@ class SchoolworkAI(commands.Cog):
                                 embed=discord.Embed(
                                     title="Invalid Email",
                                     description="That doesn't look like a valid email. Please try again or type `cancel`.",
-                                    color=discord.Color.red()
+                                    color=0xff4545
                                 )
                             )
                             continue
@@ -977,7 +977,7 @@ class SchoolworkAI(commands.Cog):
                                 embed=discord.Embed(
                                     title="Invalid Name",
                                     description="Please provide a valid name (max 50 characters). Try again or type `cancel`.",
-                                    color=discord.Color.red()
+                                    color=0xff4545
                                 )
                             )
                             continue
@@ -986,7 +986,7 @@ class SchoolworkAI(commands.Cog):
                             embed=discord.Embed(
                                 title="Email Too Long",
                                 description="Email is too long (max 100 characters). Try again or type `cancel`.",
-                                color=discord.Color.red()
+                                color=0xff4545
                             )
                         )
                         continue
@@ -996,7 +996,7 @@ class SchoolworkAI(commands.Cog):
                                 embed=discord.Embed(
                                     title="Invalid Grade",
                                     description="Please provide a valid grade (max 50 characters). Try again or type `cancel`.",
-                                    color=discord.Color.red()
+                                    color=0xff4545
                                 )
                             )
                             continue
@@ -1006,7 +1006,7 @@ class SchoolworkAI(commands.Cog):
                                 embed=discord.Embed(
                                     title="Description Too Long",
                                     description="Please provide a brief description (max 200 characters). Try again or type `cancel`.",
-                                    color=discord.Color.red()
+                                    color=0xff4545
                                 )
                             )
                             continue
@@ -1021,7 +1021,7 @@ class SchoolworkAI(commands.Cog):
                     embed=discord.Embed(
                         title="Twilio Not Configured",
                         description="Phone verification is not available at this time. Please contact an administrator.",
-                        color=discord.Color.red()
+                        color=0xff4545
                     )
                 )
                 return
@@ -1044,7 +1044,7 @@ class SchoolworkAI(commands.Cog):
                         embed=discord.Embed(
                             title="Timeout",
                             description="You took too long to respond. Application cancelled.",
-                            color=discord.Color.red()
+                            color=0xff4545
                         )
                     )
                     return
@@ -1063,7 +1063,7 @@ class SchoolworkAI(commands.Cog):
                         embed=discord.Embed(
                             title="Invalid Phone Number",
                             description="That doesn't look like a valid phone number in international format. Please try again or type `cancel`.",
-                            color=discord.Color.red()
+                            color=0xff4545
                         )
                     )
                     continue
@@ -1077,7 +1077,7 @@ class SchoolworkAI(commands.Cog):
                             embed=discord.Embed(
                                 title="Twilio Not Configured",
                                 description="Phone verification is not available at this time. Please contact an administrator.",
-                                color=discord.Color.red()
+                                color=0xff4545
                             )
                         )
                         return
@@ -1094,7 +1094,7 @@ class SchoolworkAI(commands.Cog):
                                     embed=discord.Embed(
                                         title="Twilio Error",
                                         description=f"Could not send verification code. ({resp.status})\n{text}",
-                                        color=discord.Color.red()
+                                        color=0xff4545
                                     )
                                 )
                                 continue
@@ -1103,7 +1103,7 @@ class SchoolworkAI(commands.Cog):
                         embed=discord.Embed(
                             title="Twilio Error",
                             description=f"An error occurred while sending the verification code: {e}",
-                            color=discord.Color.red()
+                            color=0xff4545
                         )
                     )
                     continue
@@ -1125,7 +1125,7 @@ class SchoolworkAI(commands.Cog):
                             embed=discord.Embed(
                                 title="Timeout",
                                 description="You took too long to respond. Application cancelled.",
-                                color=discord.Color.red()
+                                color=0xff4545
                             )
                         )
                         return
@@ -1165,7 +1165,7 @@ class SchoolworkAI(commands.Cog):
                                             embed=discord.Embed(
                                                 title="Twilio Error",
                                                 description=f"Could not resend verification code. ({resp.status})\n{text}",
-                                                color=discord.Color.red()
+                                                color=0xff4545
                                             )
                                         )
                         except Exception as e:
@@ -1173,7 +1173,7 @@ class SchoolworkAI(commands.Cog):
                                 embed=discord.Embed(
                                     title="Twilio Error",
                                     description=f"An error occurred while resending the verification code: {e}",
-                                    color=discord.Color.red()
+                                    color=0xff4545
                                 )
                             )
                         continue  # Don't count as an attempt
@@ -1197,7 +1197,7 @@ class SchoolworkAI(commands.Cog):
                                         embed=discord.Embed(
                                             title="Twilio Error",
                                             description=f"Could not decode Twilio response: {e}",
-                                            color=discord.Color.red()
+                                            color=0xff4545
                                         )
                                     )
                                     attempts += 1
@@ -1206,7 +1206,7 @@ class SchoolworkAI(commands.Cog):
                                             embed=discord.Embed(
                                                 title="Too Many Attempts",
                                                 description="Too many failed attempts. Application cancelled.",
-                                                color=discord.Color.red()
+                                                color=0xff4545
                                             )
                                         )
                                         return
@@ -1273,7 +1273,7 @@ class SchoolworkAI(commands.Cog):
                     embed=discord.Embed(
                         title="Applications Channel Not Set",
                         description="Applications channel is not set. Please contact an admin.",
-                        color=discord.Color.red()
+                        color=0xff4545
                     )
                 )
                 return
@@ -1313,7 +1313,7 @@ class SchoolworkAI(commands.Cog):
                     embed=discord.Embed(
                         title="Application Error",
                         description=f"An error occurred: {e}",
-                        color=discord.Color.red()
+                        color=0xff4545
                     )
                 )
             except discord.Forbidden:
@@ -1387,7 +1387,7 @@ class SchoolworkAI(commands.Cog):
             embed = discord.Embed(
                 title="Billing Profile Required",
                 description="You need to set up a billing profile to use SchoolworkAI. Please contact service support for assistance.",
-                color=discord.Color.red()
+                color=0xff4545
             )
             await ctx.send(embed=embed)
             return
@@ -1408,7 +1408,7 @@ class SchoolworkAI(commands.Cog):
             embed = discord.Embed(
                 title="OpenAI API Key Not Configured",
                 description="OpenAI API key is not configured. Please contact an administrator.",
-                color=discord.Color.red()
+                color=0xff4545
             )
             await ctx.send(embed=embed)
             return
@@ -1484,7 +1484,7 @@ class SchoolworkAI(commands.Cog):
                             embed = discord.Embed(
                                 title="OpenAI API Error",
                                 description=f"Status: {resp.status}\n{text}",
-                                color=discord.Color.red()
+                                color=0xff4545
                             )
                             await ctx.send(embed=embed)
                             return
@@ -1496,7 +1496,7 @@ class SchoolworkAI(commands.Cog):
                             embed = discord.Embed(
                                 title="Unexpected OpenAI Response",
                                 description="OpenAI API returned an unexpected response.",
-                                color=discord.Color.red()
+                                color=0xff4545
                             )
                             await ctx.send(embed=embed)
                             return
@@ -1568,7 +1568,7 @@ class SchoolworkAI(commands.Cog):
                                 embed=discord.Embed(
                                     title="Unable to DM",
                                     description="I couldn't send you a DM. Please enable DMs from server members and try again.",
-                                    color=discord.Color.red()
+                                    color=0xff4545
                                 )
                             )
                         except Exception as e:
@@ -1576,7 +1576,7 @@ class SchoolworkAI(commands.Cog):
                                 embed=discord.Embed(
                                     title="DM Error",
                                     description=f"An error occurred while sending your answer in DMs: {e}",
-                                    color=discord.Color.red()
+                                    color=0xff4545
                                 )
                             )
 
@@ -1584,7 +1584,7 @@ class SchoolworkAI(commands.Cog):
                 embed = discord.Embed(
                     title="OpenAI Error",
                     description=f"An error occurred while contacting OpenAI: {e}",
-                    color=discord.Color.red()
+                    color=0xff4545
                 )
                 await ctx.send(embed=embed)
 
@@ -1879,7 +1879,7 @@ class SchoolworkAI(commands.Cog):
             embed = discord.Embed(
                 title="Stripe API Key Not Configured",
                 description="Stripe API key is not configured. Please contact an administrator.",
-                color=discord.Color.red()
+                color=0xff4545
             )
             await ctx.send(embed=embed, ephemeral=True)
             return
@@ -1916,7 +1916,7 @@ class SchoolworkAI(commands.Cog):
                         embed = discord.Embed(
                             title="Stripe API Error",
                             description=f"Status: {resp.status}\n{text}",
-                            color=discord.Color.red()
+                            color=0xff4545
                         )
                         await ctx.send(embed=embed, ephemeral=True)
                         return
@@ -1926,7 +1926,7 @@ class SchoolworkAI(commands.Cog):
                         embed = discord.Embed(
                             title="Stripe API Error",
                             description=f"Could not decode Stripe response: {e}",
-                            color=discord.Color.red()
+                            color=0xff4545
                         )
                         await ctx.send(embed=embed, ephemeral=True)
                         return
@@ -1935,7 +1935,7 @@ class SchoolworkAI(commands.Cog):
             embed = discord.Embed(
                 title="Stripe Error",
                 description=f"An error occurred while contacting Stripe: {e}",
-                color=discord.Color.red()
+                color=0xff4545
             )
             await ctx.send(embed=embed, ephemeral=True)
             return
@@ -1951,6 +1951,6 @@ class SchoolworkAI(commands.Cog):
             embed = discord.Embed(
                 title="Something went wrong...",
                 description="Could not generate a billing portal link. Please contact support.",
-                color=discord.Color.red()
+                color=0xff4545
             )
             await ctx.send(embed=embed, ephemeral=True)

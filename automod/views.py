@@ -129,7 +129,7 @@ class ModerationActionView(discord.ui.View):
             if not member:
                 embed = discord.Embed(
                     description="User not found in this server.",
-                    color=discord.Color.red()
+                    color=0xff4545
                 )
                 await interaction.response.send_message(embed=embed, ephemeral=True)
                 return

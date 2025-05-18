@@ -113,7 +113,7 @@ class Invites(commands.Cog):
         embed = discord.Embed(
             title="New Member Joined!",
             description=f"{member.mention} joined using {inviter.mention}'s invite.",
-            color=discord.Color.green()
+            color=0x2bbd8e
         )
         await channel.send(embed=embed)
 

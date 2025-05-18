@@ -85,7 +85,7 @@ class Translate(commands.Cog):
             result: Translated = await asyncio.to_thread(self.translator.translate, content, dest=language, src="auto")
         except Exception:
             log.exception("Translator.translate", stack_info=True)
-            fail_embed = discord.Embed(description=TRANSLATION_FAILED, color=discord.Color.red())
+            fail_embed = discord.Embed(description=TRANSLATION_FAILED, color=0xff4545)
             if isinstance(ctx, discord.Interaction):
                 return await ctx.response.send_message(embed=fail_embed, ephemeral=True)
             else:

@@ -170,7 +170,7 @@ class NicknameManagement(commands.Cog):
         most_removed_characters = sorted(character_removal_count.items(), key=lambda item: item[1], reverse=True)[:5]
         most_removed_characters_str = ', '.join([f"{char}: {count}" for char, count in most_removed_characters])
 
-        embed = discord.Embed(title="Nickname cleanup finished", color=discord.Color.green())
+        embed = discord.Embed(title="Nickname cleanup finished", color=0x2bbd8e)
         embed.add_field(name="Total members", value=total_members, inline=True)
         embed.add_field(name="Processed members", value=processed_members, inline=True)
         embed.add_field(name="Changed nicknames", value=changed_nicknames, inline=True)

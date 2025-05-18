@@ -94,7 +94,7 @@ class ReportsPro(commands.Cog):
         embed = discord.Embed(
             title="Auto Cleanup Settings",
             description=f"Auto cleanup is now {'enabled' if enabled else 'disabled'} for reports older than {days} days.",
-            color=discord.Color.green()
+            color=0x2bbd8e
         )
         await ctx.send(embed=embed)
 
@@ -123,7 +123,7 @@ class ReportsPro(commands.Cog):
             embed = discord.Embed(
                 title="Permission Error",
                 description="I can't send messages in this channel. Please check my permissions.",
-                color=discord.Color.red()
+                color=0xff4545
             )
             await ctx.send(embed=embed)
 
@@ -141,7 +141,7 @@ class ReportsPro(commands.Cog):
             embed = discord.Embed(
                 title="Error",
                 description="You cannot report yourself.",
-                color=discord.Color.red()
+                color=0xff4545
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
@@ -151,7 +151,7 @@ class ReportsPro(commands.Cog):
             embed = discord.Embed(
                 title="Error",
                 description="The reports channel hasn't been set up yet. Please contact an admin.",
-                color=discord.Color.red()
+                color=0xff4545
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
@@ -161,7 +161,7 @@ class ReportsPro(commands.Cog):
             embed = discord.Embed(
                 title="Error",
                 description="I can't access the reports channel. Please contact an admin.",
-                color=discord.Color.red()
+                color=0xff4545
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
             return
@@ -210,7 +210,7 @@ class ReportsPro(commands.Cog):
                     embed = discord.Embed(
                         title="Not for you!",
                         description="Only the user who started this report can select a reason.",
-                        color=discord.Color.red()
+                        color=0xff4545
                     )
                     await interaction.response.send_message(embed=embed, ephemeral=True)
                     return
@@ -295,7 +295,7 @@ class ReportsPro(commands.Cog):
                     embed = discord.Embed(
                         title="Error",
                         description=f"Could not access reports config: {e}",
-                        color=discord.Color.red()
+                        color=0xff4545
                     )
                     try:
                         if hasattr(interaction, "followup"):
@@ -315,7 +315,7 @@ class ReportsPro(commands.Cog):
                     embed = discord.Embed(
                         title="Error",
                         description="Could not generate a unique report ID. Please try again.",
-                        color=discord.Color.red()
+                        color=0xff4545
                     )
                     try:
                         if hasattr(interaction, "followup"):
@@ -348,7 +348,7 @@ class ReportsPro(commands.Cog):
                     embed = discord.Embed(
                         title="Error",
                         description=f"Something went wrong while saving the report: {e}",
-                        color=discord.Color.red()
+                        color=0xff4545
                     )
                     try:
                         if hasattr(interaction, "followup"):
@@ -366,7 +366,7 @@ class ReportsPro(commands.Cog):
                     embed = discord.Embed(
                         title="Error",
                         description=f"Something went wrong while capturing chat history: {e}",
-                        color=discord.Color.red()
+                        color=0xff4545
                     )
                     try:
                         if hasattr(interaction, "followup"):
@@ -444,7 +444,7 @@ class ReportsPro(commands.Cog):
                                 # Log embed
                                 log_embed = discord.Embed(
                                     title="Report Closed: User Banned",
-                                    color=discord.Color.red(),
+                                    color=0xff4545,
                                     description=f"Report `{self.report_id}` has been closed. {user.mention} was **banned** by {interaction.user.mention}."
                                 )
                                 log_embed.add_field(name="Report ID", value=f"`{self.report_id}`", inline=True)
@@ -577,7 +577,7 @@ class ReportsPro(commands.Cog):
                             # Log embed
                             log_embed = discord.Embed(
                                 title="Report Closed: Dismissed",
-                                color=discord.Color.green(),
+                                color=0x2bbd8e,
                                 description=f"Report `{self.report_id}` has been **dismissed** by {interaction.user.mention}."
                             )
                             log_embed.add_field(name="Report ID", value=f"`{self.report_id}`", inline=True)
@@ -602,7 +602,7 @@ class ReportsPro(commands.Cog):
                         embed = discord.Embed(
                             title="Permission error",
                             description="I can't send messages in the reports channel. Please check my permissions.",
-                            color=discord.Color.red()
+                            color=0xff4545
                         )
                         try:
                             if hasattr(interaction, "followup"):
@@ -616,7 +616,7 @@ class ReportsPro(commands.Cog):
                         embed = discord.Embed(
                             title="Error",
                             description=f"Something went wrong while sending the report: {e}",
-                            color=discord.Color.red()
+                            color=0xff4545
                         )
                         try:
                             if hasattr(interaction, "followup"):
@@ -630,7 +630,7 @@ class ReportsPro(commands.Cog):
                     embed = discord.Embed(
                         title="Error",
                         description="I can't access the reports channel. Please contact an admin.",
-                        color=discord.Color.red()
+                        color=0xff4545
                     )
                     try:
                         if hasattr(interaction, "followup"):
@@ -697,14 +697,14 @@ class ReportsPro(commands.Cog):
             embed = discord.Embed(
                 title="Permission Error",
                 description="I can't send messages in this channel. Please check my permissions.",
-                color=discord.Color.red()
+                color=0xff4545
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
         except Exception as e:
             embed = discord.Embed(
                 title="Error",
                 description=f"Something went wrong while sending the report embed: {e}",
-                color=discord.Color.red()
+                color=0xff4545
             )
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -791,7 +791,7 @@ class ReportsPro(commands.Cog):
             handled_at = report_info.get("handled_at", None)
             if status.lower() == "closed":
                 if action_taken == "Banned":
-                    color = discord.Color.red()
+                    color = 0xff4545
                     title = f"Report {report_id} (Closed: Banned)"
                 elif action_taken == "Kicked":
                     color = discord.Color.orange()
@@ -800,7 +800,7 @@ class ReportsPro(commands.Cog):
                     color = discord.Color.blue()
                     title = f"Report {report_id} (Closed: {action_taken})"
                 elif action_taken == "Dismissed":
-                    color = discord.Color.green()
+                    color = 0x2bbd8e
                     title = f"Report {report_id} (Closed: Dismissed)"
                 else:
                     color = discord.Color.dark_grey()
@@ -931,7 +931,7 @@ class ReportsPro(commands.Cog):
                         # Log embed
                         log_embed = discord.Embed(
                             title="Report Closed: User Banned",
-                            color=discord.Color.red(),
+                            color=0xff4545,
                             description=f"Report `{self.report_id}` has been closed. {user.mention} was **banned** by {interaction.user.mention}."
                         )
                         log_embed.add_field(name="Report ID", value=f"`{self.report_id}`", inline=True)
@@ -1063,7 +1063,7 @@ class ReportsPro(commands.Cog):
                     # Log embed
                     log_embed = discord.Embed(
                         title="Report Closed: Dismissed",
-                        color=discord.Color.green(),
+                        color=0x2bbd8e,
                         description=f"Report `{self.report_id}` has been **dismissed** by {interaction.user.mention}."
                     )
                     log_embed.add_field(name="Report ID", value=f"`{self.report_id}`", inline=True)
@@ -1134,14 +1134,14 @@ class ReportsPro(commands.Cog):
             embed = discord.Embed(
                 title="Reports Cleared",
                 description="All reports have been cleared.",
-                color=discord.Color.green()
+                color=0x2bbd8e
             )
             await ctx.send(embed=embed)
         except discord.Forbidden:
             embed = discord.Embed(
                 title="Permission Error",
                 description="I can't send messages in this channel. Please check my permissions.",
-                color=discord.Color.red()
+                color=0xff4545
             )
             await ctx.send(embed=embed)
 
@@ -1156,7 +1156,7 @@ class ReportsPro(commands.Cog):
         embed = discord.Embed(
             title="Reports Cleaned",
             description=f"Reports older than {days} days have been cleaned up.",
-            color=discord.Color.green()
+            color=0x2bbd8e
         )
         await ctx.send(embed=embed)
 

@@ -33,7 +33,12 @@ class TriageAnalysis(commands.Cog):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=0xDEADBEEF, force_registration=True)
         default_guild = {
-            "token": None
+            "token": None,
+            "autoscan_enabled": False,
+            "autoscan_score_threshold": 5,
+            "autoscan_punishment": "none",  # none, kick, ban, timeout
+            "autoscan_timeout_seconds": 600,
+            "autoscan_log_channel": None,  # Channel ID for logging autoscan events
         }
         self.config.register_guild(**default_guild)
 
@@ -55,7 +60,150 @@ class TriageAnalysis(commands.Cog):
     async def settoken(self, ctx, token: str):
         """Set the Triage API token for this server (deprecated, use `[p]set api triage api_key,<token>` instead)."""
         await self.config.guild(ctx.guild).token.set(token)
-        await ctx.send("Triage API token set for this server. (Note: This is now deprecated, use `[p]set api triage api_key,<token>` instead.)")
+        embed = discord.Embed(
+            title="Triage API Token Set",
+            description="Triage API token set for this server. (Note: This is now deprecated, use `[p]set api triage api_key,<token>` instead.)",
+            color=0x2bbd8e
+        )
+        await ctx.send(embed=embed)
+
+    @triage.group(name="autoscan")
+    @commands.admin_or_permissions(manage_guild=True)
+    async def triage_autoscan(self, ctx):
+        """Configure automatic background file scanning."""
+        pass
+
+    @triage_autoscan.command(name="enable")
+    async def triage_autoscan_enable(self, ctx):
+        """Enable automatic background file scanning in this server."""
+        await self.config.guild(ctx.guild).autoscan_enabled.set(True)
+        embed = discord.Embed(
+            title="Autoscan Enabled",
+            description="Automatic background file scanning is now **enabled**.",
+            color=0x2bbd8e
+        )
+        await ctx.send(embed=embed)
+
+    @triage_autoscan.command(name="disable")
+    async def triage_autoscan_disable(self, ctx):
+        """Disable automatic background file scanning in this server."""
+        await self.config.guild(ctx.guild).autoscan_enabled.set(False)
+        embed = discord.Embed(
+            title="Autoscan Disabled",
+            description="Automatic background file scanning is now **disabled**.",
+            color=0xff4545
+        )
+        await ctx.send(embed=embed)
+
+    @triage_autoscan.command(name="threshold")
+    async def triage_autoscan_threshold(self, ctx, score: int):
+        """Set the score threshold for punishment (default: 5)."""
+        if score < 0 or score > 10:
+            embed = discord.Embed(
+                title="Invalid Threshold",
+                description="Score threshold must be between 0 and 10.",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
+            return
+        await self.config.guild(ctx.guild).autoscan_score_threshold.set(score)
+        embed = discord.Embed(
+            title="Threshold Set",
+            description=f"Score threshold for punishment set to **{score}**.",
+            color=0x2bbd8e
+        )
+        await ctx.send(embed=embed)
+
+    @triage_autoscan.command(name="punishment")
+    async def triage_autoscan_punishment(self, ctx, punishment: str, timeout_seconds: int = 600):
+        """
+        Set the punishment for users who upload files that score above the threshold.
+        Punishment can be: none, kick, ban, timeout (timeout_seconds is optional, default 600).
+        """
+        punishment = punishment.lower()
+        if punishment not in ("none", "kick", "ban", "timeout"):
+            embed = discord.Embed(
+                title="Invalid Punishment",
+                description="Punishment must be one of: none, kick, ban, timeout.",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
+            return
+        await self.config.guild(ctx.guild).autoscan_punishment.set(punishment)
+        if punishment == "timeout":
+            if timeout_seconds < 1 or timeout_seconds > 28 * 24 * 3600:
+                embed = discord.Embed(
+                    title="Invalid Timeout",
+                    description="Timeout seconds must be between 1 and 2419200 (28 days).",
+                    color=0xff4545
+                )
+                await ctx.send(embed=embed)
+                return
+            await self.config.guild(ctx.guild).autoscan_timeout_seconds.set(timeout_seconds)
+            embed = discord.Embed(
+                title="Punishment Set",
+                description=f"Punishment set to **timeout** for {timeout_seconds} seconds.",
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+        else:
+            embed = discord.Embed(
+                title="Punishment Set",
+                description=f"Punishment set to **{punishment}**.",
+                color=discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
+
+    @triage_autoscan.command(name="logchannel")
+    async def triage_autoscan_logchannel(self, ctx, channel: discord.TextChannel = None):
+        """
+        Set the log channel for autoscan events. If no channel is provided, disables logging.
+        """
+        if channel is None:
+            await self.config.guild(ctx.guild).autoscan_log_channel.set(None)
+            embed = discord.Embed(
+                title="Log Channel Disabled",
+                description="Autoscan log channel disabled.",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
+        else:
+            await self.config.guild(ctx.guild).autoscan_log_channel.set(channel.id)
+            embed = discord.Embed(
+                title="Log Channel Set",
+                description=f"Autoscan log channel set to {channel.mention}.",
+                color=0x2bbd8e
+            )
+            await ctx.send(embed=embed)
+
+    @triage_autoscan.command(name="status")
+    async def triage_autoscan_status(self, ctx):
+        """Show the current autoscan settings."""
+        conf = await self.config.guild(ctx.guild).all()
+        enabled = conf.get("autoscan_enabled", False)
+        threshold = conf.get("autoscan_score_threshold", 5)
+        punishment = conf.get("autoscan_punishment", "none")
+        timeout_seconds = conf.get("autoscan_timeout_seconds", 600)
+        log_channel_id = conf.get("autoscan_log_channel")
+        log_channel = None
+        if log_channel_id:
+            log_channel = ctx.guild.get_channel(log_channel_id)
+        embed = discord.Embed(
+            title="Autoscan Settings",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="Automatic File Scanning", value="Enabled" if enabled else "Disabled", inline=True)
+        embed.add_field(name="Score Threshold", value=str(threshold), inline=True)
+        embed.add_field(name="Punishment", value=punishment, inline=True)
+        if punishment == "timeout":
+            embed.add_field(name="Timeout Seconds", value=str(timeout_seconds), inline=True)
+        if log_channel:
+            embed.add_field(name="Log Channel", value=log_channel.mention, inline=False)
+        elif log_channel_id:
+            embed.add_field(name="Log Channel", value=f"(ID: {log_channel_id}, not found)", inline=False)
+        else:
+            embed.add_field(name="Log Channel", value="Not set", inline=False)
+        await ctx.send(embed=embed)
 
     @triage.command()
     async def submiturl(self, ctx, url: str):
@@ -63,9 +211,19 @@ class TriageAnalysis(commands.Cog):
         try:
             client = await self.get_client(ctx.guild)
             data = client.submit_sample_url(url)
-            await ctx.send(f"Sample submitted! ID: `{data.get('id')}` Status: `{data.get('status')}`")
+            embed = discord.Embed(
+                title="URL Submitted",
+                description=f"Sample submitted!\n**ID:** `{data.get('id')}`\n**Status:** `{data.get('status')}`",
+                color=0x2bbd8e
+            )
+            await ctx.send(embed=embed)
         except Exception as e:
-            await ctx.send(f"Error: {e}")
+            embed = discord.Embed(
+                title="Error",
+                description=f"{e}",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
 
     @triage.command()
     async def sample(self, ctx, sample_id: str):
@@ -73,9 +231,21 @@ class TriageAnalysis(commands.Cog):
         try:
             client = await self.get_client(ctx.guild)
             data = client.sample_by_id(sample_id)
-            await ctx.send(box(json.dumps(data, indent=2), lang="json"))
+            embed = discord.Embed(
+                title=f"Sample Info: {sample_id}",
+                description="See below for JSON details.",
+                color=discord.Color.blue()
+            )
+            for page in pagify(json.dumps(data, indent=2), page_length=1000):
+                embed.add_field(name="Data", value=f"```json\n{page}\n```", inline=False)
+            await ctx.send(embed=embed)
         except Exception as e:
-            await ctx.send(f"Error: {e}")
+            embed = discord.Embed(
+                title="Error",
+                description=f"{e}",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
 
     @triage.command()
     async def search(self, ctx, *, query: str):
@@ -87,13 +257,20 @@ class TriageAnalysis(commands.Cog):
             for i, sample in enumerate(paginator):
                 if i >= 10:
                     break
-                results.append(f"{sample.get('id', 'N/A')}: {sample.get('status', 'N/A')}")
-            if results:
-                await ctx.send(box("\n".join(results)))
-            else:
-                await ctx.send("No results found.")
+                results.append(f"`{sample.get('id', 'N/A')}`: {sample.get('status', 'N/A')}")
+            embed = discord.Embed(
+                title="Triage Search Results",
+                description="\n".join(results) if results else "No results found.",
+                color=discord.Color.blue() if results else discord.Color.orange()
+            )
+            await ctx.send(embed=embed)
         except Exception as e:
-            await ctx.send(f"Error: {e}")
+            embed = discord.Embed(
+                title="Error",
+                description=f"{e}",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
 
     @triage.command()
     async def staticreport(self, ctx, sample_id: str):
@@ -101,10 +278,20 @@ class TriageAnalysis(commands.Cog):
         try:
             client = await self.get_client(ctx.guild)
             data = client.static_report(sample_id)
-            for page in pagify(json.dumps(data, indent=2), page_length=1900):
-                await ctx.send(box(page, lang="json"))
+            embed = discord.Embed(
+                title=f"Static Report: {sample_id}",
+                color=discord.Color.blue()
+            )
+            for page in pagify(json.dumps(data, indent=2), page_length=1000):
+                embed.add_field(name="Data", value=f"```json\n{page}\n```", inline=False)
+            await ctx.send(embed=embed)
         except Exception as e:
-            await ctx.send(f"Error: {e}")
+            embed = discord.Embed(
+                title="Error",
+                description=f"{e}",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
 
     @triage.command()
     async def overview(self, ctx, sample_id: str):
@@ -112,10 +299,20 @@ class TriageAnalysis(commands.Cog):
         try:
             client = await self.get_client(ctx.guild)
             data = client.overview_report(sample_id)
-            for page in pagify(json.dumps(data, indent=2), page_length=1900):
-                await ctx.send(box(page, lang="json"))
+            embed = discord.Embed(
+                title=f"Overview Report: {sample_id}",
+                color=discord.Color.blue()
+            )
+            for page in pagify(json.dumps(data, indent=2), page_length=1000):
+                embed.add_field(name="Data", value=f"```json\n{page}\n```", inline=False)
+            await ctx.send(embed=embed)
         except Exception as e:
-            await ctx.send(f"Error: {e}")
+            embed = discord.Embed(
+                title="Error",
+                description=f"{e}",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
 
     @triage.command()
     async def download(self, ctx, sample_id: str):
@@ -123,9 +320,19 @@ class TriageAnalysis(commands.Cog):
         try:
             client = await self.get_client(ctx.guild)
             file_bytes = client.get_sample_file(sample_id)
-            await ctx.send(file=discord.File(BytesIO(file_bytes), filename=f"{sample_id}.bin"))
+            embed = discord.Embed(
+                title="Sample Download",
+                description=f"Here is the file for sample `{sample_id}`.",
+                color=0x2bbd8e
+            )
+            await ctx.send(embed=embed, file=discord.File(BytesIO(file_bytes), filename=f"{sample_id}.bin"))
         except Exception as e:
-            await ctx.send(f"Error: {e}")
+            embed = discord.Embed(
+                title="Error",
+                description=f"{e}",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
 
     @triage.command()
     async def events(self, ctx, sample_id: str):
@@ -138,18 +345,34 @@ class TriageAnalysis(commands.Cog):
                 if i >= 10:
                     break
                 lines.append(json.dumps(event))
+            embed = discord.Embed(
+                title=f"Sample Events: {sample_id}",
+                color=discord.Color.blue()
+            )
             if lines:
-                await ctx.send(box("\n".join(lines), lang="json"))
+                for page in pagify("\n".join(lines), page_length=1000):
+                    embed.add_field(name="Events", value=f"```json\n{page}\n```", inline=False)
             else:
-                await ctx.send("No events found.")
+                embed.description = "No events found."
+            await ctx.send(embed=embed)
         except Exception as e:
-            await ctx.send(f"Error: {e}")
+            embed = discord.Embed(
+                title="Error",
+                description=f"{e}",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
 
     @triage.command()
     async def submitfile(self, ctx):
         """Submit a file for analysis. Attach a file to this command."""
         if not ctx.message.attachments:
-            await ctx.send("Please attach a file to submit.")
+            embed = discord.Embed(
+                title="No Attachment",
+                description="Please attach a file to submit.",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
             return
         attachment = ctx.message.attachments[0]
         try:
@@ -158,9 +381,19 @@ class TriageAnalysis(commands.Cog):
             filename = attachment.filename
             # Use BytesIO for file-like object
             data = client.submit_sample_file(filename, BytesIO(file_bytes))
-            await ctx.send(f"Sample submitted! ID: `{data.get('id')}` Status: `{data.get('status')}`")
+            embed = discord.Embed(
+                title="File Submitted",
+                description=f"Sample submitted!\n**ID:** `{data.get('id')}`\n**Status:** `{data.get('status')}`",
+                color=0x2bbd8e
+            )
+            await ctx.send(embed=embed)
         except Exception as e:
-            await ctx.send(f"Error: {e}")
+            embed = discord.Embed(
+                title="Error",
+                description=f"{e}",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
 
     @triage.command()
     async def analyze(self, ctx):
@@ -169,20 +402,40 @@ class TriageAnalysis(commands.Cog):
         Attach a file to this command.
         """
         if not ctx.message.attachments:
-            await ctx.send("Please attach a file to analyze.")
+            embed = discord.Embed(
+                title="No Attachment",
+                description="Please attach a file to analyze.",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
             return
         attachment = ctx.message.attachments[0]
         try:
             client = await self.get_client(ctx.guild)
             file_bytes = await attachment.read()
             filename = attachment.filename
-            await ctx.send("Submitting file for analysis...")
+            embed = discord.Embed(
+                title="Submitting File",
+                description="Submitting file for analysis...",
+                color=discord.Color.blurple() if hasattr(discord.Color, "blurple") else discord.Color.blue()
+            )
+            await ctx.send(embed=embed)
             data = client.submit_sample_file(filename, BytesIO(file_bytes))
             sample_id = data.get("id")
             if not sample_id:
-                await ctx.send("Failed to submit file for analysis.")
+                embed = discord.Embed(
+                    title="Submission Failed",
+                    description="Failed to submit file for analysis.",
+                    color=0xff4545
+                )
+                await ctx.send(embed=embed)
                 return
-            await ctx.send(f"Sample submitted! ID: `{sample_id}`. Waiting for analysis to complete...")
+            embed = discord.Embed(
+                title="Sample Submitted",
+                description=f"Sample submitted! ID: `{sample_id}`. Waiting for analysis to complete...",
+                color=discord.Color.blurple() if hasattr(discord.Color, "blurple") else discord.Color.blue()
+            )
+            await ctx.send(embed=embed)
 
             # Send typing while polling for analysis completion
             max_wait = 600  # seconds
@@ -199,14 +452,24 @@ class TriageAnalysis(commands.Cog):
                     waited += poll_interval
 
             if status not in ("reported", "finished", "complete"):
-                await ctx.send(f"Analysis did not complete in {max_wait} seconds. Status: `{status}`")
+                embed = discord.Embed(
+                    title="Analysis Timeout",
+                    description=f"Analysis did not complete in {max_wait} seconds. Status: `{status}`",
+                    color=discord.Color.orange()
+                )
+                await ctx.send(embed=embed)
                 return
 
             # Try to get overview report
             try:
                 overview = client.overview_report(sample_id)
             except Exception as e:
-                await ctx.send(f"Analysis finished, but failed to fetch overview report: {e}")
+                embed = discord.Embed(
+                    title="Overview Fetch Failed",
+                    description=f"Analysis finished, but failed to fetch overview report: {e}",
+                    color=0xff4545
+                )
+                await ctx.send(embed=embed)
                 return
 
             # Send the entire overview as a JSON file
@@ -309,7 +572,7 @@ class TriageAnalysis(commands.Cog):
             embed = discord.Embed(
                 title="Triage Analysis Results",
                 description=f"Sample ID: `{sample_id}`\nStatus: `{status}`",
-                color=discord.Color.orange() if score and score >= 5 else discord.Color.green() if score and score < 5 else discord.Color.default()
+                color=discord.Color.orange() if score and score >= 5 else 0x2bbd8e if score and score < 5 else discord.Color.default()
             )
             if target_name:
                 embed.add_field(name="Target", value=target_name, inline=True)
@@ -354,7 +617,187 @@ class TriageAnalysis(commands.Cog):
                 file=discord.File(overview_bytes, filename=f"{sample_id}_overview.json")
             )
         except Exception as e:
-            await ctx.send(f"Error: {e}")
+            embed = discord.Embed(
+                title="Error",
+                description=f"{e}",
+                color=0xff4545
+            )
+            await ctx.send(embed=embed)
+
+    # --- Background file scan listener ---
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        # Only scan in guilds, not DMs, and ignore bots
+        if not message.guild or message.author.bot:
+            return
+
+        guild = message.guild
+        conf = await self.config.guild(guild).all()
+        if not conf.get("autoscan_enabled", False):
+            return
+
+        # Only scan if there are attachments
+        if not message.attachments:
+            return
+
+        # Only scan files that are not images (to avoid scanning memes, etc)
+        # You can adjust this logic as needed
+        suspicious_exts = (
+            ".exe", ".dll", ".scr", ".bat", ".cmd", ".js", ".vbs", ".jar", ".ps1", ".msi", ".com", ".cpl", ".sys",
+            ".zip", ".rar", ".7z", ".iso", ".img", ".apk", ".bin", ".elf", ".py", ".sh", ".hta", ".lnk", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".rtf", ".pdf"
+        )
+        for attachment in message.attachments:
+            filename = attachment.filename.lower()
+            if not any(filename.endswith(ext) for ext in suspicious_exts):
+                continue  # skip non-suspicious files
+
+            # Start background scan
+            asyncio.create_task(self._background_scan_file(message, attachment, conf))
+
+    async def _background_scan_file(self, message: discord.Message, attachment: discord.Attachment, conf: dict):
+        try:
+            # Get log channel if set
+            log_channel_id = conf.get("autoscan_log_channel")
+            log_channel = None
+            if log_channel_id:
+                log_channel = message.guild.get_channel(log_channel_id)
+            # Get client
+            client = await self.get_client(message.guild)
+            file_bytes = await attachment.read()
+            filename = attachment.filename
+            # Submit file for analysis
+            notify_msg = None
+            if log_channel:
+                try:
+                    embed = discord.Embed(
+                        title="Scanning File",
+                        description=f"🔎 Scanning file `{filename}` from {message.author.mention} for malware...",
+                        color=discord.Color.blurple() if hasattr(discord.Color, "blurple") else discord.Color.blue()
+                    )
+                    notify_msg = await log_channel.send(embed=embed)
+                except Exception:
+                    notify_msg = None
+            data = client.submit_sample_file(filename, BytesIO(file_bytes))
+            sample_id = data.get("id")
+            if not sample_id:
+                if notify_msg:
+                    embed = discord.Embed(
+                        title="Submission Failed",
+                        description=f"❌ Failed to submit `{filename}` for analysis.",
+                        color=0xff4545
+                    )
+                    await notify_msg.edit(content=None, embed=embed)
+                return
+
+            # Poll for completion
+            max_wait = 600  # seconds
+            poll_interval = 10  # seconds
+            waited = 0
+            status = None
+            while waited < max_wait:
+                sample_info = client.sample_by_id(sample_id)
+                status = sample_info.get("status")
+                if status in ("reported", "failed", "finished", "complete"):
+                    break
+                await asyncio.sleep(poll_interval)
+                waited += poll_interval
+
+            if status not in ("reported", "finished", "complete"):
+                if notify_msg:
+                    embed = discord.Embed(
+                        title="Analysis Timeout",
+                        description=f"⚠️ Analysis for `{filename}` did not complete in {max_wait} seconds. Status: `{status}`",
+                        color=discord.Color.orange()
+                    )
+                    await notify_msg.edit(content=None, embed=embed)
+                return
+
+            # Get overview report
+            try:
+                overview = client.overview_report(sample_id)
+            except Exception as e:
+                if notify_msg:
+                    embed = discord.Embed(
+                        title="Overview Fetch Failed",
+                        description=f"⚠️ Analysis finished, but failed to fetch overview report for `{filename}`: {e}",
+                        color=0xff4545
+                    )
+                    await notify_msg.edit(content=None, embed=embed)
+                return
+
+            # Extract score
+            analysis_info = overview.get("analysis", {})
+            score = analysis_info.get("score") or overview.get("score", 0)
+            verdict = overview.get("verdict", "N/A")
+            tags = analysis_info.get("tags") or overview.get("tags", [])
+            threshold = conf.get("autoscan_score_threshold", 5)
+            punishment = conf.get("autoscan_punishment", "none")
+            timeout_seconds = conf.get("autoscan_timeout_seconds", 600)
+
+            # Compose result embed
+            embed = discord.Embed(
+                title="Autoscan Result",
+                description=f"🦠 Scan complete for `{filename}` from {message.author.mention}.",
+                color=discord.Color.orange() if score and score >= threshold else 0x2bbd8e
+            )
+            embed.add_field(name="Score", value=str(score), inline=True)
+            embed.add_field(name="Verdict", value=verdict, inline=True)
+            embed.add_field(name="Tags", value=', '.join(tags) if tags else "None", inline=False)
+            embed.add_field(name="Sample ID", value=f"`{sample_id}`", inline=False)
+
+            # If score is above threshold, take action
+            punishment_msg = ""
+            if score is not None and score >= threshold:
+                embed.add_field(name="Threshold", value=f"⚠️ Score exceeds threshold ({threshold})!", inline=False)
+                # Take punishment action
+                try:
+                    if punishment == "kick":
+                        await message.guild.kick(message.author, reason=f"Triage autoscan: file `{filename}` scored {score}")
+                        punishment_msg = f"🚫 User {message.author.mention} has been **kicked**."
+                    elif punishment == "ban":
+                        await message.guild.ban(message.author, reason=f"Triage autoscan: file `{filename}` scored {score}", delete_message_days=0)
+                        punishment_msg = f"🚫 User {message.author.mention} has been **banned**."
+                    elif punishment == "timeout":
+                        # Discord timeouts require discord.py 2.0+ and permissions
+                        until = discord.utils.utcnow() + datetime.timedelta(seconds=timeout_seconds)
+                        try:
+                            await message.author.edit(timeout=until, reason=f"Triage autoscan: file `{filename}` scored {score}")
+                            punishment_msg = f"⏲️ User {message.author.mention} has been **timed out** for {timeout_seconds} seconds."
+                        except Exception as e:
+                            punishment_msg = f"⚠️ Failed to timeout user: {e}"
+                    elif punishment == "none":
+                        punishment_msg = "(No punishment configured.)"
+                except Exception as e:
+                    punishment_msg = f"⚠️ Failed to apply punishment: {e}"
+            if punishment_msg:
+                embed.add_field(name="Punishment", value=punishment_msg, inline=False)
+
+            if notify_msg:
+                await notify_msg.edit(content=None, embed=embed)
+            elif log_channel:
+                try:
+                    await log_channel.send(embed=embed)
+                except Exception:
+                    pass
+            # If no log channel, be absolutely silent
+
+        except Exception as e:
+            # Only log to log_channel if set, otherwise be silent
+            log_channel_id = conf.get("autoscan_log_channel")
+            log_channel = None
+            if log_channel_id:
+                log_channel = message.guild.get_channel(log_channel_id)
+            if log_channel:
+                try:
+                    embed = discord.Embed(
+                        title="Autoscan Error",
+                        description=f"⚠️ Error during autoscan: {e}",
+                        color=0xff4545
+                    )
+                    await log_channel.send(embed=embed)
+                except Exception:
+                    pass
+            # If no log channel, be absolutely silent
 
 # --- Below is the original Client and helpers, unchanged except for moving into the cog file ---
 
