@@ -1572,7 +1572,7 @@ class AutoMod(commands.Cog):
 
             if changelog:
                 changelog_message = "\n".join(changelog)
-                embed = discord.Embed(title="Whitelist Changelog", description=changelog_message, color=discord.Color.blue())
+                embed = discord.Embed(title="Whitelist was modified", description=changelog_message, color=0xfffffe)
                 await ctx.send(embed=embed)
         except Exception as e:
             raise RuntimeError(f"Failed to update channel whitelist: {e}")
@@ -1600,7 +1600,7 @@ class AutoMod(commands.Cog):
 
             if changelog:
                 changelog_message = "\n".join(changelog)
-                embed = discord.Embed(title="Whitelist Changelog", description=changelog_message, color=discord.Color.blue())
+                embed = discord.Embed(title="Whitelist was updated", description=changelog_message, color=0xfffffe)
                 await ctx.send(embed=embed)
         except Exception as e:
             raise RuntimeError(f"Failed to update role whitelist: {e}")
@@ -1628,7 +1628,7 @@ class AutoMod(commands.Cog):
 
             if changelog:
                 changelog_message = "\n".join(changelog)
-                embed = discord.Embed(title="Whitelist Changelog", description=changelog_message, color=discord.Color.blue())
+                embed = discord.Embed(title="Whitelist was updated", description=changelog_message, color=0xfffffe)
                 await ctx.send(embed=embed)
         except Exception as e:
             raise RuntimeError(f"Failed to update user whitelist: {e}")
@@ -1656,7 +1656,7 @@ class AutoMod(commands.Cog):
 
             if changelog:
                 changelog_message = "\n".join(changelog)
-                embed = discord.Embed(title="Whitelist Changelog", description=changelog_message, color=discord.Color.blue())
+                embed = discord.Embed(title="Whitelist was updated", description=changelog_message, color=0xfffffe)
                 await ctx.send(embed=embed)
         except Exception as e:
             raise RuntimeError(f"Failed to update category whitelist: {e}")
