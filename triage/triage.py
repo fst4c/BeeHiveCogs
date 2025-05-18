@@ -34,7 +34,11 @@ class Triage(commands.Cog):
         # The key is stored as "triage" -> "apikey"
         # This is a global key, not per-guild
         tokens = await self.bot.get_shared_api_tokens("triage")
-        return tokens.get("apikey")
+        # Triage expects the API key as a string, not None or empty
+        api_key = tokens.get("apikey")
+        if not api_key or not isinstance(api_key, str) or not api_key.strip():
+            return None
+        return api_key.strip()
 
     async def _get_log_channel(self, guild):
         channel_id = await self.config.guild(guild).log_channel()
@@ -70,6 +74,7 @@ class Triage(commands.Cog):
         :param interactive: Optional bool, if true, manual profile selection
         :param profiles: Optional list of profiles
         """
+        # Triage expects the Authorization header as "Bearer <API_KEY>"
         headers = {
             "Authorization": f"Bearer {api_key}",
         }
@@ -117,10 +122,19 @@ class Triage(commands.Cog):
             if network:
                 data.add_field("defaults.network", network)
 
+        # Triage expects the Authorization header and the API key to be valid.
+        # If you get a 401, the key is likely invalid or for the wrong endpoint.
         async with self.session.post(self.triage_api_url, headers=headers, data=data) as resp:
-            # Accept both 201 (created) and 200 (pending) as valid responses
             if resp.status in (201, 200):
                 return await resp.json()
+            elif resp.status == 401:
+                text = await resp.text()
+                raise RuntimeError(
+                    "Triage API error: 401 Unauthorized. "
+                    "Check your API key and endpoint. "
+                    "See https://tria.ge/docs/ for details. "
+                    f"Response: {text}"
+                )
             else:
                 text = await resp.text()
                 raise RuntimeError(f"Triage API error: {resp.status} {text}")
@@ -149,6 +163,14 @@ class Triage(commands.Cog):
                         return True
                     elif status in ("failed", "error"):
                         raise RuntimeError(f"Triage analysis failed: {status}")
+                elif resp.status == 401:
+                    text = await resp.text()
+                    raise RuntimeError(
+                        "Triage API polling error: 401 Unauthorized. "
+                        "Check your API key and endpoint. "
+                        "See https://tria.ge/docs/ for details. "
+                        f"Response: {text}"
+                    )
                 else:
                     text = await resp.text()
                     raise RuntimeError(f"Triage API polling error: {resp.status} {text}")
@@ -169,6 +191,14 @@ class Triage(commands.Cog):
                 return await resp.json()
             elif resp.status == 404:
                 raise RuntimeError("Sample not found in Triage overview.")
+            elif resp.status == 401:
+                text = await resp.text()
+                raise RuntimeError(
+                    "Triage API overview error: 401 Unauthorized. "
+                    "Check your API key and endpoint. "
+                    "See https://tria.ge/docs/ for details. "
+                    f"Response: {text}"
+                )
             else:
                 text = await resp.text()
                 raise RuntimeError(f"Triage API overview error: {resp.status} {text}")
@@ -203,7 +233,7 @@ class Triage(commands.Cog):
         """
         api_key = await self._get_api_key(guild)
         if not api_key:
-            return "Triage API key not set in Red's keystore. Use `[p]set api triage apikey,<key>` to set it."
+            return "Triage API key not set in Red's keystore. Use `[p]triage apikey <key>` to set it."
         try:
             file_bytes = await attachment.read()
             submit_result = await self._submit_file(
@@ -325,7 +355,7 @@ class Triage(commands.Cog):
         Set the Triage API key for this bot (global, Red keystore).
         """
         # Store the API key in Red's keystore, not in config
-        await self.bot.set_shared_api_tokens("triage", apikey=api_key)
+        await self.bot.set_shared_api_tokens("triage", apikey=api_key.strip())
         await ctx.send("Triage API key set in Red's keystore (global).")
 
     @triage.command(name="autolog")
