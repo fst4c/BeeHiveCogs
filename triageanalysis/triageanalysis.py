@@ -759,7 +759,7 @@ class TriageAnalysis(commands.Cog):
 
             # Poll for completion
             max_wait = 600  # seconds
-            poll_interval = 10  # seconds
+            poll_interval = 5  # seconds
             waited = 0
             status = None
             while waited < max_wait:
