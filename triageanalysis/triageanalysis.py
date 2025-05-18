@@ -2,8 +2,7 @@
 # All rights reserved.
 
 import discord
-from red_commands import commands, checks
-from redbot.core import commands as redcommands, Config, app_commands
+from redbot.core import commands, Config, app_commands
 from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import box, pagify
 
@@ -40,13 +39,13 @@ class TriageAnalysis(commands.Cog):
             raise RuntimeError("Triage API token not set for this server. Use `[p]triage settoken <token>`.")
         return Client(token)
 
-    @redcommands.group()
+    @commands.group()
     async def triage(self, ctx):
         """Triage API commands."""
         pass
 
     @triage.command()
-    @checks.admin_or_permissions(manage_guild=True)
+    @commands.admin_or_permissions(manage_guild=True)
     async def settoken(self, ctx, token: str):
         """Set the Triage API token for this server."""
         await self.config.guild(ctx.guild).token.set(token)
