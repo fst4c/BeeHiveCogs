@@ -4,8 +4,8 @@ from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import box
 import asyncio
 
-# Use the triage package (https://pypi.org/project/triage/)
-from triage import Client as TriageClient
+# Do NOT import triage.Client at module level to avoid circular import.
+# We'll import it inside the method where it's needed.
 
 class Triage(commands.Cog):
     """
@@ -45,8 +45,9 @@ class Triage(commands.Cog):
         return None
 
     def _get_triage_client(self, api_key):
-        # Cache TriageClient per API key
+        # Import triage.Client here to avoid circular import at module level
         if api_key not in self._triage_clients:
+            from triage import Client as TriageClient
             self._triage_clients[api_key] = TriageClient(token=api_key)
         return self._triage_clients[api_key]
 
