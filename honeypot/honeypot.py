@@ -543,12 +543,9 @@ class Honeypot(commands.Cog, name="Honeypot"):
     @commands.group()
     async def honeypot(self, ctx: commands.Context) -> None:
         """
-        Manage the honeypot system for your server.
+        Honeypots are special channels designed to attract advertising bots & compromised Discord accounts.
 
-        Honeypots are special channels designed to attract advertising bots and compromised Discord accounts.
-        When a user interacts with the honeypot channel, the bot can take automated action to protect your community.
-
-        Use subcommands to create, configure, and monitor the honeypot.
+        **[Visit the docs to learn more](<https://sentri.beehive.systems/features/honeypot-channels>)**
         """
         pass
 
