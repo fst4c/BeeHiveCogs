@@ -23,9 +23,6 @@ import datetime
 import re
 import pytz
 
-# Missing dependency: Client class is used but not imported.
-# Assuming it should be imported from triage.client or similar.
-
 urllib3.disable_warnings()
 
 class TriageAnalysis(commands.Cog):
