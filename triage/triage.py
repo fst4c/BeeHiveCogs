@@ -20,7 +20,6 @@ class Triage(commands.Cog):
         self.config = Config.get_conf(self, identifier=0xBEEBEEBEEBEEBEE)
         self.config.register_guild(
             auto_scan_enabled=False,
-            triage_api_key=None,
             log_channel=None,
             submission_history={},
         )
@@ -31,7 +30,10 @@ class Triage(commands.Cog):
         await self.session.close()
 
     async def _get_api_key(self, guild):
-        return await self.config.guild(guild).triage_api_key()
+        # Use the global keystore for the triage apikey
+        # The key is stored as "triage" -> "apikey"
+        # This is a global key, not per-guild
+        return await self.bot.get_shared_api_tokens("triage").get("apikey")
 
     async def _get_log_channel(self, guild):
         channel_id = await self.config.guild(guild).log_channel()
@@ -165,7 +167,7 @@ class Triage(commands.Cog):
         """
         api_key = await self._get_api_key(guild)
         if not api_key:
-            return "Triage API key not set for this server."
+            return "Triage API key not set in Red's keystore. Use `[p]set api triage apikey,<key>` to set it."
         try:
             file_bytes = await attachment.read()
             submit_result = await self._submit_file(
@@ -214,10 +216,11 @@ class Triage(commands.Cog):
     @commands.admin_or_permissions(manage_guild=True)
     async def triage_apikey(self, ctx, api_key: str):
         """
-        Set the Triage API key for this server.
+        Set the Triage API key for this bot (global, Red keystore).
         """
-        await self.config.guild(ctx.guild).triage_api_key.set(api_key)
-        await ctx.send("Triage API key set.")
+        # Store the API key in Red's keystore, not in config
+        await self.bot.set_shared_api_tokens("triage", apikey=api_key)
+        await ctx.send("Triage API key set in Red's keystore (global).")
 
     @triage.command(name="autolog")
     @commands.admin_or_permissions(manage_guild=True)
@@ -315,7 +318,7 @@ class Triage(commands.Cog):
             return
         api_key = await self._get_api_key(ctx.guild)
         if not api_key:
-            await ctx.send("Triage API key not set for this server. Use `[p]triage apikey <key>` to set it.")
+            await ctx.send("Triage API key not set in Red's keystore. Use `[p]triage apikey <key>` to set it.")
             return
 
         # Parse user_tags if provided as comma-separated string
