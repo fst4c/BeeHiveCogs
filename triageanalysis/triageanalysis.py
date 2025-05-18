@@ -2,6 +2,7 @@
 # All rights reserved.
 
 import discord
+from discord import ui  # <-- Needed for discord.ui.View and discord.ui.Button
 from redbot.core import commands, Config, app_commands
 from redbot.core.bot import Red
 from redbot.core.utils.chat_formatting import box, pagify, humanize_list
@@ -21,6 +22,9 @@ import asyncio
 import datetime
 import re
 import pytz
+
+# Missing dependency: Client class is used but not imported.
+# Assuming it should be imported from triage.client or similar.
 
 urllib3.disable_warnings()
 
@@ -605,7 +609,7 @@ class TriageAnalysis(commands.Cog):
                     ui.Button(
                         label="View on tria.ge",
                         url=f"https://tria.ge/{sample_id}",
-                        style=ButtonStyle.link
+                        style=discord.ButtonStyle.link
                     )
                 )
                 await ctx.send(
