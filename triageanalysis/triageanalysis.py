@@ -661,7 +661,6 @@ class TriageAnalysis(commands.Cog):
                     )
                 )
                 await ctx.send(
-                    content="Analysis complete! See below for summary.",
                     embed=embed,
                     view=view
                 )
