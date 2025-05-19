@@ -8,6 +8,7 @@ import asyncio
 import tempfile
 import matplotlib.pyplot as plt # type: ignore
 import matplotlib.dates as mdates # type: ignore
+from matplotlib.lines import Line2D
 import math
 import calendar
 from datetime import datetime, timezone, timedelta
@@ -1128,15 +1129,16 @@ class AutoMod(commands.Cog):
                     ax.set_xlim(0, 8)
                     ax.set_ylim(0, 7)
                     ax.set_xticks(range(8))
-                    ax.set_yticks([0, 2, 4, 6])
+                    # Fix: set y-ticks and y-tick labels to match (7 ticks for 7 days)
+                    ax.set_yticks(range(7))
                     # Week labels (show start of each week)
                     week_labels = []
                     for week in range(8):
                         week_start = start_date + timedelta(days=week * 7)
                         week_labels.append(week_start.strftime("%b %d"))
                     ax.set_xticklabels(week_labels, rotation=45, ha="right", fontsize=8)
-                    # Day labels (Mon, Wed, Fri)
-                    day_labels = ["Mon", "", "Wed", "", "Fri", "", "Sun"]
+                    # Day labels (Mon, Tue, Wed, Thu, Fri, Sat, Sun)
+                    day_labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
                     ax.set_yticklabels(day_labels, fontsize=8)
                     ax.tick_params(left=False, bottom=False)
                     ax.set_title(f"Abuse trend for {user.display_name} (last 8 weeks)", fontsize=13, pad=12)
@@ -1146,7 +1148,6 @@ class AutoMod(commands.Cog):
                     plt.tight_layout(pad=1.2)
 
                     # Legend
-                    from matplotlib.lines import Line2D
                     legend_elements = [
                         Line2D([0], [0], marker='s', color='w', label='0', markerfacecolor=github_colors[0], markersize=10, markeredgecolor="#d0d0d0"),
                         Line2D([0], [0], marker='s', color='w', label='1', markerfacecolor=github_colors[1], markersize=10, markeredgecolor="#d0d0d0"),
