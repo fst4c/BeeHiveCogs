@@ -9,6 +9,7 @@ import tempfile
 import matplotlib.pyplot as plt # type: ignore
 import matplotlib.dates as mdates # type: ignore
 import math
+import calendar
 from datetime import datetime, timezone, timedelta
 import asyncio
 import io
@@ -1030,6 +1031,7 @@ class AutoMod(commands.Cog):
 
         [View command documentation](<https://sentri.beehive.systems/features/agentic-moderator#automod-history>)
         """
+
         temp_file = None
         file = None
         try:
@@ -1060,8 +1062,8 @@ class AutoMod(commands.Cog):
                 await ctx.send(f"No violations or warnings found for {user.mention}.")
                 return
 
-            # --- Generate abuse trend graph ---
-            # We'll plot the number of violations per week (or per day if < 21 days)
+            # --- Generate abuse trend "GitHub-style" heatmap ---
+            # We'll show a grid of days (last 8 weeks, 7 days per week), color intensity = #violations
             timestamps = [v.get("timestamp") for v in violations if v.get("timestamp")]
             image_url = None
             if timestamps:
@@ -1069,53 +1071,96 @@ class AutoMod(commands.Cog):
                 datetimes = [datetime.fromtimestamp(ts, tz=timezone.utc) for ts in timestamps]
                 datetimes.sort()
                 if len(datetimes) > 0:
-                    first = datetimes[0]
-                    last = datetimes[-1]
-                    days_span = (last - first).days + 1
-                    if days_span <= 21:
-                        # Per day
-                        group_fmt = "%Y-%m-%d"
-                        label_fmt = "%b %d"
-                        date_list = [(first + timedelta(days=i)).date() for i in range(days_span)]
-                        group_by = lambda dt: dt.strftime(group_fmt)
-                    else:
-                        # Per week
-                        group_fmt = "%Y-W%W"
-                        label_fmt = "W%W\n%Y"
-                        # Find all week starts in range
-                        week_starts = []
-                        current = first - timedelta(days=first.weekday())
-                        while current <= last:
-                            week_starts.append(current.date())
-                            current += timedelta(days=7)
-                        date_list = week_starts
-                        group_by = lambda dt: dt.strftime(group_fmt)
-                    # Count violations per group
-                    grouped = Counter(group_by(dt) for dt in datetimes)
-                    # Prepare x/y for plot
-                    x_labels = []
-                    y_counts = []
-                    for d in date_list:
-                        key = d.strftime(group_fmt)
-                        label = d.strftime(label_fmt)
-                        x_labels.append(label)
-                        y_counts.append(grouped.get(key, 0))
-                    # Plot
-                    plt.style.use("seaborn-v0_8-darkgrid")
-                    fig, ax = plt.subplots(figsize=(7, 3))
-                    ax.plot(x_labels, y_counts, marker="o", color="#ff4545", linewidth=2)
-                    ax.set_title(f"Abuse trend for {user.display_name}", fontsize=13)
-                    ax.set_xlabel("Date" if days_span <= 21 else "Week")
-                    ax.set_ylabel("Violations")
-                    ax.set_ylim(bottom=0)
-                    plt.xticks(rotation=45, ha="right", fontsize=8)
-                    plt.tight_layout()
+                    # Build a grid for the last 8 weeks (56 days)
+                    today = datetime.now(timezone.utc).date()
+                    start_date = today - timedelta(days=55)
+                    date_grid = [start_date + timedelta(days=i) for i in range(56)]
+                    # Count violations per day
+                    day_counts = Counter(dt.date() for dt in datetimes)
+                    # Find max for color scaling
+                    max_count = max(day_counts.values()) if day_counts else 1
+
+                    # Prepare grid: 7 rows (days of week), 8 columns (weeks)
+                    grid = [[0 for _ in range(8)] for _ in range(7)]
+                    for idx, day in enumerate(date_grid):
+                        week = idx // 7
+                        weekday = day.weekday()  # Monday=0
+                        grid[weekday][week] = day_counts.get(day, 0)
+
+                    # Color palette: 0 = lightest, 4 = darkest (GitHub style)
+                    # We'll use 5 levels: 0 (no violations), 1, 2, 3, 4+ (darkest)
+                    import matplotlib.colors as mcolors
+                    github_colors = [
+                        "#ebedf0",  # 0
+                        "#f9c0c0",  # 1
+                        "#f88379",  # 2
+                        "#ff4545",  # 3
+                        "#b80000",  # 4+
+                    ]
+                    def get_color(val):
+                        if val == 0:
+                            return github_colors[0]
+                        elif val == 1:
+                            return github_colors[1]
+                        elif val == 2:
+                            return github_colors[2]
+                        elif val == 3:
+                            return github_colors[3]
+                        else:
+                            return github_colors[4]
+
+                    # Plot the grid
+                    fig, ax = plt.subplots(figsize=(8, 2.2))
+                    for week in range(8):
+                        for weekday in range(7):
+                            count = grid[weekday][week]
+                            color = get_color(count)
+                            rect = plt.Rectangle(
+                                (week, 6 - weekday), 1, 1,  # y axis: top is Sunday
+                                facecolor=color, edgecolor="#d0d0d0", linewidth=0.5
+                            )
+                            ax.add_patch(rect)
+                            # Optionally, show count if high
+                            if count > 0 and max_count > 2 and count == max_count:
+                                ax.text(week + 0.5, 6 - weekday + 0.5, str(count), color="white", ha="center", va="center", fontsize=7, fontweight="bold")
+
+                    # Set axis
+                    ax.set_xlim(0, 8)
+                    ax.set_ylim(0, 7)
+                    ax.set_xticks(range(8))
+                    ax.set_yticks([0, 2, 4, 6])
+                    # Week labels (show start of each week)
+                    week_labels = []
+                    for week in range(8):
+                        week_start = start_date + timedelta(days=week * 7)
+                        week_labels.append(week_start.strftime("%b %d"))
+                    ax.set_xticklabels(week_labels, rotation=45, ha="right", fontsize=8)
+                    # Day labels (Mon, Wed, Fri)
+                    day_labels = ["Mon", "", "Wed", "", "Fri", "", "Sun"]
+                    ax.set_yticklabels(day_labels, fontsize=8)
+                    ax.tick_params(left=False, bottom=False)
+                    ax.set_title(f"Abuse trend for {user.display_name} (last 8 weeks)", fontsize=13, pad=12)
+                    # Remove spines
+                    for spine in ax.spines.values():
+                        spine.set_visible(False)
+                    plt.tight_layout(pad=1.2)
+
+                    # Legend
+                    from matplotlib.lines import Line2D
+                    legend_elements = [
+                        Line2D([0], [0], marker='s', color='w', label='0', markerfacecolor=github_colors[0], markersize=10, markeredgecolor="#d0d0d0"),
+                        Line2D([0], [0], marker='s', color='w', label='1', markerfacecolor=github_colors[1], markersize=10, markeredgecolor="#d0d0d0"),
+                        Line2D([0], [0], marker='s', color='w', label='2', markerfacecolor=github_colors[2], markersize=10, markeredgecolor="#d0d0d0"),
+                        Line2D([0], [0], marker='s', color='w', label='3', markerfacecolor=github_colors[3], markersize=10, markeredgecolor="#d0d0d0"),
+                        Line2D([0], [0], marker='s', color='w', label='4+', markerfacecolor=github_colors[4], markersize=10, markeredgecolor="#d0d0d0"),
+                    ]
+                    ax.legend(handles=legend_elements, title="Violations", bbox_to_anchor=(1.01, 1), loc="upper left", fontsize=8, title_fontsize=9, frameon=False)
+
                     # Save to tempfile
                     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
                         plt.savefig(tmp, format="png", bbox_inches="tight", dpi=120)
                         temp_file = tmp.name
                     plt.close(fig)
-                    # Instead of passing an open file, open it fresh for each send/edit
                     image_url = "attachment://abuse_trend.png"
                 else:
                     temp_file = None
@@ -1178,13 +1223,11 @@ class AutoMod(commands.Cog):
                         pass
                 return
 
-            # Emoji-based pagination
-            FIRST_EMOJI = "⏮️"
-            PREV_EMOJI = "⬅️"
-            NEXT_EMOJI = "➡️"
-            LAST_EMOJI = "⏭️"
-            STOP_EMOJI = "⏹️"
-            PAGINATION_EMOJIS = [FIRST_EMOJI, PREV_EMOJI, NEXT_EMOJI, LAST_EMOJI, STOP_EMOJI]
+            # Emoji-based pagination (left, close/delete, right)
+            LEFT_EMOJI = "⬅️"
+            CLOSE_EMOJI = "🗑️"
+            RIGHT_EMOJI = "➡️"
+            PAGINATION_EMOJIS = [LEFT_EMOJI, CLOSE_EMOJI, RIGHT_EMOJI]
 
             page = 0
             embed = make_embed(page)
@@ -1217,18 +1260,24 @@ class AutoMod(commands.Cog):
 
                     emoji = str(reaction.emoji)
                     old_page = page
-                    if emoji == FIRST_EMOJI:
-                        page = 0
-                    elif emoji == PREV_EMOJI:
+                    if emoji == LEFT_EMOJI:
                         if page > 0:
                             page -= 1
-                    elif emoji == NEXT_EMOJI:
+                    elif emoji == RIGHT_EMOJI:
                         if page < total_pages - 1:
                             page += 1
-                    elif emoji == LAST_EMOJI:
-                        page = total_pages - 1
-                    elif emoji == STOP_EMOJI:
-                        break
+                    elif emoji == CLOSE_EMOJI:
+                        try:
+                            await message.delete()
+                        except Exception:
+                            pass
+                        if temp_file:
+                            import os
+                            try:
+                                os.remove(temp_file)
+                            except Exception:
+                                pass
+                        return
 
                     # Remove user's reaction to keep UI clean
                     try:
@@ -1236,7 +1285,7 @@ class AutoMod(commands.Cog):
                     except Exception:
                         pass
 
-                    if page != old_page or emoji == STOP_EMOJI:
+                    if page != old_page:
                         embed = make_embed(page)
                         if temp_file:
                             with open(temp_file, "rb") as f:
@@ -1244,8 +1293,6 @@ class AutoMod(commands.Cog):
                                 await message.edit(embed=embed, attachments=[file])
                         else:
                             await message.edit(embed=embed)
-                    if emoji == STOP_EMOJI:
-                        break
             finally:
                 # Clean up reactions
                 try:
