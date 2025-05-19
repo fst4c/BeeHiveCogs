@@ -1110,6 +1110,7 @@ class AutoMod(commands.Cog):
                     if z_max == 0:
                         z_max = 1
 
+                    # --- Fix: Make colorbar wider and use larger font to prevent overlap ---
                     fig = go.Figure(
                         data=go.Heatmap(
                             z=z,
@@ -1118,7 +1119,15 @@ class AutoMod(commands.Cog):
                             colorscale=github_colorscale,
                             zmin=0,
                             zmax=max(1, z_max),
-                            colorbar=dict(title="Violations", tickvals=[0, 1, 10, 20, 30, 40], len=0.5),
+                            colorbar=dict(
+                                title="Violations",
+                                tickvals=[0, 1, 10, 20, 30, 40],
+                                len=0.8,  # Make colorbar longer
+                                thickness=30,  # Make colorbar wider
+                                titlefont=dict(size=16),
+                                tickfont=dict(size=14),
+                                x=1.05,  # Move colorbar a bit to the right
+                            ),
                             showscale=True,
                             hovertemplate="Week: %{x}<br>Day: %{y}<br>Violations: %{z}<extra></extra>",
                             reversescale=False,
@@ -1127,20 +1136,28 @@ class AutoMod(commands.Cog):
                     fig.update_layout(
                         title=f"Abuse trend for {user.display_name} (last 8 weeks)",
                         xaxis=dict(title="Week", tickmode="array", tickvals=week_labels, ticktext=week_labels, showgrid=False),
-                        yaxis=dict(title="Day", tickmode="array", tickvals=day_labels, ticktext=day_labels, showgrid=False, autorange="reversed"),
-                        margin=dict(l=40, r=40, t=60, b=40),
-                        width=700,
-                        height=250,
-                        font=dict(size=12),
+                        yaxis=dict(
+                            title="Day",
+                            tickmode="array",
+                            tickvals=day_labels,
+                            ticktext=day_labels,
+                            showgrid=False,
+                            autorange="reversed",
+                            tickfont=dict(size=14),  # Make y-axis font larger
+                        ),
+                        margin=dict(l=40, r=80, t=60, b=40),  # Add more right margin for colorbar
+                        width=750,  # Slightly wider
+                        height=270,  # Slightly taller
+                        font=dict(size=13),
                         plot_bgcolor="#ffffff",
                         paper_bgcolor="#ffffff",
                     )
                     # Remove gridlines and axis lines for a cleaner look
-                    fig.update_xaxes(showgrid=False, zeroline=False, showline=False)
+                    fig.update_xaxes(showgrid=False, zeroline=False, showline=False, tickfont=dict(size=14))
                     fig.update_yaxes(showgrid=False, zeroline=False, showline=False)
 
                     # Save to PNG in memory
-                    img_bytes = pio.to_image(fig, format="png", width=700, height=250, scale=2)
+                    img_bytes = pio.to_image(fig, format="png", width=750, height=270, scale=2)
                     temp_file = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
                     temp_file.write(img_bytes)
                     temp_file.flush()
