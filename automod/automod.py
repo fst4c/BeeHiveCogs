@@ -6,15 +6,16 @@ import unicodedata
 import re
 import asyncio
 import tempfile
-import matplotlib.pyplot as plt # type: ignore
-import matplotlib.dates as mdates # type: ignore
-from matplotlib.lines import Line2D
 import math
 import calendar
 from datetime import datetime, timezone, timedelta
 import asyncio
 import io
 import os
+
+import plotly.graph_objects as go
+import plotly.io as pio
+import base64
 
 from . import views
 
@@ -1063,22 +1064,18 @@ class AutoMod(commands.Cog):
                 await ctx.send(f"No violations or warnings found for {user.mention}.")
                 return
 
-            # --- Generate abuse trend "GitHub-style" heatmap ---
-            # We'll show a grid of days (last 8 weeks, 7 days per week), color intensity = #violations
+            # --- Generate abuse trend "GitHub-style" heatmap using plotly ---
             timestamps = [v.get("timestamp") for v in violations if v.get("timestamp")]
             image_url = None
+            temp_file = None
             if timestamps:
-                # Convert to datetime objects
                 datetimes = [datetime.fromtimestamp(ts, tz=timezone.utc) for ts in timestamps]
                 datetimes.sort()
                 if len(datetimes) > 0:
-                    # Build a grid for the last 8 weeks (56 days)
                     today = datetime.now(timezone.utc).date()
                     start_date = today - timedelta(days=55)
                     date_grid = [start_date + timedelta(days=i) for i in range(56)]
-                    # Count violations per day
                     day_counts = Counter(dt.date() for dt in datetimes)
-                    # Find max for color scaling
                     max_count = max(day_counts.values()) if day_counts else 1
 
                     # Prepare grid: 7 rows (days of week), 8 columns (weeks)
@@ -1088,82 +1085,66 @@ class AutoMod(commands.Cog):
                         weekday = day.weekday()  # Monday=0
                         grid[weekday][week] = day_counts.get(day, 0)
 
-                    # Color palette: 0 = lightest, 4 = darkest (GitHub style)
-                    # We'll use 5 levels: 0 (no violations), 10, 20, 30, 40+ (darkest)
-                    import matplotlib.colors as mcolors
-                    github_colors = [
-                        "#ebedf0",  # 0
-                        "#f9c0c0",  # 10
-                        "#f88379",  # 20
-                        "#ff4545",  # 30
-                        "#b80000",  # 40+
-                    ]
-                    def get_color(val):
-                        if val == 0:
-                            return github_colors[0]
-                        elif 1 <= val < 10:
-                            return github_colors[1]
-                        elif 10 <= val < 20:
-                            return github_colors[2]
-                        elif 20 <= val < 30:
-                            return github_colors[3]
-                        elif 30 <= val < 40:
-                            return github_colors[4]
-                        else:  # 40 or more
-                            return github_colors[4]
-
-                    # Plot the grid
-                    fig, ax = plt.subplots(figsize=(8, 2.2))
-                    for week in range(8):
-                        for weekday in range(7):
-                            count = grid[weekday][week]
-                            color = get_color(count)
-                            rect = plt.Rectangle(
-                                (week, 6 - weekday), 1, 1,  # y axis: top is Sunday
-                                facecolor=color, edgecolor="#d0d0d0", linewidth=0.5
-                            )
-                            ax.add_patch(rect)
-                            # Optionally, show count if high
-                            if count > 0 and max_count > 2 and count == max_count:
-                                ax.text(week + 0.5, 6 - weekday + 0.5, str(count), color="white", ha="center", va="center", fontsize=7, fontweight="bold")
-
-                    # Set axis
-                    ax.set_xlim(0, 8)
-                    ax.set_ylim(0, 7)
-                    ax.set_xticks(range(8))
-                    # Fix: set y-ticks and y-tick labels to match (7 ticks for 7 days)
-                    ax.set_yticks(range(7))
-                    # Week labels (show start of each week)
+                    # Plotly heatmap
+                    # Y axis: Monday (0) to Sunday (6)
+                    z = grid
+                    # X axis: week labels
                     week_labels = []
                     for week in range(8):
                         week_start = start_date + timedelta(days=week * 7)
                         week_labels.append(week_start.strftime("%b %d"))
-                    ax.set_xticklabels(week_labels, rotation=45, ha="right", fontsize=8)
-                    # Day labels (Mon, Tue, Wed, Thu, Fri, Sat, Sun)
+                    # Y axis: day labels
                     day_labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-                    ax.set_yticklabels(day_labels, fontsize=8)
-                    ax.tick_params(left=False, bottom=False)
-                    ax.set_title(f"Abuse trend for {user.display_name} (last 8 weeks)", fontsize=13, pad=12)
-                    # Remove spines
-                    for spine in ax.spines.values():
-                        spine.set_visible(False)
-                    plt.tight_layout(pad=1.2)
 
-                    # Legend
-                    legend_elements = [
-                        Line2D([0], [0], marker='s', color='w', label='0', markerfacecolor=github_colors[0], markersize=10, markeredgecolor="#d0d0d0"),
-                        Line2D([0], [0], marker='s', color='w', label='1-9', markerfacecolor=github_colors[1], markersize=10, markeredgecolor="#d0d0d0"),
-                        Line2D([0], [0], marker='s', color='w', label='10-19', markerfacecolor=github_colors[2], markersize=10, markeredgecolor="#d0d0d0"),
-                        Line2D([0], [0], marker='s', color='w', label='20-29', markerfacecolor=github_colors[3], markersize=10, markeredgecolor="#d0d0d0"),
-                        Line2D([0], [0], marker='s', color='w', label='30+', markerfacecolor=github_colors[4], markersize=10, markeredgecolor="#d0d0d0"),
+                    # Custom color scale (GitHub style)
+                    github_colorscale = [
+                        [0.0, "#ebedf0"],
+                        [0.2, "#f9c0c0"],
+                        [0.4, "#f88379"],
+                        [0.6, "#ff4545"],
+                        [1.0, "#b80000"],
                     ]
-                    ax.legend(handles=legend_elements, title="Violations", bbox_to_anchor=(1.01, 1), loc="upper left", fontsize=8, title_fontsize=9, frameon=False)
 
-                    # Save to tempfile
-                    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-                        plt.savefig(tmp, format="png", bbox_inches="tight", dpi=120)
-                        temp_file = tmp.name
-                    plt.close(fig)
+                    # Normalize z for color scale
+                    z_max = max([max(row) for row in z]) if z and any(z) else 1
+                    if z_max == 0:
+                        z_max = 1
+
+                    fig = go.Figure(
+                        data=go.Heatmap(
+                            z=z,
+                            x=week_labels,
+                            y=day_labels,
+                            colorscale=github_colorscale,
+                            zmin=0,
+                            zmax=max(1, z_max),
+                            colorbar=dict(title="Violations", tickvals=[0, 1, 10, 20, 30, 40], len=0.5),
+                            showscale=True,
+                            hovertemplate="Week: %{x}<br>Day: %{y}<br>Violations: %{z}<extra></extra>",
+                            reversescale=False,
+                        )
+                    )
+                    fig.update_layout(
+                        title=f"Abuse trend for {user.display_name} (last 8 weeks)",
+                        xaxis=dict(title="Week", tickmode="array", tickvals=week_labels, ticktext=week_labels, showgrid=False),
+                        yaxis=dict(title="Day", tickmode="array", tickvals=day_labels, ticktext=day_labels, showgrid=False, autorange="reversed"),
+                        margin=dict(l=40, r=40, t=60, b=40),
+                        width=700,
+                        height=250,
+                        font=dict(size=12),
+                        plot_bgcolor="#ffffff",
+                        paper_bgcolor="#ffffff",
+                    )
+                    # Remove gridlines and axis lines for a cleaner look
+                    fig.update_xaxes(showgrid=False, zeroline=False, showline=False)
+                    fig.update_yaxes(showgrid=False, zeroline=False, showline=False)
+
+                    # Save to PNG in memory
+                    img_bytes = pio.to_image(fig, format="png", width=700, height=250, scale=2)
+                    temp_file = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                    temp_file.write(img_bytes)
+                    temp_file.flush()
+                    temp_file.close()
                     image_url = "attachment://abuse_trend.png"
                 else:
                     temp_file = None
@@ -1213,15 +1194,14 @@ class AutoMod(commands.Cog):
             if total_pages == 1:
                 embed = make_embed(0)
                 if temp_file:
-                    with open(temp_file, "rb") as f:
+                    with open(temp_file.name, "rb") as f:
                         file = discord.File(f, filename="abuse_trend.png")
                         await ctx.send(embed=embed, file=file)
                 else:
                     await ctx.send(embed=embed)
                 if temp_file:
-                    import os
                     try:
-                        os.remove(temp_file)
+                        os.remove(temp_file.name)
                     except Exception:
                         pass
                 return
@@ -1235,7 +1215,7 @@ class AutoMod(commands.Cog):
             page = 0
             embed = make_embed(page)
             if temp_file:
-                with open(temp_file, "rb") as f:
+                with open(temp_file.name, "rb") as f:
                     file = discord.File(f, filename="abuse_trend.png")
                     message = await ctx.send(embed=embed, file=file)
             else:
@@ -1275,9 +1255,8 @@ class AutoMod(commands.Cog):
                         except Exception:
                             pass
                         if temp_file:
-                            import os
                             try:
-                                os.remove(temp_file)
+                                os.remove(temp_file.name)
                             except Exception:
                                 pass
                         return
@@ -1291,7 +1270,7 @@ class AutoMod(commands.Cog):
                     if page != old_page:
                         embed = make_embed(page)
                         if temp_file:
-                            with open(temp_file, "rb") as f:
+                            with open(temp_file.name, "rb") as f:
                                 file = discord.File(f, filename="abuse_trend.png")
                                 await message.edit(embed=embed, attachments=[file])
                         else:
@@ -1303,9 +1282,8 @@ class AutoMod(commands.Cog):
                 except Exception:
                     pass
                 if temp_file:
-                    import os
                     try:
-                        os.remove(temp_file)
+                        os.remove(temp_file.name)
                     except Exception:
                         pass
         except Exception as e:
