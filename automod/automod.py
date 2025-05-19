@@ -1262,9 +1262,11 @@ class AutoMod(commands.Cog):
                     value=f"**{warning_count}** warning{'s' if warning_count != 1 else ''} for this user.",
                     inline=False
                 )
+                # Fix: Use None for icon_url if not present, instead of discord.Embed.Empty
+                icon_url = getattr(user.display_avatar, "url", None)
                 embed.set_footer(
                     text=f"Page {page+1}/{total_pages} • Only the last 50 violations are kept per user. Warnings are cumulative.",
-                    icon_url=getattr(user.display_avatar, "url", discord.Embed.Empty)
+                    icon_url=icon_url
                 )
                 if image_url:
                     embed.set_image(url=image_url)
