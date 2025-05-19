@@ -1110,7 +1110,7 @@ class AutoMod(commands.Cog):
                     if z_max == 0:
                         z_max = 1
 
-                    # --- Fix: Make colorbar wider and use larger font to prevent overlap ---
+                    # --- Fix: Remove invalid 'titlefont' property from colorbar dict ---
                     fig = go.Figure(
                         data=go.Heatmap(
                             z=z,
@@ -1124,7 +1124,7 @@ class AutoMod(commands.Cog):
                                 tickvals=[0, 1, 10, 20, 30, 40],
                                 len=0.8,  # Make colorbar longer
                                 thickness=30,  # Make colorbar wider
-                                titlefont=dict(size=16),
+                                # titlefont=dict(size=16),  # <-- Removed, not valid for plotly.graph_objs.heatmap.ColorBar
                                 tickfont=dict(size=14),
                                 x=1.05,  # Move colorbar a bit to the right
                             ),
