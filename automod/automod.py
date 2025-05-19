@@ -1089,25 +1089,27 @@ class AutoMod(commands.Cog):
                         grid[weekday][week] = day_counts.get(day, 0)
 
                     # Color palette: 0 = lightest, 4 = darkest (GitHub style)
-                    # We'll use 5 levels: 0 (no violations), 1, 2, 3, 4+ (darkest)
+                    # We'll use 5 levels: 0 (no violations), 10, 20, 30, 40+ (darkest)
                     import matplotlib.colors as mcolors
                     github_colors = [
                         "#ebedf0",  # 0
-                        "#f9c0c0",  # 1
-                        "#f88379",  # 2
-                        "#ff4545",  # 3
-                        "#b80000",  # 4+
+                        "#f9c0c0",  # 10
+                        "#f88379",  # 20
+                        "#ff4545",  # 30
+                        "#b80000",  # 40+
                     ]
                     def get_color(val):
                         if val == 0:
                             return github_colors[0]
-                        elif val == 1:
+                        elif 1 <= val < 10:
                             return github_colors[1]
-                        elif val == 2:
+                        elif 10 <= val < 20:
                             return github_colors[2]
-                        elif val == 3:
+                        elif 20 <= val < 30:
                             return github_colors[3]
-                        else:
+                        elif 30 <= val < 40:
+                            return github_colors[4]
+                        else:  # 40 or more
                             return github_colors[4]
 
                     # Plot the grid
@@ -1150,10 +1152,10 @@ class AutoMod(commands.Cog):
                     # Legend
                     legend_elements = [
                         Line2D([0], [0], marker='s', color='w', label='0', markerfacecolor=github_colors[0], markersize=10, markeredgecolor="#d0d0d0"),
-                        Line2D([0], [0], marker='s', color='w', label='1', markerfacecolor=github_colors[1], markersize=10, markeredgecolor="#d0d0d0"),
-                        Line2D([0], [0], marker='s', color='w', label='2', markerfacecolor=github_colors[2], markersize=10, markeredgecolor="#d0d0d0"),
-                        Line2D([0], [0], marker='s', color='w', label='3', markerfacecolor=github_colors[3], markersize=10, markeredgecolor="#d0d0d0"),
-                        Line2D([0], [0], marker='s', color='w', label='4+', markerfacecolor=github_colors[4], markersize=10, markeredgecolor="#d0d0d0"),
+                        Line2D([0], [0], marker='s', color='w', label='1-9', markerfacecolor=github_colors[1], markersize=10, markeredgecolor="#d0d0d0"),
+                        Line2D([0], [0], marker='s', color='w', label='10-19', markerfacecolor=github_colors[2], markersize=10, markeredgecolor="#d0d0d0"),
+                        Line2D([0], [0], marker='s', color='w', label='20-29', markerfacecolor=github_colors[3], markersize=10, markeredgecolor="#d0d0d0"),
+                        Line2D([0], [0], marker='s', color='w', label='30+', markerfacecolor=github_colors[4], markersize=10, markeredgecolor="#d0d0d0"),
                     ]
                     ax.legend(handles=legend_elements, title="Violations", bbox_to_anchor=(1.01, 1), loc="upper left", fontsize=8, title_fontsize=9, frameon=False)
 
