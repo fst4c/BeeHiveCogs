@@ -1088,15 +1088,18 @@ class AutoMod(commands.Cog):
                         weekday = day.weekday()  # Monday=0
                         grid[weekday][week] = day_counts.get(day, 0)
 
-                    # Color palette: 0 = lightest, 4 = darkest (GitHub style)
-                    # We'll use 5 levels: 0 (no violations), 10, 20, 30, 40+ (darkest)
+                    # --- Enhanced Color Palette and Design ---
+                    # Use a more visually pleasing palette (cool-to-warm, with soft background)
                     import matplotlib.colors as mcolors
+                    from matplotlib.patches import FancyBboxPatch
+
                     github_colors = [
-                        "#ebedf0",  # 0
-                        "#f9c0c0",  # 10
-                        "#f88379",  # 20
-                        "#ff4545",  # 30
-                        "#b80000",  # 40+
+                        "#f4f6fb",  # 0 - very light blue-gray
+                        "#b3c6e0",  # 1-9 - soft blue
+                        "#7fa8d1",  # 10-19 - medium blue
+                        "#f7b267",  # 20-29 - soft orange
+                        "#f4845f",  # 30+ - coral
+                        "#c44536",  # 40+ - deep red
                     ]
                     def get_color(val):
                         if val == 0:
@@ -1110,58 +1113,113 @@ class AutoMod(commands.Cog):
                         elif 30 <= val < 40:
                             return github_colors[4]
                         else:  # 40 or more
-                            return github_colors[4]
+                            return github_colors[5]
 
-                    # Plot the grid
-                    fig, ax = plt.subplots(figsize=(8, 2.2))
+                    # Plot the grid with rounded corners and subtle grid lines
+                    fig, ax = plt.subplots(figsize=(8.5, 2.7), dpi=120)
+                    ax.set_facecolor("#f9fafb")
+                    # Draw a soft drop shadow background
+                    shadow = FancyBboxPatch(
+                        (0.15, -0.2), 8-0.3, 7+0.4,
+                        boxstyle="round,pad=0.18,rounding_size=0.25",
+                        linewidth=0, facecolor="#e0e3ea", alpha=0.35, zorder=0
+                    )
+                    ax.add_patch(shadow)
+
+                    # Draw the heatmap cells
                     for week in range(8):
                         for weekday in range(7):
                             count = grid[weekday][week]
                             color = get_color(count)
-                            rect = plt.Rectangle(
-                                (week, 6 - weekday), 1, 1,  # y axis: top is Sunday
-                                facecolor=color, edgecolor="#d0d0d0", linewidth=0.5
+                            # Rounded rectangle for each cell
+                            cell = FancyBboxPatch(
+                                (week+0.08, 6 - weekday + 0.08), 0.84, 0.84,
+                                boxstyle="round,pad=0.08,rounding_size=0.18",
+                                linewidth=0.7, edgecolor="#d0d3db", facecolor=color, zorder=2
                             )
-                            ax.add_patch(rect)
+                            ax.add_patch(cell)
                             # Optionally, show count if high
                             if count > 0 and max_count > 2 and count == max_count:
-                                ax.text(week + 0.5, 6 - weekday + 0.5, str(count), color="white", ha="center", va="center", fontsize=7, fontweight="bold")
+                                ax.text(week + 0.5, 6 - weekday + 0.5, str(count), color="#222", ha="center", va="center", fontsize=8, fontweight="bold", zorder=3)
 
                     # Set axis
-                    ax.set_xlim(0, 8)
-                    ax.set_ylim(0, 7)
+                    ax.set_xlim(-0.1, 8.1)
+                    ax.set_ylim(-0.1, 7.1)
                     ax.set_xticks(range(8))
-                    # Fix: set y-ticks and y-tick labels to match (7 ticks for 7 days)
                     ax.set_yticks(range(7))
+
                     # Week labels (show start of each week)
                     week_labels = []
                     for week in range(8):
                         week_start = start_date + timedelta(days=week * 7)
                         week_labels.append(week_start.strftime("%b %d"))
-                    ax.set_xticklabels(week_labels, rotation=45, ha="right", fontsize=8)
+                    ax.set_xticklabels(week_labels, rotation=35, ha="right", fontsize=9, color="#4a4a4a", fontweight="medium")
                     # Day labels (Mon, Tue, Wed, Thu, Fri, Sat, Sun)
                     day_labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-                    ax.set_yticklabels(day_labels, fontsize=8)
-                    ax.tick_params(left=False, bottom=False)
-                    ax.set_title(f"Abuse trend for {user.display_name} (last 8 weeks)", fontsize=13, pad=12)
+                    ax.set_yticklabels(day_labels, fontsize=9, color="#4a4a4a", fontweight="medium")
+                    ax.tick_params(left=False, bottom=False, labelleft=True, labelbottom=True)
+
+                    # Title with user avatar
+                    from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+                    import requests
+                    from io import BytesIO
+
+                    ax.set_title(
+                        f"Abuse Trend for {user.display_name} (last 8 weeks)",
+                        fontsize=15, pad=18, color="#2d2d2d", fontweight="bold", loc="left"
+                    )
+                    # Add user avatar (left of title)
+                    try:
+                        avatar_url = user.display_avatar.url
+                        response = requests.get(avatar_url, timeout=3)
+                        if response.status_code == 200:
+                            avatar_img = plt.imread(BytesIO(response.content))
+                            imagebox = OffsetImage(avatar_img, zoom=0.18, clip_path=None)
+                            ab = AnnotationBbox(
+                                imagebox, (-0.7, 7.2), frameon=False, box_alignment=(0.5, 0.5), zorder=10
+                            )
+                            ax.add_artist(ab)
+                    except Exception:
+                        pass
+
                     # Remove spines
                     for spine in ax.spines.values():
                         spine.set_visible(False)
-                    plt.tight_layout(pad=1.2)
+                    plt.tight_layout(pad=1.5)
 
-                    # Legend
+                    # Custom Legend (horizontal, below the plot)
+                    from matplotlib.lines import Line2D
                     legend_elements = [
-                        Line2D([0], [0], marker='s', color='w', label='0', markerfacecolor=github_colors[0], markersize=10, markeredgecolor="#d0d0d0"),
-                        Line2D([0], [0], marker='s', color='w', label='1-9', markerfacecolor=github_colors[1], markersize=10, markeredgecolor="#d0d0d0"),
-                        Line2D([0], [0], marker='s', color='w', label='10-19', markerfacecolor=github_colors[2], markersize=10, markeredgecolor="#d0d0d0"),
-                        Line2D([0], [0], marker='s', color='w', label='20-29', markerfacecolor=github_colors[3], markersize=10, markeredgecolor="#d0d0d0"),
-                        Line2D([0], [0], marker='s', color='w', label='30+', markerfacecolor=github_colors[4], markersize=10, markeredgecolor="#d0d0d0"),
+                        Line2D([0], [0], marker='s', color='w', label='0', markerfacecolor=github_colors[0], markersize=13, markeredgecolor="#d0d3db"),
+                        Line2D([0], [0], marker='s', color='w', label='1-9', markerfacecolor=github_colors[1], markersize=13, markeredgecolor="#d0d3db"),
+                        Line2D([0], [0], marker='s', color='w', label='10-19', markerfacecolor=github_colors[2], markersize=13, markeredgecolor="#d0d3db"),
+                        Line2D([0], [0], marker='s', color='w', label='20-29', markerfacecolor=github_colors[3], markersize=13, markeredgecolor="#d0d3db"),
+                        Line2D([0], [0], marker='s', color='w', label='30-39', markerfacecolor=github_colors[4], markersize=13, markeredgecolor="#d0d3db"),
+                        Line2D([0], [0], marker='s', color='w', label='40+', markerfacecolor=github_colors[5], markersize=13, markeredgecolor="#d0d3db"),
                     ]
-                    ax.legend(handles=legend_elements, title="Violations", bbox_to_anchor=(1.01, 1), loc="upper left", fontsize=8, title_fontsize=9, frameon=False)
+                    ax.legend(
+                        handles=legend_elements,
+                        title="Violations",
+                        bbox_to_anchor=(0.5, -0.18),
+                        loc="upper center",
+                        fontsize=9,
+                        title_fontsize=10,
+                        frameon=False,
+                        ncol=6,
+                        handletextpad=0.7,
+                        columnspacing=1.2,
+                        borderaxespad=0.0,
+                    )
+
+                    # Subtle grid lines for week separation
+                    for week in range(1, 8):
+                        ax.axvline(week, color="#e6e8ef", linewidth=0.7, zorder=1, alpha=0.7)
+                    for day in range(1, 7):
+                        ax.axhline(day, color="#e6e8ef", linewidth=0.7, zorder=1, alpha=0.7)
 
                     # Save to tempfile
                     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-                        plt.savefig(tmp, format="png", bbox_inches="tight", dpi=120)
+                        plt.savefig(tmp, format="png", bbox_inches="tight", dpi=140, transparent=True)
                         temp_file = tmp.name
                     plt.close(fig)
                     image_url = "attachment://abuse_trend.png"
@@ -1182,29 +1240,32 @@ class AutoMod(commands.Cog):
                 end = start + VIOLATIONS_PER_PAGE
                 violations_to_show = violations[start:end]
                 embed = discord.Embed(
-                    title=f"Violation history for {user.display_name}",
-                    color=0xff4545,
-                    description=f"Showing violations {start+1}-{min(end, total_violations)} of {total_violations} for {user.mention}."
+                    title=f"📜 Violation History for {user.display_name}",
+                    color=0x7fa8d1,
+                    description=f"**Showing {start+1}-{min(end, total_violations)} of {total_violations} violations for {user.mention}.**"
                 )
                 for v in violations_to_show:
                     ts = v.get("timestamp")
                     time_str = f"<t:{int(ts)}:R>" if ts else "Unknown time"
                     content = v.get("content", "*No content*")
                     categories = v.get("categories", {})
-                    cat_str = ", ".join(f"{cat}: {score*100:.0f}%" for cat, score in categories.items())
+                    cat_str = ", ".join(f"`{cat}`: **{score*100:.0f}%**" for cat, score in categories.items())
                     channel_id = v.get("channel_id")
                     channel_mention = f"<#{channel_id}>" if channel_id else "Unknown"
                     embed.add_field(
-                        name=f"{time_str} in {channel_mention}",
+                        name=f"🕒 {time_str} in {channel_mention}",
                         value=f"**Categories:** {cat_str}\n**Message:** {content[:300]}{'...' if len(content) > 300 else ''}",
                         inline=False
                     )
                 embed.add_field(
-                    name="Warnings issued",
-                    value=f"{warning_count} warning{'s' if warning_count != 1 else ''} for this user.",
+                    name="⚠️ Warnings issued",
+                    value=f"**{warning_count}** warning{'s' if warning_count != 1 else ''} for this user.",
                     inline=False
                 )
-                embed.set_footer(text=f"Page {page+1}/{total_pages} • Only the last 50 violations are kept per user. Warnings are cumulative.")
+                embed.set_footer(
+                    text=f"Page {page+1}/{total_pages} • Only the last 50 violations are kept per user. Warnings are cumulative.",
+                    icon_url=getattr(user.display_avatar, "url", discord.Embed.Empty)
+                )
                 if image_url:
                     embed.set_image(url=image_url)
                 return embed
