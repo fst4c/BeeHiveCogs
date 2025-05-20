@@ -650,6 +650,8 @@ class Skysearch(commands.Cog):
                 elif file_format.lower() == "html":
                     if "../" in file_path or "..\\" in file_path:
                         raise Exception("Invalid file path")
+                    if "../" in file_path or "..\\" in file_path:
+                        raise Exception("Invalid file path")
                     with open(file_path, "w", newline='', encoding='utf-8') as file:
                         aircraft_keys = list(response['ac'][0].keys())
                         file.write('<table>\n')
@@ -670,6 +672,8 @@ class Skysearch(commands.Cog):
                 if os.path.exists(file_path):
                     os.remove(file_path)
 
+            if "../" in file_path or "..\\" in file_path:
+                raise Exception("Invalid file path")
             if "../" in file_path or "..\\" in file_path:
                 raise Exception("Invalid file path")
             with open(file_path, 'rb') as fp:
