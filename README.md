@@ -40,6 +40,24 @@ Access detailed weather information, forecasts, and historical data for any loca
 [p]load weatherpro
 ```
 
+### [adaptiveslowmode](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/adaptiveslowmode)
+
+Dynamically adjust Discord channel slowmode in 1-second increments based on real-time chat activity, keeping conversations readable and moderatable without constant manual intervention. AdaptiveSlowmode automatically increases or decreases slowmode to target a configurable messages-per-minute rate, and provides interactive log messages with buttons for manual adjustment.
+
+**Key features**
+- Automatically tunes slowmode for each channel based on recent message activity.
+- Set minimum/maximum slowmode, target messages per minute, and which channels to monitor.
+- Interactive log messages (with buttons) allow manual slowmode adjustment from Discord.
+- Survey command to calibrate settings based on 5 minutes of real activity.
+- Logging channel support for activity and adjustment reports.
+
+```
+[p]cog install BeeHiveSafety adaptiveslowmode
+```
+```
+[p]load adaptiveslowmode
+```
+
 
 ### [ping](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/ping)
 
