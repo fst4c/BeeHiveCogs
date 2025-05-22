@@ -58,7 +58,6 @@ Dynamically adjust Discord channel slowmode in 1-second increments based on real
 [p]load adaptiveslowmode
 ```
 
-
 ### [ping](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/ping)
 
 A nice, functional ping-and-speedtest cog that shows your host latency, transit latency, download speed, and upload speed in a neat, orderly, no-frills embed. If your bot is hosted on a poor quality connection, includes a special offer when detected. `[p]ping`.
@@ -239,6 +238,20 @@ Automatically transcribe and moderate voice notes and other audio sent in your s
 ```
 ```
 [p]set api openai api_key YOURAPIKEYHERE
+```
+
+### [triageanalysis](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/triageanalysis)
+
+Integrate the [Tria.ge](https://tria.ge/) malware analysis sandbox with your Red-DiscordBot. Automatically or manually scan suspicious files, enforce punishments, and get rich analysis reports in Discord. `[p]triage`
+
+```
+[p]cog install BeeHiveSafety triageanalysis
+```
+```
+[p]load triageanalysis
+```
+```
+[p]set api triage api_key YOURAPIKEYHERE
 ```
 
 
