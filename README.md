@@ -203,7 +203,7 @@ Integrate the Ransomware.live API with your Red-DiscordBot to monitor and receiv
 
 ### [automod](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/automod)
 
-Utilize OpenAI's frontier moderation models to keep chat clean in your server for free. `[p]automod`
+Utilize OpenAI's frontier moderation models to keep chat clean in your server. `[p]automod`
 
 ```
 [p]cog install BeeHiveSafety automod
@@ -228,7 +228,7 @@ Automatically identify songs shared in chat as files.
 
 ### [transcriber](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/transcriber)
 
-Automatically transcribe and moderate voice notes and other audio sent in your server using frontier AI models. `[p]transcriber`
+Automatically transcribe and moderate voice notes and other audio sent in your server using OpenAI. `[p]transcriber`
 
 ```
 [p]cog install BeeHiveSafety transcriber
