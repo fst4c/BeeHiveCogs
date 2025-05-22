@@ -156,14 +156,16 @@ Integrate the AbuseIPDB API with your Red-DiscordBot to check and report IP addr
 
 ### [cloudflare](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/cloudflare)
 
-Utilize Cloudflare's URL scanner and Cloudflare Intel via Discord.
+Integrate Cloudflare's URL Scanner and Cloudflare Intel APIs with your Red-DiscordBot.
 
-```
-[p]cog install BeeHiveSafety cloudflare
-```
-```
-[p]load cloudflare
-```
+**Key features**
+- Scan URLs for threats using Cloudflare's URL Scanner, both manually and automatically.
+- Search and view historical URL scan results.
+- Enable automatic scanning of all posted URLs in your server, with optional logging to a channel.
+- Query Cloudflare Intel for domain, IP, ASN, and WHOIS intelligence directly from Discord.
+- Download detailed reports for domains and WHOIS lookups.
+
+> **Note:** You must set your Cloudflare API credentials using Red's shared API tokens for this cog to function.
 
 ### [virustotal](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/virustotal)
 
