@@ -254,6 +254,15 @@ Integrate the [Tria.ge](https://tria.ge/) malware analysis sandbox with your Red
 [p]set api triage api_key YOURAPIKEYHERE
 ```
 
+## Proof-of-concept cogs
+
+These are cogs that we make to showcase the usefulness/application of one or two specific bits of tech functionality. Are they meant for your bot? Absolutely not. Is there a chance you might learn something cool from them code-wise? Absolutely.
+
+### [schoolworkai](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/schoolworkai)
+
+A full-featured, privacy-focused AI homework assistant for Discord. SchoolworkAI provides `/ask`, `/answer`, `/explain`, and `/outline` commands for students, with onboarding, billing, invite rewards, and usage/rating stats.
+
+
 
 
 
