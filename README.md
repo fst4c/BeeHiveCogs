@@ -246,6 +246,9 @@ Automatically transcribe and moderate voice notes and other audio sent in your s
 
 Integrate the [Tria.ge](https://tria.ge/) malware analysis sandbox with your Red-DiscordBot. Automatically or manually scan suspicious files, enforce punishments, and get rich analysis reports in Discord. `[p]triage`
 
+>[!TIP]
+>Visit [tria.ge/account](https://tria.ge/account) to generate an API key. 
+
 ```
 [p]cog install BeeHiveSafety triageanalysis
 ```
