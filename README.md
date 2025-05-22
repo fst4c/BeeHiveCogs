@@ -136,7 +136,7 @@ Manage and track invite links for your Discord server. This cog allows you to se
 ```
 
 ## Brand cogs
-Brand cogs are cogs we make that are intended to integrate other third party services primarily with your, Red instance. Red is a powerful tool when correctly equipped, and we hope these cogs help extend your Red-bot's capabilities.
+Brand cogs are cogs we make that are intended to integrate other third party services with your Red instance. Red is a powerful tool when correctly equipped, and we hope these cogs help extend your bot's capabilities in your own community.
 
 >[!TIP]
 >Unless otherwise specified, brand cogs are not authored, audited, or endorsed by the brands and tools that they interact with.
