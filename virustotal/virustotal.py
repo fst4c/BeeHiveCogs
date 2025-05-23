@@ -144,7 +144,7 @@ class VirusTotal(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.Cog.listener()
-    async def on_message(self, message):
+    async def on_message_without_command(self, message):
         """Automatically scan files if auto_scan is enabled"""
         guild = message.guild
         if guild is None:
