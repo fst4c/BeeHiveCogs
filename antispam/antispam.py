@@ -497,7 +497,7 @@ class AntiSpam(commands.Cog):
                 embed.add_field(name="User", value=f"{user.mention} (`{user.id}`)", inline=False)
                 embed.add_field(
                     name="Reason",
-                    value=f"{reason}\n`[p]antispam signatures` for details.",
+                    value=f"**{reason}**\n[p]-# `antispam signatures` for details.",
                     inline=False
                 )
                 embed.add_field(name="Punishment", value=punishment)
