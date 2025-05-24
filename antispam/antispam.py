@@ -434,7 +434,7 @@ class AntiSpam(commands.Cog):
                     f"Latest message:\n{last_content[:400]}\n\n"
                     f"Previous similar messages in last 5 minutes:\n" +
                     "\n".join(
-                        f"<t:{int(ts)}:f>: {msg[:400]}"
+                        f"<t:{int(ts)}:R>: {msg[:400]}"
                         for ts, msg in similar_msgs_5min
                     )
                 )
