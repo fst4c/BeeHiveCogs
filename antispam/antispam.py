@@ -206,6 +206,11 @@ class AntiSpam(commands.Cog):
         if getattr(message, "webhook_id", None) is not None:
             return
 
+        # Autobypass users with administrator permission
+        if hasattr(message.author, "guild_permissions"):
+            if getattr(message.author.guild_permissions, "administrator", False):
+                return
+
         guild = message.guild
         conf = self.config.guild(guild)
         try:
