@@ -39,7 +39,7 @@ class AntiSpam(commands.Cog):
             "emoji_spam_threshold": 15,
             "emoji_spam_unique_threshold": 10,
             "punishment": "timeout",
-            "timeout_time": 60,
+            "timeout_time": 15,  # Default timeout time in minutes
             "ignored_channels": [],
             "ignored_roles": [],
             "ignored_users": [],
@@ -92,13 +92,13 @@ class AntiSpam(commands.Cog):
         await ctx.send(f"Punishment set to: {punishment}")
 
     @antispam.command()
-    async def timeout(self, ctx, seconds: int):
-        """Set timeout duration in seconds."""
-        if seconds < 1:
-            await ctx.send("Timeout time must be greater than 0 seconds.")
+    async def timeout(self, ctx, minutes: int):
+        """Set timeout duration in minutes."""
+        if minutes < 1:
+            await ctx.send("Timeout time must be greater than 0 minutes.")
             return
-        await self.config.guild(ctx.guild).timeout_time.set(seconds)
-        await ctx.send(f"Timeout time set to {seconds} seconds.")
+        await self.config.guild(ctx.guild).timeout_time.set(minutes)
+        await ctx.send(f"Timeout time set to {minutes} minutes.")
 
     @antispam.command()
     async def emojispam(self, ctx, max_emojis: int = 15, max_unique: int = 10):
@@ -436,7 +436,7 @@ class AntiSpam(commands.Cog):
         try:
             timeout_time = await conf.timeout_time()
         except Exception:
-            timeout_time = 60
+            timeout_time = 1  # fallback to 1 minute
         user = message.author
 
         now = time.time()
@@ -458,27 +458,9 @@ class AntiSpam(commands.Cog):
             if punishment == "timeout":
                 if hasattr(user, "timeout"):
                     import datetime
-                    until = discord.utils.utcnow() + datetime.timedelta(seconds=timeout_time)
+                    until = discord.utils.utcnow() + datetime.timedelta(minutes=timeout_time)
                     await user.timeout(until, reason=reason)
-                else:
-                    muted = discord.utils.get(guild.roles, name="Muted")
-                    if not muted:
-                        try:
-                            muted = await guild.create_role(name="Muted", reason="AntiSpam timeout fallback role")
-                        except Exception:
-                            muted = None
-                    if muted:
-                        for channel in guild.channels:
-                            try:
-                                await channel.set_permissions(muted, send_messages=False, add_reactions=False)
-                            except Exception:
-                                continue
-                        try:
-                            await user.add_roles(muted, reason=reason)
-                            await asyncio.sleep(timeout_time)
-                            await user.remove_roles(muted, reason="AntiSpam: timeout expired")
-                        except Exception:
-                            pass
+                # If the user object does not have a timeout method, do nothing (no fallback mute)
             elif punishment == "kick":
                 try:
                     await user.kick(reason=reason)
@@ -559,7 +541,7 @@ class AntiSpam(commands.Cog):
         embed.add_field(name="Message limit", value=f"{message_limit} per {interval}s")
         embed.add_field(name="Punishment", value=punishment)
         if punishment == "timeout":
-            embed.add_field(name="Timeout Time", value=f"{timeout_time}s")
+            embed.add_field(name="Timeout Time", value=f"{timeout_time}m")
         embed.add_field(name="Emoji Spam threshold", value=f"{emoji_spam_threshold} total, {emoji_spam_unique_threshold} unique", inline=False)
         embed.add_field(name="Similarity threshold", value=f"{similarity_threshold:.2f}", inline=False)
         if log_channel:
