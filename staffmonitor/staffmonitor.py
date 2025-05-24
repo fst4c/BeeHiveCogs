@@ -265,15 +265,21 @@ class StaffMonitor(commands.Cog):
         # Update last active
         await self.config.member(ctx.author).last_active.set(datetime.utcnow().isoformat())
 
-    # --- Notes System ---
+    # --- Master Command Group: staff ---
 
     @commands.group()
+    async def staff(self, ctx):
+        """Staff monitoring, analytics, notes, feedback, and configuration."""
+
+    # --- Subgroup: staff notes ---
+
+    @staff.group(name="notes")
     @checks.mod_or_permissions(manage_guild=True)
-    async def staffnotes(self, ctx):
+    async def staff_notes(self, ctx):
         """Staff notes system."""
 
-    @staffnotes.command()
-    async def add(self, ctx, member: discord.Member, *, note: str):
+    @staff_notes.command(name="add")
+    async def staff_notes_add(self, ctx, member: discord.Member, *, note: str):
         """Add a note about a staff member."""
         if not await self.is_staff(member, ctx.guild):
             await ctx.send("That user is not a staff member.")
@@ -288,8 +294,8 @@ class StaffMonitor(commands.Cog):
             notes.append(entry)
         await ctx.send(f"Note added for {member.mention}.")
 
-    @staffnotes.command()
-    async def view(self, ctx, member: discord.Member):
+    @staff_notes.command(name="view")
+    async def staff_notes_view(self, ctx, member: discord.Member):
         """View notes about a staff member."""
         notes = await self.config.member(member).notes()
         if not notes:
@@ -303,14 +309,14 @@ class StaffMonitor(commands.Cog):
         for page in pagify("\n\n".join(pages), delims=["\n"], page_length=1800):
             await ctx.send(page)
 
-    # --- Feedback System ---
+    # --- Subgroup: staff feedback ---
 
-    @commands.group()
-    async def stafffeedback(self, ctx):
+    @staff.group(name="feedback")
+    async def staff_feedback(self, ctx):
         """Feedback system for staff."""
 
-    @stafffeedback.command()
-    async def rate(self, ctx, member: discord.Member, rating: int, *, feedback: str = ""):
+    @staff_feedback.command(name="rate")
+    async def staff_feedback_rate(self, ctx, member: discord.Member, rating: int, *, feedback: str = ""):
         """Rate a staff member (1-5 stars) and leave feedback."""
         if not await self.is_staff(member, ctx.guild):
             await ctx.send("That user is not a staff member.")
@@ -329,9 +335,9 @@ class StaffMonitor(commands.Cog):
             feedbacks.append(entry)
         await ctx.send(f"Feedback submitted for {member.mention}.")
 
-    @stafffeedback.command()
+    @staff_feedback.command(name="view")
     @checks.mod_or_permissions(manage_guild=True)
-    async def view(self, ctx, member: discord.Member):
+    async def staff_feedback_view(self, ctx, member: discord.Member):
         """View feedback for a staff member."""
         feedbacks = await self.config.member(member).feedback()
         if not feedbacks:
@@ -344,127 +350,83 @@ class StaffMonitor(commands.Cog):
         for page in pagify(msg, page_length=1800):
             await ctx.send(page)
 
-    # --- Reports & Analytics ---
+    # --- Subgroup: staff stats ---
 
-    @commands.group()
+    @staff.group(name="stats")
     @checks.mod_or_permissions(manage_guild=True)
-    async def staffstats(self, ctx):
+    async def staff_stats(self, ctx):
         """Staff activity and analytics."""
 
-    @staffstats.command()
-    async def punishments(self, ctx, member: discord.Member = None):
-        """Show punishment logs for a staff member or all staff."""
-        if member:
-            logs = await self.config.member(member).punishments()
-            if not logs:
-                await ctx.send("No punishments found for this member.")
-                return
-            msg = f"**Punishments for {member.mention}:**\n"
-            for p in logs[-20:]:
-                msg += (
-                    f"\n`{p['timestamp']}`: {p['action']} -> <@{p['target_id']}>"
-                    f" (by <@{p['staff_id']}>) Reason: {p['reason']}"
-                )
-            for page in pagify(msg, page_length=1800):
-                await ctx.send(page)
-        else:
-            # Top 5 staff by punishments this week
-            now = datetime.utcnow()
-            week_ago = now - timedelta(days=7)
-            staff_counts = {}
-            for m in ctx.guild.members:
-                if not await self.is_staff(m, ctx.guild):
-                    continue
-                logs = await self.config.member(m).punishments()
-                count = sum(
-                    1
-                    for p in logs
-                    if datetime.fromisoformat(p["timestamp"]) > week_ago
-                )
-                if count:
-                    staff_counts[m] = count
-            if not staff_counts:
-                await ctx.send("No punishments found for any staff this week.")
-                return
-            top = sorted(staff_counts.items(), key=lambda x: x[1], reverse=True)[:5]
-            msg = "**Top 5 staff by punishments this week:**\n"
-            for i, (m, c) in enumerate(top, 1):
-                msg += f"{i}. {m.mention}: {c}\n"
-            await ctx.send(msg)
+    @staff_stats.command(name="profile")
+    async def staff_stats_profile(self, ctx, member: discord.Member = None):
+        """
+        Show a comprehensive profile for a staff member, including punishments, activity, and command usage.
+        """
+        member = member or ctx.author
+        if not await self.is_staff(member, ctx.guild):
+            await ctx.send("That user is not a staff member.")
+            return
 
-    @staffstats.command()
-    async def activity(self, ctx, member: discord.Member = None):
-        """Show text/voice activity for a staff member or all staff."""
-        if member:
-            voice = await self.config.member(member).voice_sessions()
-            text = await self.config.member(member).interactions()
-            total_voice = sum(s["duration"] for s in voice)
-            total_text = len([i for i in text if i["type"] == "message"])
-            msg = (
-                f"**Activity for {member.mention}:**\n"
-                f"Text messages: {total_text}\n"
-                f"Voice time: {humanize_number(int(total_voice // 60))} minutes"
+        # Gather punishments
+        punishments = await self.config.member(member).punishments()
+        punishments_count = len(punishments)
+        last_punishments = punishments[-5:] if punishments else []
+
+        # Gather activity
+        voice_sessions = await self.config.member(member).voice_sessions()
+        total_voice = sum(s["duration"] for s in voice_sessions)
+        total_voice_minutes = int(total_voice // 60)
+        interactions = await self.config.member(member).interactions()
+        total_text = len([i for i in interactions if i["type"] == "message"])
+
+        # Gather command usage
+        command_usage = await self.config.member(member).command_usage()
+        command_counter = {}
+        for u in command_usage:
+            command_counter[u["command"]] = command_counter.get(u["command"], 0) + 1
+        top_commands = sorted(command_counter.items(), key=lambda x: x[1], reverse=True)[:5]
+
+        # Gather feedback
+        feedbacks = await self.config.member(member).feedback()
+        avg_rating = None
+        if feedbacks:
+            avg_rating = sum(f["rating"] for f in feedbacks) / len(feedbacks)
+
+        embed = discord.Embed(
+            title=f"Staff Profile: {member.display_name}",
+            color=discord.Color.blurple(),
+            timestamp=datetime.utcnow(),
+        )
+        embed.set_thumbnail(url=getattr(member.avatar, "url", None) or getattr(member.default_avatar, "url", None))
+        embed.add_field(
+            name="Punishments Issued",
+            value=f"{punishments_count}\n" +
+                  "\n".join(
+                      f"`{p['timestamp']}`: {p['action']} -> <@{p['target_id']}>"
+                      for p in last_punishments
+                  ) if last_punishments else "No punishments found.",
+            inline=False,
+        )
+        embed.add_field(
+            name="Activity",
+            value=f"Text messages: {total_text}\nVoice time: {humanize_number(total_voice_minutes)} minutes",
+            inline=False,
+        )
+        embed.add_field(
+            name="Top Commands Used",
+            value="\n".join(f"{cmd}: {count}" for cmd, count in top_commands) if top_commands else "No commands used.",
+            inline=False,
+        )
+        if avg_rating is not None:
+            embed.add_field(
+                name="Feedback",
+                value=f"Average rating: {avg_rating:.2f}/5 ({len(feedbacks)} ratings)",
+                inline=False,
             )
-            await ctx.send(msg)
-        else:
-            # Leaderboard
-            leaderboard = []
-            for m in ctx.guild.members:
-                if not await self.is_staff(m, ctx.guild):
-                    continue
-                voice = await self.config.member(m).voice_sessions()
-                text = await self.config.member(m).interactions()
-                total_voice = sum(s["duration"] for s in voice)
-                total_text = len([i for i in text if i["type"] == "message"])
-                leaderboard.append((m, total_text, total_voice))
-            if not leaderboard:
-                await ctx.send("No staff activity found.")
-                return
-            leaderboard.sort(key=lambda x: (x[1], x[2]), reverse=True)
-            msg = "**Staff Activity Leaderboard:**\n"
-            for i, (m, t, v) in enumerate(leaderboard[:10], 1):
-                msg += f"{i}. {m.mention}: {t} messages, {humanize_number(int(v // 60))} min voice\n"
-            await ctx.send(msg)
+        await ctx.send(embed=embed)
 
-    @staffstats.command()
-    async def commands(self, ctx, member: discord.Member = None):
-        """Show command usage stats for a staff member or all staff."""
-        if member:
-            usage = await self.config.member(member).command_usage()
-            if not usage:
-                await ctx.send("No command usage found for this member.")
-                return
-            counter = {}
-            for u in usage:
-                counter[u["command"]] = counter.get(u["command"], 0) + 1
-            msg = f"**Command usage for {member.mention}:**\n"
-            for cmd, count in sorted(counter.items(), key=lambda x: x[1], reverse=True):
-                msg += f"{cmd}: {count}\n"
-            await ctx.send(msg)
-        else:
-            # Most/least used commands by staff
-            counter = {}
-            for m in ctx.guild.members:
-                if not await self.is_staff(m, ctx.guild):
-                    continue
-                usage = await self.config.member(m).command_usage()
-                for u in usage:
-                    counter[u["command"]] = counter.get(u["command"], 0) + 1
-            if not counter:
-                await ctx.send("No command usage found for any staff.")
-                return
-            most = sorted(counter.items(), key=lambda x: x[1], reverse=True)[:5]
-            least = sorted(counter.items(), key=lambda x: x[1])[:5]
-            msg = "**Most used staff commands:**\n"
-            for cmd, count in most:
-                msg += f"{cmd}: {count}\n"
-            msg += "\n**Least used staff commands:**\n"
-            for cmd, count in least:
-                msg += f"{cmd}: {count}\n"
-            await ctx.send(msg)
-
-    @staffstats.command()
-    async def export(self, ctx, member: discord.Member = None, format: str = "csv"):
+    @staff_stats.command(name="export")
+    async def staff_stats_export(self, ctx, member: discord.Member = None, format: str = "csv"):
         """Export staff logs to CSV or JSON."""
         if member:
             data = {
@@ -506,15 +468,15 @@ class StaffMonitor(commands.Cog):
             file = discord.File(io.BytesIO(json.dumps(data, indent=2).encode()), filename=filename)
         await ctx.send("Here are the logs:", file=file)
 
-    # --- Config Commands ---
+    # --- Subgroup: staff set (configuration) ---
 
-    @commands.group()
+    @staff.group(name="set")
     @checks.admin_or_permissions(administrator=True)
-    async def staffmonitorset(self, ctx):
+    async def staff_set(self, ctx):
         """StaffMonitor configuration."""
 
-    @staffmonitorset.command()
-    async def modlog(self, ctx, channel: discord.TextChannel = None):
+    @staff_set.command(name="modlog")
+    async def staff_set_modlog(self, ctx, channel: discord.TextChannel = None):
         """Set the modlog channel for staff actions."""
         if channel is None:
             await self.config.guild(ctx.guild).modlog_channel.set(None)
@@ -523,35 +485,35 @@ class StaffMonitor(commands.Cog):
             await self.config.guild(ctx.guild).modlog_channel.set(channel.id)
             await ctx.send(f"Modlog channel set to {channel.mention}.")
 
-    @staffmonitorset.command()
-    async def modchannels(self, ctx, *channels: discord.TextChannel):
+    @staff_set.command(name="modchannels")
+    async def staff_set_modchannels(self, ctx, *channels: discord.TextChannel):
         """Set channels considered as mod channels."""
         ids = [c.id for c in channels]
         await self.config.guild(ctx.guild).mod_channels.set(ids)
         await ctx.send(f"Mod channels set: {', '.join(c.mention for c in channels)}")
 
-    @staffmonitorset.command()
-    async def staffroles(self, ctx, *roles: discord.Role):
+    @staff_set.command(name="staffroles")
+    async def staff_set_staffroles(self, ctx, *roles: discord.Role):
         """Set staff roles for monitoring."""
         ids = [r.id for r in roles]
         await self.config.guild(ctx.guild).staff_roles.set(ids)
         await ctx.send(f"Staff roles set: {', '.join(r.mention for r in roles)}")
 
-    @staffmonitorset.command()
-    async def privacyroles(self, ctx, *roles: discord.Role):
+    @staff_set.command(name="privacyroles")
+    async def staff_set_privacyroles(self, ctx, *roles: discord.Role):
         """Set roles that can view logs/reports."""
         ids = [r.id for r in roles]
         await self.config.guild(ctx.guild).privacy_roles.set(ids)
         await ctx.send(f"Privacy roles set: {', '.join(r.mention for r in roles)}")
 
-    @staffmonitorset.command()
-    async def dmlogging(self, ctx, enabled: bool):
+    @staff_set.command(name="dmlogging")
+    async def staff_set_dmlogging(self, ctx, enabled: bool):
         """Enable/disable DM logging for staff."""
         await self.config.guild(ctx.guild).dm_logging.set(enabled)
         await ctx.send(f"DM logging {'enabled' if enabled else 'disabled'}.")
 
-    @staffmonitorset.command()
-    async def alertchannel(self, ctx, channel: discord.TextChannel = None):
+    @staff_set.command(name="alertchannel")
+    async def staff_set_alertchannel(self, ctx, channel: discord.TextChannel = None):
         """Set the alert channel for suspicious staff activity."""
         if channel is None:
             await self.config.guild(ctx.guild).alerts.alert_channel.set(None)
@@ -560,8 +522,8 @@ class StaffMonitor(commands.Cog):
             await self.config.guild(ctx.guild).alerts.alert_channel.set(channel.id)
             await ctx.send(f"Alert channel set to {channel.mention}.")
 
-    @staffmonitorset.command()
-    async def alertthresholds(self, ctx, mass_ban: int = 3, excessive_punish: int = 5):
+    @staff_set.command(name="alertthresholds")
+    async def staff_set_alertthresholds(self, ctx, mass_ban: int = 3, excessive_punish: int = 5):
         """Set thresholds for mass ban/kick and excessive punishments."""
         await self.config.guild(ctx.guild).alerts.mass_ban_threshold.set(mass_ban)
         await self.config.guild(ctx.guild).alerts.excessive_punish_threshold.set(excessive_punish)
@@ -599,8 +561,8 @@ class StaffMonitor(commands.Cog):
 
     # --- Help/Info ---
 
-    @commands.command()
-    async def staffmonitorinfo(self, ctx):
+    @staff.command(name="info")
+    async def staff_info(self, ctx):
         """Show info about StaffMonitor cog."""
         embed = discord.Embed(
             title="StaffMonitor",
