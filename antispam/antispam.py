@@ -496,7 +496,7 @@ class AntiSpam(commands.Cog):
                 )
                 embed.add_field(name="User", value=f"{user.mention} (`{user.id}`)", inline=False)
                 embed.add_field(
-                    name="Reason",
+                    name="Signature",
                     value=f"**{reason}**\n[p]-# `antispam signatures` for details.",
                     inline=False
                 )
