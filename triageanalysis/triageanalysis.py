@@ -38,7 +38,7 @@ class TriageAnalysis(commands.Cog):
             "autoscan_enabled": True,
             "autoscan_score_threshold": 7,
             "autoscan_punishment": "ban",  # none, kick, ban, timeout
-            "autoscan_timeout_seconds": 600,
+            "autoscan_timeout_seconds": 1200,
             "autoscan_log_channel": None,  # Channel ID for logging autoscan events
         }
         self.config.register_guild(**default_guild)
@@ -522,7 +522,7 @@ class TriageAnalysis(commands.Cog):
             await ctx.send(embed=embed)
 
             # Send typing while polling for analysis completion
-            max_wait = 600  # seconds
+            max_wait = 1200  # seconds
             poll_interval = 10  # seconds
             waited = 0
             status = None
