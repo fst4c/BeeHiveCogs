@@ -35,6 +35,7 @@ class AntiSpam(commands.Cog):
         "Invisible.Obfuscation.H!msg": "Obfuscated/invisible characters: Message contains invisible or control unicode characters.",
         "Unicode.Homoglyph.I!msg": "Unicode homoglyph abuse: Message uses visually confusable unicode characters.",
         "Coordinated.Raid.J!msg": "Coordinated spam/raid: Multiple new users spamming in a channel.",
+        "Markdown.Header.K!msg": "Markdown header spam: Excessive or overly long H1/H2/H3 markdown headers in a message.",
     }
 
     # Unicode invisible/obfuscation characters
@@ -75,6 +76,16 @@ class AntiSpam(commands.Cog):
         # ... (expand as needed)
     }
 
+    # Default Markdown header spam thresholds
+    HEADER_SPAM_LIMITS = {
+        "h1_max_lines": 2,      # Max allowed H1 lines per message
+        "h1_max_length": 80,    # Max allowed length of a single H1 line
+        "h2_max_lines": 3,      # Max allowed H2 lines per message
+        "h2_max_length": 80,    # Max allowed length of a single H2 line
+        "h3_max_lines": 5,      # Max allowed H3 lines per message
+        "h3_max_length": 100,   # Max allowed length of a single H3 line
+    }
+
     def __init__(self, bot):
         self.bot = bot
         self.config = Config.get_conf(self, identifier=73947298374)
@@ -100,6 +111,13 @@ class AntiSpam(commands.Cog):
             "raid_min_msgs": 7,
             "raid_min_unique_users": 8,
             "raid_min_new_users": 5,
+            # Markdown header spam (customizable)
+            "h1_max_lines": self.HEADER_SPAM_LIMITS["h1_max_lines"],
+            "h1_max_length": self.HEADER_SPAM_LIMITS["h1_max_length"],
+            "h2_max_lines": self.HEADER_SPAM_LIMITS["h2_max_lines"],
+            "h2_max_length": self.HEADER_SPAM_LIMITS["h2_max_length"],
+            "h3_max_lines": self.HEADER_SPAM_LIMITS["h3_max_lines"],
+            "h3_max_length": self.HEADER_SPAM_LIMITS["h3_max_length"],
         }
         self.config.register_guild(**default_guild)
         self.user_message_cache = defaultdict(lambda: deque(maxlen=15))
@@ -321,6 +339,71 @@ class AntiSpam(commands.Cog):
         await self.config.guild(ctx.guild).raid_min_new_users.set(count)
         await ctx.send(f"Raid detection minimum new users set to {count}.")
 
+    @antispam.group(name="headerspam", invoke_without_command=True)
+    async def headerspam(self, ctx):
+        """Configure markdown header spam thresholds."""
+        await ctx.send_help()
+
+    @headerspam.command(name="h1lines")
+    async def headerspam_h1lines(self, ctx, max_lines: int):
+        """Set the maximum number of H1 (# ) headers allowed per message."""
+        if max_lines < 0 or max_lines > 20:
+            await ctx.send("H1 max lines must be between 0 and 20.")
+            return
+        await self.config.guild(ctx.guild).h1_max_lines.set(max_lines)
+        example = "\n".join([f"# Example H1 header {i+1}" for i in range(max_lines)]) if max_lines > 0 else "*No H1 headers allowed*"
+        await ctx.send(f"Set H1 max lines to {max_lines}.\nExample:\n{example}")
+
+    @headerspam.command(name="h1length")
+    async def headerspam_h1length(self, ctx, max_length: int):
+        """Set the maximum length of a single H1 (# ) header line."""
+        if max_length < 10 or max_length > 500:
+            await ctx.send("H1 max length must be between 10 and 500.")
+            return
+        await self.config.guild(ctx.guild).h1_max_length.set(max_length)
+        example = "# " + "A" * (max_length - 2)
+        await ctx.send(f"Set H1 max length to {max_length}.\nExample:\n{example}")
+
+    @headerspam.command(name="h2lines")
+    async def headerspam_h2lines(self, ctx, max_lines: int):
+        """Set the maximum number of H2 (## ) headers allowed per message."""
+        if max_lines < 0 or max_lines > 20:
+            await ctx.send("H2 max lines must be between 0 and 20.")
+            return
+        await self.config.guild(ctx.guild).h2_max_lines.set(max_lines)
+        example = "\n".join([f"## Example H2 header {i+1}" for i in range(max_lines)]) if max_lines > 0 else "*No H2 headers allowed*"
+        await ctx.send(f"Set H2 max lines to {max_lines}.\nExample:\n{example}")
+
+    @headerspam.command(name="h2length")
+    async def headerspam_h2length(self, ctx, max_length: int):
+        """Set the maximum length of a single H2 (## ) header line."""
+        if max_length < 10 or max_length > 500:
+            await ctx.send("H2 max length must be between 10 and 500.")
+            return
+        await self.config.guild(ctx.guild).h2_max_length.set(max_length)
+        example = "## " + "B" * (max_length - 3)
+        await ctx.send(f"Set H2 max length to {max_length}.\nExample:\n{example}")
+
+    @headerspam.command(name="h3lines")
+    async def headerspam_h3lines(self, ctx, max_lines: int):
+        """Set the maximum number of H3 (### ) headers allowed per message."""
+        if max_lines < 0 or max_lines > 20:
+            await ctx.send("H3 max lines must be between 0 and 20.")
+            return
+        await self.config.guild(ctx.guild).h3_max_lines.set(max_lines)
+        example = "\n".join([f"### Example H3 header {i+1}" for i in range(max_lines)]) if max_lines > 0 else "*No H3 headers allowed*"
+        await ctx.send(f"Set H3 max lines to {max_lines}.\nExample:\n{example}")
+
+    @headerspam.command(name="h3length")
+    async def headerspam_h3length(self, ctx, max_length: int):
+        """Set the maximum length of a single H3 (### ) header line."""
+        if max_length < 10 or max_length > 500:
+            await ctx.send("H3 max length must be between 10 and 500.")
+            return
+        await self.config.guild(ctx.guild).h3_max_length.set(max_length)
+        example = "### " + "C" * (max_length - 4)
+        await ctx.send(f"Set H3 max length to {max_length}.\nExample:\n{example}")
+
     @commands.Cog.listener()
     async def on_message_without_command(self, message: discord.Message):
         if not message.guild or message.author.bot:
@@ -441,6 +524,34 @@ class AntiSpam(commands.Cog):
                 await self._punish(message, reason, evidence=evidence)
                 return
 
+        # Heuristic 2c: Markdown Header Spam (H1/H2/H3)
+        try:
+            h1_max_lines = await conf.h1_max_lines()
+            h1_max_length = await conf.h1_max_length()
+            h2_max_lines = await conf.h2_max_lines()
+            h2_max_length = await conf.h2_max_length()
+            h3_max_lines = await conf.h3_max_lines()
+            h3_max_length = await conf.h3_max_length()
+        except Exception:
+            h1_max_lines = self.HEADER_SPAM_LIMITS["h1_max_lines"]
+            h1_max_length = self.HEADER_SPAM_LIMITS["h1_max_length"]
+            h2_max_lines = self.HEADER_SPAM_LIMITS["h2_max_lines"]
+            h2_max_length = self.HEADER_SPAM_LIMITS["h2_max_length"]
+            h3_max_lines = self.HEADER_SPAM_LIMITS["h3_max_lines"]
+            h3_max_length = self.HEADER_SPAM_LIMITS["h3_max_length"]
+
+        header_spam_result = self._check_markdown_header_spam(
+            message.content,
+            h1_max_lines, h1_max_length,
+            h2_max_lines, h2_max_length,
+            h3_max_lines, h3_max_length
+        )
+        if header_spam_result is not None:
+            reason = "Markdown.Header.K!msg"
+            evidence = header_spam_result
+            await self._punish(message, reason, evidence=evidence)
+            return
+
         # Heuristic 3: ASCII Art / Large Block Messages
         try:
             ascii_art_threshold = await conf.ascii_art_threshold()
@@ -530,6 +641,66 @@ class AntiSpam(commands.Cog):
                 reason = "Coordinated.Raid.J!msg"
                 await self._punish(message, reason, evidence=raid_evidence)
                 return
+
+    def _check_markdown_header_spam(
+        self,
+        content: str,
+        h1_max_lines: int, h1_max_length: int,
+        h2_max_lines: int, h2_max_length: int,
+        h3_max_lines: int, h3_max_length: int
+    ):
+        """
+        Returns evidence string if header spam detected, else None.
+        """
+        h1_lines = []
+        h2_lines = []
+        h3_lines = []
+        lines = content.splitlines()
+        for line in lines:
+            # Remove leading/trailing whitespace for accurate matching
+            lstripped = line.lstrip()
+            if lstripped.startswith("# "):
+                h1_lines.append(lstripped)
+            elif lstripped.startswith("## "):
+                h2_lines.append(lstripped)
+            elif lstripped.startswith("### "):
+                h3_lines.append(lstripped)
+        # Check for too many headers
+        if len(h1_lines) > h1_max_lines:
+            return (
+                f"Too many H1 headers (max {h1_max_lines} allowed, found {len(h1_lines)}).\n"
+                f"Headers: " + "\n".join(h1_lines[:5])[:400]
+            )
+        if len(h2_lines) > h2_max_lines:
+            return (
+                f"Too many H2 headers (max {h2_max_lines} allowed, found {len(h2_lines)}).\n"
+                f"Headers: " + "\n".join(h2_lines[:7])[:400]
+            )
+        if len(h3_lines) > h3_max_lines:
+            return (
+                f"Too many H3 headers (max {h3_max_lines} allowed, found {len(h3_lines)}).\n"
+                f"Headers: " + "\n".join(h3_lines[:10])[:400]
+            )
+        # Check for overly long headers
+        for h1 in h1_lines:
+            if len(h1) > h1_max_length:
+                return (
+                    f"H1 header too long (max {h1_max_length} chars):\n"
+                    f"{h1[:400]}"
+                )
+        for h2 in h2_lines:
+            if len(h2) > h2_max_length:
+                return (
+                    f"H2 header too long (max {h2_max_length} chars):\n"
+                    f"{h2[:400]}"
+                )
+        for h3 in h3_lines:
+            if len(h3) > h3_max_length:
+                return (
+                    f"H3 header too long (max {h3_max_length} chars):\n"
+                    f"{h3[:400]}"
+                )
+        return None
 
     def _normalize_text(self, text):
         # Remove invisible chars, normalize case, strip punctuation, NFKC normalize, replace homoglyphs
@@ -791,6 +962,12 @@ class AntiSpam(commands.Cog):
             raid_min_msgs = await conf.raid_min_msgs()
             raid_min_unique_users = await conf.raid_min_unique_users()
             raid_min_new_users = await conf.raid_min_new_users()
+            h1_max_lines = await conf.h1_max_lines()
+            h1_max_length = await conf.h1_max_length()
+            h2_max_lines = await conf.h2_max_lines()
+            h2_max_length = await conf.h2_max_length()
+            h3_max_lines = await conf.h3_max_lines()
+            h3_max_length = await conf.h3_max_length()
         except Exception:
             await ctx.send("Failed to fetch AntiSpam settings.")
             return
@@ -816,6 +993,15 @@ class AntiSpam(commands.Cog):
                 f"Min msgs: {raid_min_msgs}, "
                 f"Min unique users: {raid_min_unique_users}, "
                 f"Min new users: {raid_min_new_users}"
+            ),
+            inline=False
+        )
+        embed.add_field(
+            name="Markdown header spam",
+            value=(
+                f"H1: max {h1_max_lines} lines, {h1_max_length} chars/line\n"
+                f"H2: max {h2_max_lines} lines, {h2_max_length} chars/line\n"
+                f"H3: max {h3_max_lines} lines, {h3_max_length} chars/line"
             ),
             inline=False
         )
