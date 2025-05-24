@@ -10,7 +10,7 @@ import csv
 import io
 import json
 
-log = getLogger("red.BeeHive.staffmonitor")
+log = getLogger("red.beehive.staffmonitor")
 
 DEFAULT_GUILD = {
     "modlog_channel": None,
@@ -46,7 +46,7 @@ class StaffMonitor(commands.Cog):
     """
 
     __version__ = "1.0.0"
-    __author__ = "aikaterna, max, etc."
+    __author__ = "adminelevation"
 
     def __init__(self, bot: Red):
         self.bot = bot
