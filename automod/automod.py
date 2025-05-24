@@ -645,13 +645,13 @@ class AutoMod(commands.Cog):
             try:
                 # Prepare the action_taken string
                 if message_deleted and timeout_issued:
-                    action_taken = "Message deleted\nTimeout issued"
+                    action_taken = "🗑️ Message deleted\n🔇 Timeout issued"
                 elif message_deleted:
-                    action_taken = "Message deleted"
+                    action_taken = "🗑️ Message deleted"
                 elif timeout_issued:
-                    action_taken = "User timed out"
+                    action_taken = "🔇 Timeout issued"
                 else:
-                    action_taken = "No action taken"
+                    action_taken = ":x: Violation ignored"
 
                 # Prepare the payload
                 payload = {
