@@ -985,7 +985,7 @@ class AntiSpam(commands.Cog):
         embed.add_field(name="Emoji Spam threshold", value=f"{emoji_spam_threshold} total, {emoji_spam_unique_threshold} unique", inline=False)
         embed.add_field(name="Similarity threshold", value=f"{similarity_threshold:.2f}", inline=False)
         embed.add_field(
-            name="Raid detection",
+            name="Raid responder",
             value=(
                 f"Enabled: {raid_enabled}\n"
                 f"Window: {raid_window}s, "
