@@ -94,6 +94,7 @@ class AntiSpam(commands.Cog):
             "ignored_users": [],
             "log_channel": None,
             # Raid detection thresholds (new)
+            "raid_enabled": True,  # <--- NEW: raid detection toggle
             "raid_window": 60,  # seconds
             "raid_join_age": 1200,  # seconds (10 minutes)
             "raid_min_msgs": 7,
@@ -262,6 +263,18 @@ class AntiSpam(commands.Cog):
     async def raid(self, ctx):
         """Configure coordinated raid/spam detection thresholds."""
         await ctx.send_help()
+
+    @raid.command(name="enable")
+    async def raid_enable(self, ctx):
+        """Enable coordinated raid/spam detection."""
+        await self.config.guild(ctx.guild).raid_enabled.set(True)
+        await ctx.send("Raid detection enabled.")
+
+    @raid.command(name="disable")
+    async def raid_disable(self, ctx):
+        """Disable coordinated raid/spam detection."""
+        await self.config.guild(ctx.guild).raid_enabled.set(False)
+        await ctx.send("Raid detection disabled.")
 
     @raid.command(name="window")
     async def raid_window(self, ctx, seconds: int):
@@ -506,12 +519,17 @@ class AntiSpam(commands.Cog):
             await self._punish(message, reason, evidence=evidence)
             return
 
-        # Heuristic 9: Coordinated Spam/Raid Detection
-        raid_triggered, raid_evidence = await self._detect_coordinated_raid(message)
-        if raid_triggered:
-            reason = "Coordinated.Raid.J!msg"
-            await self._punish(message, reason, evidence=raid_evidence)
-            return
+        # Heuristic 9: Coordinated Spam/Raid Detection (toggleable)
+        try:
+            raid_enabled = await conf.raid_enabled()
+        except Exception:
+            raid_enabled = True
+        if raid_enabled:
+            raid_triggered, raid_evidence = await self._detect_coordinated_raid(message)
+            if raid_triggered:
+                reason = "Coordinated.Raid.J!msg"
+                await self._punish(message, reason, evidence=raid_evidence)
+                return
 
     def _normalize_text(self, text):
         # Remove invisible chars, normalize case, strip punctuation, NFKC normalize, replace homoglyphs
@@ -767,6 +785,7 @@ class AntiSpam(commands.Cog):
             emoji_spam_threshold = await conf.emoji_spam_threshold()
             emoji_spam_unique_threshold = await conf.emoji_spam_unique_threshold()
             similarity_threshold = await conf.similarity_threshold()
+            raid_enabled = await conf.raid_enabled()
             raid_window = await conf.raid_window()
             raid_join_age = await conf.raid_join_age()
             raid_min_msgs = await conf.raid_min_msgs()
@@ -791,6 +810,7 @@ class AntiSpam(commands.Cog):
         embed.add_field(
             name="Raid detection",
             value=(
+                f"Enabled: {raid_enabled}\n"
                 f"Window: {raid_window}s, "
                 f"Join age: {raid_join_age}s, "
                 f"Min msgs: {raid_min_msgs}, "
