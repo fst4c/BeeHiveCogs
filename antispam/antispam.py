@@ -57,7 +57,7 @@ class AntiSpam(commands.Cog):
         "\ufeff",  # zero-width no-break space
     ]
 
-    # Unicode confusables/homoglyphs (partial, for demonstration)
+    # Unicode confusables/homoglyphs
     HOMOGLYPH_MAP = {
         "а": "a",  # Cyrillic a
         "е": "e",  # Cyrillic e
@@ -82,7 +82,7 @@ class AntiSpam(commands.Cog):
             "enabled": True,
             "message_limit": 6,
             "interval": 7,
-            "similarity_threshold": 0.85,
+            "similarity_threshold": 0.80,
             "ascii_art_threshold": 12,
             "ascii_art_min_lines": 6,
             "emoji_spam_threshold": 15,
@@ -94,11 +94,11 @@ class AntiSpam(commands.Cog):
             "ignored_users": [],
             "log_channel": None,
             # Raid detection thresholds (new)
-            "raid_window": 30,  # seconds
-            "raid_join_age": 600,  # seconds (10 minutes)
-            "raid_min_msgs": 6,
-            "raid_min_unique_users": 4,
-            "raid_min_new_users": 3,
+            "raid_window": 60,  # seconds
+            "raid_join_age": 1200,  # seconds (10 minutes)
+            "raid_min_msgs": 7,
+            "raid_min_unique_users": 8,
+            "raid_min_new_users": 5,
         }
         self.config.register_guild(**default_guild)
         self.user_message_cache = defaultdict(lambda: deque(maxlen=15))
