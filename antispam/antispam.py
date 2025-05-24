@@ -1,15 +1,23 @@
-import discord # type: ignore # type: ignore
-from redbot.core import commands, Config, checks # type: ignore
+import discord  # type: ignore
+from redbot.core import commands, Config, checks  # type: ignore
 import asyncio
 import re
 import time
-from collections import defaultdict, deque
+import unicodedata
+import string
+from collections import defaultdict, deque, Counter
 from difflib import SequenceMatcher
+
+try:
+    from rapidfuzz import fuzz
+    RAPIDFUZZ_AVAILABLE = True
+except ImportError:
+    RAPIDFUZZ_AVAILABLE = False
 
 class AntiSpam(commands.Cog):
     """
     Heuristic-based anti-spam cog for Red-DiscordBot.
-    Detects and mitigates message spam, flooding, copypasta, ascii art, emoji spam, and more.
+    Detects and mitigates message spam, flooding, copypasta, ascii art, emoji spam, unicode/invisible abuse, and more.
     """
 
     __author__ = "adminelevation"
@@ -17,13 +25,54 @@ class AntiSpam(commands.Cog):
 
     # Virus signature-like detection codes and their descriptions
     DETECTION_SIGNATURES = {
-        "Spam:MsgFlood.A!msg": "Message flooding: Too many messages sent in a short time.",
-        "Spam:Repeat.Copypasta.B!msg": "Copypasta/repeat: Multiple highly similar messages sent in a short time.",
-        "Spam:Repeat.Timespan.C!msg": "Repeated similar messages: Multiple highly similar messages sent over a longer period.",
-        "Spam:Block.AsciiArt.D!msg": "ASCII art/large block: Message contains large ASCII art or block text.",
-        "Spam:Emoji.Spam.E!msg": "Emoji spam: Excessive emoji usage in a single message.",
-        "Spam:Unicode.Zalgo.F!msg": "Zalgo/unicode spam: Excessive use of combining unicode marks (Zalgo text).",
-        "Spam:Mention.Mass.G!msg": "Mass mention: Excessive user mentions or use of @everyone/@here.",
+        "MsgFlood.A!msg": "Message flooding: Too many messages sent in a short time.",
+        "Repeat.Copypasta.B!msg": "Copypasta/repeat: Multiple highly similar messages sent in a short time.",
+        "Repeat.Timespan.C!msg": "Repeated similar messages: Multiple highly similar messages sent over a longer period.",
+        "Block.AsciiArt.D!msg": "ASCII art/large block: Message contains large ASCII art or block text.",
+        "Emoji.Spam.E!msg": "Emoji spam: Excessive emoji usage in a single message.",
+        "Unicode.Zalgo.F!msg": "Zalgo/unicode spam: Excessive use of combining unicode marks (Zalgo text).",
+        "Mention.Mass.G!msg": "Mass mention: Excessive user mentions or use of @everyone/@here.",
+        "Invisible.Obfuscation.H!msg": "Obfuscated/invisible characters: Message contains invisible or control unicode characters.",
+        "Unicode.Homoglyph.I!msg": "Unicode homoglyph abuse: Message uses visually confusable unicode characters.",
+        "Coordinated.Raid.J!msg": "Coordinated spam/raid: Multiple new users spamming in a channel.",
+    }
+
+    # Unicode invisible/obfuscation characters
+    INVISIBLE_CHARS = [
+        "\u200b",  # zero-width space
+        "\u200c",  # zero-width non-joiner
+        "\u200d",  # zero-width joiner
+        "\u200e",  # left-to-right mark
+        "\u200f",  # right-to-left mark
+        "\u202a",  # left-to-right embedding
+        "\u202b",  # right-to-left embedding
+        "\u202c",  # pop directional formatting
+        "\u202d",  # left-to-right override
+        "\u202e",  # right-to-left override
+        "\u2060",  # word joiner
+        "\u2061",  # function application
+        "\u2062",  # invisible times
+        "\u2063",  # invisible separator
+        "\u2064",  # invisible plus
+        "\ufeff",  # zero-width no-break space
+    ]
+
+    # Unicode confusables/homoglyphs (partial, for demonstration)
+    HOMOGLYPH_MAP = {
+        "а": "a",  # Cyrillic a
+        "е": "e",  # Cyrillic e
+        "о": "o",  # Cyrillic o
+        "р": "p",  # Cyrillic p
+        "с": "c",  # Cyrillic c
+        "у": "y",  # Cyrillic y
+        "х": "x",  # Cyrillic x
+        "і": "i",  # Cyrillic i
+        "Ι": "I",  # Greek capital iota
+        "Ο": "O",  # Greek capital omicron
+        "Α": "A",  # Greek capital alpha
+        "Β": "B",  # Greek capital beta
+        "ϲ": "c",  # Greek small letter lunate sigma
+        # ... (expand as needed)
     }
 
     def __init__(self, bot):
@@ -44,10 +93,21 @@ class AntiSpam(commands.Cog):
             "ignored_roles": [],
             "ignored_users": [],
             "log_channel": None,
+            # Raid detection thresholds (new)
+            "raid_window": 30,  # seconds
+            "raid_join_age": 600,  # seconds (10 minutes)
+            "raid_min_msgs": 6,
+            "raid_min_unique_users": 4,
+            "raid_min_new_users": 3,
         }
         self.config.register_guild(**default_guild)
         self.user_message_cache = defaultdict(lambda: deque(maxlen=15))
         self.user_last_action = {}
+
+        # For coordinated/raid detection
+        self.channel_user_message_times = defaultdict(lambda: deque(maxlen=100))
+        self.channel_new_user_joins = defaultdict(lambda: deque(maxlen=100))
+        self.user_first_seen = {}
 
     async def red_delete_data_for_user(self, *, requester, user_id: int):
         pass
@@ -198,6 +258,56 @@ class AntiSpam(commands.Cog):
             embed.add_field(name=code, value=desc, inline=False)
         await ctx.send(embed=embed)
 
+    @antispam.group(name="raid", invoke_without_command=True)
+    async def raid(self, ctx):
+        """Configure coordinated raid/spam detection thresholds."""
+        await ctx.send_help()
+
+    @raid.command(name="window")
+    async def raid_window(self, ctx, seconds: int):
+        """Set the time window (in seconds) for raid detection (default: 30)."""
+        if seconds < 5 or seconds > 600:
+            await ctx.send("Window must be between 5 and 600 seconds.")
+            return
+        await self.config.guild(ctx.guild).raid_window.set(seconds)
+        await ctx.send(f"Raid detection window set to {seconds} seconds.")
+
+    @raid.command(name="joinage")
+    async def raid_joinage(self, ctx, seconds: int):
+        """Set the max account age (in seconds) to consider a user 'new' for raid detection (default: 600)."""
+        if seconds < 60 or seconds > 86400:
+            await ctx.send("Join age must be between 60 and 86400 seconds (1 minute to 1 day).")
+            return
+        await self.config.guild(ctx.guild).raid_join_age.set(seconds)
+        await ctx.send(f"Raid detection 'new user' join age set to {seconds} seconds.")
+
+    @raid.command(name="minmsgs")
+    async def raid_minmsgs(self, ctx, count: int):
+        """Set the minimum number of messages in the window to trigger raid detection (default: 6)."""
+        if count < 2 or count > 100:
+            await ctx.send("Minimum messages must be between 2 and 100.")
+            return
+        await self.config.guild(ctx.guild).raid_min_msgs.set(count)
+        await ctx.send(f"Raid detection minimum messages set to {count}.")
+
+    @raid.command(name="minunique")
+    async def raid_minunique(self, ctx, count: int):
+        """Set the minimum number of unique users in the window to trigger raid detection (default: 4)."""
+        if count < 2 or count > 100:
+            await ctx.send("Minimum unique users must be between 2 and 100.")
+            return
+        await self.config.guild(ctx.guild).raid_min_unique_users.set(count)
+        await ctx.send(f"Raid detection minimum unique users set to {count}.")
+
+    @raid.command(name="minnew")
+    async def raid_minnew(self, ctx, count: int):
+        """Set the minimum number of new users in the window to trigger raid detection (default: 3)."""
+        if count < 1 or count > 100:
+            await ctx.send("Minimum new users must be between 1 and 100.")
+            return
+        await self.config.guild(ctx.guild).raid_min_new_users.set(count)
+        await ctx.send(f"Raid detection minimum new users set to {count}.")
+
     @commands.Cog.listener()
     async def on_message_without_command(self, message: discord.Message):
         if not message.guild or message.author.bot:
@@ -240,6 +350,15 @@ class AntiSpam(commands.Cog):
         cache = self.user_message_cache[message.author.id]
         cache.append((now, message.content))
 
+        # Track first seen for coordinated/raid detection
+        if message.author.id not in self.user_first_seen:
+            self.user_first_seen[message.author.id] = now
+            # Track join for this channel
+            self.channel_new_user_joins[message.channel.id].append((now, message.author.id))
+
+        # Track per-channel user message times for coordinated/raid detection
+        self.channel_user_message_times[message.channel.id].append((now, message.author.id))
+
         # Heuristic 1: Message Frequency (Flooding)
         try:
             message_limit = await conf.message_limit()
@@ -248,7 +367,7 @@ class AntiSpam(commands.Cog):
             return
         recent_msgs = [t for t, _ in cache if now - t < interval]
         if len(recent_msgs) >= message_limit:
-            reason = "Spam:MsgFlood.A!msg"
+            reason = "MsgFlood.A!msg"
             evidence = "\n".join(
                 f"<t:{int(ts)}:f>: {content[:200]}"
                 for ts, content in list(cache)[-len(recent_msgs):]
@@ -297,7 +416,7 @@ class AntiSpam(commands.Cog):
                     similar_count_5min += 1
                     similar_msgs_5min.append((ts, prev_content))
             if similar_count_5min >= 2:
-                reason = "Spam:Repeat.Timespan.C!msg"
+                reason = "Repeat.Timespan.C!msg"
                 evidence = (
                     f"Latest message:\n{last_content[:400]}\n\n"
                     f"Previous similar messages in last 5 minutes:\n" +
@@ -317,7 +436,7 @@ class AntiSpam(commands.Cog):
             ascii_art_threshold = 12
             ascii_art_min_lines = 6
         if self._is_ascii_art(message.content, ascii_art_threshold, ascii_art_min_lines):
-            reason = "Spam:Block.AsciiArt.D!msg"
+            reason = "Block.AsciiArt.D!msg"
             evidence = f"Message content (first 600 chars):\n`{message.content[:600]}`"
             await self._punish(message, reason, evidence=evidence)
             return
@@ -331,7 +450,7 @@ class AntiSpam(commands.Cog):
             emoji_spam_unique_threshold = 10
         emoji_count, unique_emoji_count, emoji_list = self._count_emojis(message.content)
         if emoji_count >= emoji_spam_threshold or unique_emoji_count >= emoji_spam_unique_threshold:
-            reason = "Spam:Emoji.Spam.E!msg"
+            reason = "Emoji.Spam.E!msg"
             evidence = (
                 f"Total emojis: {emoji_count}\n"
                 f"Unique emojis: {unique_emoji_count}\n"
@@ -344,7 +463,7 @@ class AntiSpam(commands.Cog):
         # Heuristic 5: Zalgo/Unicode Spam
         if self._is_zalgo(message.content):
             zalgo_chars = re.findall(r'[\u0300-\u036F\u0489]', message.content)
-            reason = "Spam:Unicode.Zalgo.F!msg"
+            reason = "Unicode.Zalgo.F!msg"
             evidence = (
                 f"Message content (first 400 chars):\n{message.content[:400]}\n\n"
                 f"Number of zalgo/unicode marks: {len(zalgo_chars)}"
@@ -355,7 +474,7 @@ class AntiSpam(commands.Cog):
         # Heuristic 6: Mass Mentions
         if self._is_mass_mention(message):
             mention_list = [f"<@{m.id}>" for m in message.mentions]
-            reason = "Spam:Mention.Mass.G!msg"
+            reason = "Mention.Mass.G!msg"
             evidence = (
                 f"Mentions: {', '.join(mention_list) if mention_list else 'None'}\n"
                 f"@everyone: {'@everyone' in message.content}\n"
@@ -365,14 +484,66 @@ class AntiSpam(commands.Cog):
             await self._punish(message, reason, evidence=evidence)
             return
 
+        # Heuristic 7: Obfuscated/Invisible Characters
+        invisible_found = self._find_invisible_chars(message.content)
+        if invisible_found:
+            reason = "Invisible.Obfuscation.H!msg"
+            evidence = (
+                f"Message contains invisible/obfuscated characters:\n"
+                f"{', '.join(invisible_found)}\n"
+                f"Message content (first 400 chars):\n{message.content[:400]}"
+            )
+            await self._punish(message, reason, evidence=evidence)
+            return
+
+        # Heuristic 8: Unicode Homoglyph/Language Abuse
+        if self._has_homoglyph_abuse(message.content):
+            reason = "Unicode.Homoglyph.I!msg"
+            evidence = (
+                f"Message contains suspicious unicode homoglyphs (confusable with ASCII):\n"
+                f"Message content (first 400 chars):\n{message.content[:400]}"
+            )
+            await self._punish(message, reason, evidence=evidence)
+            return
+
+        # Heuristic 9: Coordinated Spam/Raid Detection
+        raid_triggered, raid_evidence = await self._detect_coordinated_raid(message)
+        if raid_triggered:
+            reason = "Coordinated.Raid.J!msg"
+            await self._punish(message, reason, evidence=raid_evidence)
+            return
+
+    def _normalize_text(self, text):
+        # Remove invisible chars, normalize case, strip punctuation, NFKC normalize, replace homoglyphs
+        text = unicodedata.normalize("NFKC", text)
+        # Remove invisible chars
+        for ch in self.INVISIBLE_CHARS:
+            text = text.replace(ch, "")
+        # Replace homoglyphs with ASCII equivalents
+        text = "".join(self.HOMOGLYPH_MAP.get(c, c) for c in text)
+        # Remove punctuation
+        text = text.translate(str.maketrans("", "", string.punctuation))
+        # Lowercase
+        text = text.lower()
+        # Remove extra whitespace
+        text = " ".join(text.split())
+        return text
+
     def _similar(self, a, b, threshold):
         if not a or not b:
             return False
+        norm_a = self._normalize_text(a)
+        norm_b = self._normalize_text(b)
         try:
-            ratio = SequenceMatcher(None, a, b).ratio()
+            if RAPIDFUZZ_AVAILABLE:
+                # Use token_sort_ratio for better fuzzy matching
+                score = fuzz.token_sort_ratio(norm_a, norm_b) / 100.0
+            else:
+                # Fallback to SequenceMatcher
+                score = SequenceMatcher(None, norm_a, norm_b).ratio()
         except Exception:
             return False
-        return ratio > threshold
+        return score > threshold
 
     def _is_ascii_art(self, content, threshold, min_lines):
         lines = content.splitlines()
@@ -425,6 +596,74 @@ class AntiSpam(commands.Cog):
         emoji_list = custom_emojis + unicode_emojis
         unique_emoji_set = set(emoji_list)
         return len(emoji_list), len(unique_emoji_set), emoji_list
+
+    def _find_invisible_chars(self, content):
+        found = []
+        for ch in self.INVISIBLE_CHARS:
+            if ch in content:
+                name = unicodedata.name(ch, f"U+{ord(ch):04X}")
+                found.append(f"{name} (U+{ord(ch):04X})")
+        # Also check for other control chars (C0/C1)
+        for c in content:
+            if unicodedata.category(c) in ("Cf", "Cc") and c not in self.INVISIBLE_CHARS:
+                name = unicodedata.name(c, f"U+{ord(c):04X}")
+                found.append(f"{name} (U+{ord(c):04X})")
+        return found
+
+    def _has_homoglyph_abuse(self, content):
+        # If message contains a suspicious number of non-ASCII chars that are confusable with ASCII
+        count = 0
+        for c in content:
+            if c in self.HOMOGLYPH_MAP and self.HOMOGLYPH_MAP[c] != c:
+                count += 1
+        # Heuristic: 3+ confusable chars in a short message, or 5+ in any message
+        if count >= 5:
+            return True
+        if count >= 3 and len(content) < 50:
+            return True
+        return False
+
+    async def _detect_coordinated_raid(self, message):
+        # Look for many new users (joined in last X minutes) sending messages in a channel in a short time
+        now = time.time()
+        conf = self.config.guild(message.guild)
+        try:
+            window = await conf.raid_window()
+        except Exception:
+            window = 30
+        try:
+            join_age = await conf.raid_join_age()
+        except Exception:
+            join_age = 10 * 60
+        try:
+            min_msgs = await conf.raid_min_msgs()
+        except Exception:
+            min_msgs = 6
+        try:
+            min_unique_users = await conf.raid_min_unique_users()
+        except Exception:
+            min_unique_users = 4
+        try:
+            min_new_users = await conf.raid_min_new_users()
+        except Exception:
+            min_new_users = 3
+
+        channel_id = message.channel.id
+        recent_msgs = [u for t, u in self.channel_user_message_times[channel_id] if now - t < window]
+        if len(recent_msgs) < min_msgs:
+            return False, None
+        # Count how many unique users, and how many are "new"
+        user_counts = Counter(recent_msgs)
+        unique_users = set(recent_msgs)
+        new_users = [u for u in unique_users if now - self.user_first_seen.get(u, now) < join_age]
+        if len(new_users) >= min_new_users and len(unique_users) >= min_unique_users:
+            evidence = (
+                f"Possible coordinated spam/raid detected in {message.channel.mention}.\n"
+                f"Recent unique users: {len(unique_users)} (new: {len(new_users)}) in {window}s\n"
+                f"New users: {', '.join(str(u) for u in new_users)}"
+            )
+            return True, evidence
+        return False, None
 
     async def _punish(self, message, reason, evidence=None):
         guild = message.guild
@@ -528,6 +767,11 @@ class AntiSpam(commands.Cog):
             emoji_spam_threshold = await conf.emoji_spam_threshold()
             emoji_spam_unique_threshold = await conf.emoji_spam_unique_threshold()
             similarity_threshold = await conf.similarity_threshold()
+            raid_window = await conf.raid_window()
+            raid_join_age = await conf.raid_join_age()
+            raid_min_msgs = await conf.raid_min_msgs()
+            raid_min_unique_users = await conf.raid_min_unique_users()
+            raid_min_new_users = await conf.raid_min_new_users()
         except Exception:
             await ctx.send("Failed to fetch AntiSpam settings.")
             return
@@ -544,6 +788,17 @@ class AntiSpam(commands.Cog):
             embed.add_field(name="Timeout Time", value=f"{timeout_time}m")
         embed.add_field(name="Emoji Spam threshold", value=f"{emoji_spam_threshold} total, {emoji_spam_unique_threshold} unique", inline=False)
         embed.add_field(name="Similarity threshold", value=f"{similarity_threshold:.2f}", inline=False)
+        embed.add_field(
+            name="Raid detection",
+            value=(
+                f"Window: {raid_window}s, "
+                f"Join age: {raid_join_age}s, "
+                f"Min msgs: {raid_min_msgs}, "
+                f"Min unique users: {raid_min_unique_users}, "
+                f"Min new users: {raid_min_new_users}"
+            ),
+            inline=False
+        )
         if log_channel:
             embed.add_field(name="Log channel", value=log_channel.mention, inline=False)
         if ignored_channels:
