@@ -32,7 +32,7 @@ class AntiSpam(commands.Cog):
         "Emoji.Spam.E!msg": "Emoji spam: Excessive emoji usage in a single message.",
         "Unicode.Zalgo.F!msg": "Zalgo/unicode spam: Excessive use of combining unicode marks (Zalgo text).",
         "Mention.Mass.G!msg": "Mass mention: Excessive user mentions or use of @everyone/@here.",
-        "Invisible.Obfuscation.H!msg": "Obfuscated/invisible characters: Message contains invisible or control unicode characters.",
+        # "Invisible.Obfuscation.H!msg": "Obfuscated/invisible characters: Message contains invisible or control unicode characters.",  # Removed
         "Unicode.Homoglyph.I!msg": "Unicode homoglyph abuse: Message uses visually confusable unicode characters.",
         "Coordinated.Raid.J!msg": "Coordinated spam/raid: Multiple new users spamming in a channel.",
         "Markdown.Header.K!msg": "Markdown header spam: Excessive or overly long H1/H2/H3 markdown headers in a message.",
@@ -593,16 +593,7 @@ class AntiSpam(commands.Cog):
             return
 
         # Heuristic 7: Obfuscated/Invisible Characters
-        invisible_found = self._find_invisible_chars(message.content)
-        if invisible_found:
-            reason = "Invisible.Obfuscation.H!msg"
-            evidence = (
-                f"Message contains invisible/obfuscated characters:\n"
-                f"{', '.join(invisible_found)}\n"
-                f"Message content (first 400 chars):\n{message.content[:400]}"
-            )
-            await self._punish(message, reason, evidence=evidence)
-            return
+        # (Removed: No longer checks for invisible/obfuscated characters)
 
         # Heuristic 8: Unicode Homoglyph/Language Abuse
         if self._has_homoglyph_abuse(message.content):
@@ -770,22 +761,7 @@ class AntiSpam(commands.Cog):
         unique_emoji_set = set(emoji_list)
         return len(emoji_list), len(unique_emoji_set), emoji_list
 
-    def _find_invisible_chars(self, content):
-        found = []
-        # Exclude ZERO WIDTH JOINER (U+200D) from obfuscation check
-        skip_codepoints = {0x200D}
-        for ch in self.INVISIBLE_CHARS:
-            if ord(ch) in skip_codepoints:
-                continue
-            if ch in content:
-                name = unicodedata.name(ch, f"U+{ord(ch):04X}")
-                found.append(f"{name} (U+{ord(ch):04X})")
-        # Also check for other control chars (C0/C1), but skip U+200D
-        for c in content:
-            if unicodedata.category(c) in ("Cf", "Cc") and c not in self.INVISIBLE_CHARS and ord(c) not in skip_codepoints:
-                name = unicodedata.name(c, f"U+{ord(c):04X}")
-                found.append(f"{name} (U+{ord(c):04X})")
-        return found
+    # Removed _find_invisible_chars and all uses
 
     def _has_homoglyph_abuse(self, content):
         # If message contains a suspicious number of non-ASCII chars that are confusable with ASCII
