@@ -772,13 +772,17 @@ class AntiSpam(commands.Cog):
 
     def _find_invisible_chars(self, content):
         found = []
+        # Exclude ZERO WIDTH JOINER (U+200D) from obfuscation check
+        skip_codepoints = {0x200D}
         for ch in self.INVISIBLE_CHARS:
+            if ord(ch) in skip_codepoints:
+                continue
             if ch in content:
                 name = unicodedata.name(ch, f"U+{ord(ch):04X}")
                 found.append(f"{name} (U+{ord(ch):04X})")
-        # Also check for other control chars (C0/C1)
+        # Also check for other control chars (C0/C1), but skip U+200D
         for c in content:
-            if unicodedata.category(c) in ("Cf", "Cc") and c not in self.INVISIBLE_CHARS:
+            if unicodedata.category(c) in ("Cf", "Cc") and c not in self.INVISIBLE_CHARS and ord(c) not in skip_codepoints:
                 name = unicodedata.name(c, f"U+{ord(c):04X}")
                 found.append(f"{name} (U+{ord(c):04X})")
         return found
