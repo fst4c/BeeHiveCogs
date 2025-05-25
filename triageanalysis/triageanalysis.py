@@ -734,10 +734,6 @@ class TriageAnalysis(commands.Cog):
                 embed.add_field(name="Domains", value=domains_str, inline=False)
             if ips_str:
                 embed.add_field(name="IPs", value=ips_str, inline=False)
-
-            embed.set_footer(text="Full overview report available on tria.ge.")
-
-            # Add a URL button to view the report on tria.ge
             try:
                 view = ui.View()
                 view.add_item(
