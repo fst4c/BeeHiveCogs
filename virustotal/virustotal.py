@@ -298,7 +298,7 @@ class VirusTotal(commands.Cog):
                                                     from datetime import timedelta, datetime, timezone
                                                     until = datetime.now(timezone.utc) + timedelta(seconds=malware_action_timeout)
                                                     await member.edit(timeout=until, reason=reason)
-                                                    await ctx.send(f":warning: {member.mention} was **timed out** for {malware_action_timeout} seconds for sending a file flagged as malware by {malicious} vendors.")
+                                                    await ctx.send(f"{member.mention} was **timed out** for {malware_action_timeout} seconds for sending a file flagged as malware by {malicious} vendors.")
                                                     action_taken = True
                                                 else:
                                                     await ctx.send(":warning: Timeout action is not supported on this version of discord.py.")
@@ -316,7 +316,7 @@ class VirusTotal(commands.Cog):
                                                 pass
                                         # Send alert as an embed
                                         alert_embed = discord.Embed(
-                                            title="Malware detected",
+                                            title="Malware detected in file",
                                             description=f"Malware or suspicious behavor was detected in file `{file_name}`",
                                             color=0xfffffe
                                         )
