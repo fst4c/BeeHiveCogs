@@ -217,53 +217,38 @@ class AntiSpam(commands.Cog):
         if ctx.invoked_subcommand is None:
             await ctx.send_help()
 
-    @whitelist.command(name="addchannel")
+    @whitelist.command(name="channel")
     async def whitelist_channel(self, ctx, channel: discord.TextChannel):
-        """Whitelist a channel from antispam."""
-        async with self.config.guild(ctx.guild).ignored_channels() as chans:
-            if channel.id not in chans:
-                chans.append(channel.id)
-        await ctx.send(f"Whitelisted channel: {channel.mention}")
-
-    @whitelist.command(name="removechannel")
-    async def unwhitelist_channel(self, ctx, channel: discord.TextChannel):
-        """Remove a channel from the whitelist."""
+        """Toggle whitelist status for a channel."""
         async with self.config.guild(ctx.guild).ignored_channels() as chans:
             if channel.id in chans:
                 chans.remove(channel.id)
-        await ctx.send(f"Removed channel from whitelist: {channel.mention}")
+                await ctx.send(f"Removed channel from whitelist: {channel.mention}")
+            else:
+                chans.append(channel.id)
+                await ctx.send(f"Whitelisted channel: {channel.mention}")
 
-    @whitelist.command(name="addrole")
+    @whitelist.command(name="role")
     async def whitelist_role(self, ctx, role: discord.Role):
-        """Whitelist a role from antispam."""
-        async with self.config.guild(ctx.guild).ignored_roles() as roles:
-            if role.id not in roles:
-                roles.append(role.id)
-        await ctx.send(f"Whitelisted role: {role.name}")
-
-    @whitelist.command(name="removerole")
-    async def unwhitelist_role(self, ctx, role: discord.Role):
-        """Remove a role from the whitelist."""
+        """Toggle whitelist status for a role."""
         async with self.config.guild(ctx.guild).ignored_roles() as roles:
             if role.id in roles:
                 roles.remove(role.id)
-        await ctx.send(f"Removed role from whitelist: {role.name}")
+                await ctx.send(f"Removed role from whitelist: {role.name}")
+            else:
+                roles.append(role.id)
+                await ctx.send(f"Whitelisted role: {role.name}")
 
-    @whitelist.command(name="adduser")
+    @whitelist.command(name="user")
     async def whitelist_user(self, ctx, user: discord.Member):
-        """Whitelist a user from antispam."""
-        async with self.config.guild(ctx.guild).ignored_users() as users:
-            if user.id not in users:
-                users.append(user.id)
-        await ctx.send(f"Whitelisted user: {user.mention}")
-
-    @whitelist.command(name="removeuser")
-    async def unwhitelist_user(self, ctx, user: discord.Member):
-        """Remove a user from the whitelist."""
+        """Toggle whitelist status for a user."""
         async with self.config.guild(ctx.guild).ignored_users() as users:
             if user.id in users:
                 users.remove(user.id)
-        await ctx.send(f"Removed user from whitelist: {user.mention}")
+                await ctx.send(f"Removed user from whitelist: {user.mention}")
+            else:
+                users.append(user.id)
+                await ctx.send(f"Whitelisted user: {user.mention}")
 
     @antispam.command(name="signatures")
     async def signatures(self, ctx):
