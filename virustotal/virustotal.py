@@ -320,6 +320,7 @@ class VirusTotal(commands.Cog):
                                             description=f"Malware or suspicious behavor was detected in file `{file_name}`",
                                             color=0xfffffe
                                         )
+                                        embed.set_footer(text="Powered by VirusTotal | virustotal.com")
                                         await ctx.send(embed=alert_embed)
                                         # Log to log channel if set
                                         if log_channel:
