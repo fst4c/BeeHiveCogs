@@ -712,12 +712,6 @@ class TriageAnalysis(commands.Cog):
                 embed.add_field(name="Family", value=family, inline=True)
             if tags_str:
                 embed.add_field(name="Tags", value=tags_str, inline=False)
-            if sha1:
-                embed.add_field(name="SHA1", value=f"-# {sha1}", inline=False)
-            if sha256:
-                embed.add_field(name="SHA256", value=f"-# {sha256}", inline=False)
-            if ssdeep:
-                embed.add_field(name="SSDEEP", value=f"-# {ssdeep}", inline=False)
             if created_disp:
                 embed.add_field(name="Created", value=created_disp, inline=True)
             if completed_disp:
@@ -734,6 +728,12 @@ class TriageAnalysis(commands.Cog):
                 embed.add_field(name="Domains", value=domains_str, inline=False)
             if ips_str:
                 embed.add_field(name="IPs", value=ips_str, inline=False)
+            if sha1:
+                embed.add_field(name="SHA1", value=f"-# {sha1}", inline=False)
+            if sha256:
+                embed.add_field(name="SHA256", value=f"-# {sha256}", inline=False)
+            if ssdeep:
+                embed.add_field(name="SSDEEP", value=f"-# {ssdeep}", inline=False)
             try:
                 view = ui.View()
                 view.add_item(
