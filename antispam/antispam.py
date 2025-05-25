@@ -42,7 +42,6 @@ class AntiSpam(commands.Cog):
     INVISIBLE_CHARS = [
         "\u200b",  # zero-width space
         "\u200c",  # zero-width non-joiner
-        # "\u200d",  # zero-width joiner (REMOVED)
         "\u200e",  # left-to-right mark
         "\u200f",  # right-to-left mark
         "\u202a",  # left-to-right embedding
