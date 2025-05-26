@@ -471,7 +471,7 @@ class AntiSpam(commands.Cog):
                     similar_msgs.append(prev)
                     similar_msgs_timestamps.append(ts)
             if similar_count >= 2:
-                reason = "Spam:Repeat.Copypasta.B!msg"
+                reason = "Repeat.Copypasta.B!msg"
                 evidence = (
                     f"{last[:400]}"
                     f"\n" +
