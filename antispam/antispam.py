@@ -485,21 +485,17 @@ class AntiSpam(commands.Cog):
 
         # Heuristic 2b: Similar message content in last 5 minutes
         five_minutes = 5 * 60
-        similar_count_5min = 0
         similar_msgs_5min = []
         if len(cache) >= 2:
             last_content = cache[-1][1]
-            for ts, prev_content in list(cache)[:-1]:
+            for ts, prev_content in list(cache):
                 if now - ts > five_minutes:
                     continue
                 if self._similar(last_content, prev_content, similarity_threshold):
-                    similar_count_5min += 1
                     similar_msgs_5min.append((ts, prev_content))
-            if similar_count_5min >= 2:
+            if len(similar_msgs_5min) >= 2:
                 reason = "Repeat.Timespan.C!msg"
                 evidence = (
-                    f"Latest message:\n{last_content[:400]}\n\n"
-                    f"Previous similar messages in last 5 minutes:\n" +
                     "\n".join(
                         f"<t:{int(ts)}:R>: {msg[:400]}"
                         for ts, msg in similar_msgs_5min
