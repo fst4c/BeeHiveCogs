@@ -172,7 +172,7 @@ class InviteFilter(commands.Cog):
                     )
                     embed.add_field(name="Channel", value=message.channel.mention, inline=True)
                     embed.add_field(name="User", value=f"{member.mention} ({member.id})", inline=True)
-                    embed.add_field(name="Detected invite", value=f"`{log_invite_url}`", inline=False)  # Use the matched URL
+                    embed.add_field(name="Detected invite", value=f"`{log_invite_url}`", inline=True)  # Use the matched URL
 
                     # Add invite details if fetched
                     for name, value in log_fields.items():
