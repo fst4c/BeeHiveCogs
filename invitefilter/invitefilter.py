@@ -217,7 +217,7 @@ class InviteFilter(commands.Cog):
         """Manage the invite filter settings."""
         await ctx.send_help(ctx.command)
 
-    @commands.mod_or_permissions()
+    @commands.admin_or_permissions(manage_guild=True)
     @invitefilter.command()
     async def toggle(self, ctx, on_off: bool = None):
         """Toggle the invite filter on or off.
@@ -236,7 +236,7 @@ class InviteFilter(commands.Cog):
         status = "enabled" if new_status else "disabled"
         await ctx.send(f"✅ Invite filter is now **{status}**.")
 
-    @commands.mod_or_permissions()
+    @commands.admin_or_permissions(manage_guild=True)
     @invitefilter.group(invoke_without_command=True)
     async def whitelist(self, ctx):
         """Manage the invite filter whitelist (channels, categories, roles, and users)."""
@@ -343,8 +343,8 @@ class InviteFilter(commands.Cog):
         else:
             await ctx.send("No changes made to the user whitelist.")
 
-    @commands.mod_or_permissions()
-    @invitefilter.command(name="logchannel", aliases=["logs"])
+    @commands.admin_or_permissions(manage_guild=True)
+    @invitefilter.command(name="logs")
     async def set_log_channel(self, ctx, channel: discord.TextChannel = None):
         """Set the logging channel for invite detections.
 
@@ -362,7 +362,7 @@ class InviteFilter(commands.Cog):
             await self.config.guild(guild).logging_channel.set(None)
             await ctx.send("✅ Logging channel disabled.")
 
-    @commands.mod_or_permissions()
+    @commands.admin_or_permissions(manage_guild=True)
     @invitefilter.command(aliases=["duration"])
     async def timeout(self, ctx, minutes: int):
         """Set the timeout duration in minutes when an invite is detected.
