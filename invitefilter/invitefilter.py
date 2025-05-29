@@ -85,6 +85,7 @@ class InviteFilter(commands.Cog):
             invite_info = None  # Store invite info for logging
 
             # Fetch invite details first (if possible) to log them even if deletion/timeout fails
+            is_own_guild_invite = False
             try:
                 # Use the extracted code which is more reliable for fetch_invite
                 invite_info = await self.bot.fetch_invite(invite_code)
@@ -92,11 +93,18 @@ class InviteFilter(commands.Cog):
                 log_fields["Server ID"] = invite_info.guild.id if getattr(invite_info, "guild", None) else "N/A"
                 log_fields["Member count"] = getattr(invite_info, 'approximate_member_count', 'N/A')  # Use getattr for safety
                 log_fields["Online now"] = getattr(invite_info, 'approximate_presence_count', 'N/A')
+                # Ignore invites that belong to the current server
+                if getattr(invite_info, "guild", None) and invite_info.guild.id == guild.id:
+                    is_own_guild_invite = True
             except discord.NotFound:
                 log_fields["Invite Status"] = "Invalid or Expired"
             except discord.HTTPException as e:
                 log_fields["Invite Fetch Error"] = f"HTTP Error: {getattr(e, 'status', 'Unknown')}"
             # No except discord.Forbidden here, handle below for specific actions
+
+            # If the invite is for this server, ignore it
+            if is_own_guild_invite:
+                return
 
             # --- Action: Delete Message ---
             try:
