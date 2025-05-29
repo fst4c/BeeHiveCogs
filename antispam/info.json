@@ -1,0 +1,21 @@
+{
+  "author": [
+    "adminelevation"
+  ],
+  "name": "antispam",
+  "short": "Heuristic-based anti-spam for Red-DiscordBot.",
+  "description": "Detects and mitigates message spam, flooding, copypasta, ascii art, emoji spam, unicode/invisible abuse, and more.",
+  "install_msg": "AntiSpam cog loaded. Use `[p]antispam` to configure.",
+  "requirements": [
+    "rapidfuzz"
+  ],
+  "tags": [
+    "moderation",
+    "antispam",
+    "raid",
+    "security",
+    "utility"
+  ],
+  "min_bot_version": "3.5.0",
+  "end_user_data_statement": "This cog stores per-guild configuration and recent message metadata for spam detection. No persistent user data is stored beyond what is required for anti-spam operation."
+}

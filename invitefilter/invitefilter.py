@@ -85,6 +85,7 @@ class InviteFilter(commands.Cog):
             invite_info = None  # Store invite info for logging
 
             # Fetch invite details first (if possible) to log them even if deletion/timeout fails
+            is_own_guild_invite = False
             try:
                 # Use the extracted code which is more reliable for fetch_invite
                 invite_info = await self.bot.fetch_invite(invite_code)
@@ -92,11 +93,18 @@ class InviteFilter(commands.Cog):
                 log_fields["Server ID"] = invite_info.guild.id if getattr(invite_info, "guild", None) else "N/A"
                 log_fields["Member count"] = getattr(invite_info, 'approximate_member_count', 'N/A')  # Use getattr for safety
                 log_fields["Online now"] = getattr(invite_info, 'approximate_presence_count', 'N/A')
+                # Ignore invites that belong to the current server
+                if getattr(invite_info, "guild", None) and invite_info.guild.id == guild.id:
+                    is_own_guild_invite = True
             except discord.NotFound:
                 log_fields["Invite Status"] = "Invalid or Expired"
             except discord.HTTPException as e:
                 log_fields["Invite Fetch Error"] = f"HTTP Error: {getattr(e, 'status', 'Unknown')}"
             # No except discord.Forbidden here, handle below for specific actions
+
+            # If the invite is for this server, ignore it
+            if is_own_guild_invite:
+                return
 
             # --- Action: Delete Message ---
             try:
@@ -172,7 +180,7 @@ class InviteFilter(commands.Cog):
                     )
                     embed.add_field(name="Channel", value=message.channel.mention, inline=True)
                     embed.add_field(name="User", value=f"{member.mention} ({member.id})", inline=True)
-                    embed.add_field(name="Detected invite", value=f"`{log_invite_url}`", inline=False)  # Use the matched URL
+                    embed.add_field(name="Detected invite", value=f"`{log_invite_url}`", inline=True)  # Use the matched URL
 
                     # Add invite details if fetched
                     for name, value in log_fields.items():
@@ -217,7 +225,7 @@ class InviteFilter(commands.Cog):
         """Manage the invite filter settings."""
         await ctx.send_help(ctx.command)
 
-    @commands.mod_or_permissions()
+    @commands.admin_or_permissions(manage_guild=True)
     @invitefilter.command()
     async def toggle(self, ctx, on_off: bool = None):
         """Toggle the invite filter on or off.
@@ -236,7 +244,7 @@ class InviteFilter(commands.Cog):
         status = "enabled" if new_status else "disabled"
         await ctx.send(f"✅ Invite filter is now **{status}**.")
 
-    @commands.mod_or_permissions()
+    @commands.admin_or_permissions(manage_guild=True)
     @invitefilter.group(invoke_without_command=True)
     async def whitelist(self, ctx):
         """Manage the invite filter whitelist (channels, categories, roles, and users)."""
@@ -343,8 +351,8 @@ class InviteFilter(commands.Cog):
         else:
             await ctx.send("No changes made to the user whitelist.")
 
-    @commands.mod_or_permissions()
-    @invitefilter.command(name="logchannel", aliases=["logs"])
+    @commands.admin_or_permissions(manage_guild=True)
+    @invitefilter.command(name="logs")
     async def set_log_channel(self, ctx, channel: discord.TextChannel = None):
         """Set the logging channel for invite detections.
 
@@ -362,7 +370,7 @@ class InviteFilter(commands.Cog):
             await self.config.guild(guild).logging_channel.set(None)
             await ctx.send("✅ Logging channel disabled.")
 
-    @commands.mod_or_permissions()
+    @commands.admin_or_permissions(manage_guild=True)
     @invitefilter.command(aliases=["duration"])
     async def timeout(self, ctx, minutes: int):
         """Set the timeout duration in minutes when an invite is detected.

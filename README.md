@@ -40,6 +40,23 @@ Access detailed weather information, forecasts, and historical data for any loca
 [p]load weatherpro
 ```
 
+### [adaptiveslowmode](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/adaptiveslowmode)
+
+Dynamically adjust Discord channel slowmode in 1-second increments based on real-time chat activity, keeping conversations readable and moderatable without constant manual intervention. AdaptiveSlowmode automatically increases or decreases slowmode to target a configurable messages-per-minute rate, and provides interactive log messages with buttons for manual adjustment.
+
+**Key features**
+- Automatically tunes slowmode for each channel based on recent message activity.
+- Set minimum/maximum slowmode, target messages per minute, and which channels to monitor.
+- Interactive log messages (with buttons) allow manual slowmode adjustment from Discord.
+- Survey command to calibrate settings based on 5 minutes of real activity.
+- Logging channel support for activity and adjustment reports.
+
+```
+[p]cog install BeeHiveSafety adaptiveslowmode
+```
+```
+[p]load adaptiveslowmode
+```
 
 ### [ping](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/ping)
 
@@ -119,7 +136,7 @@ Manage and track invite links for your Discord server. This cog allows you to se
 ```
 
 ## Brand cogs
-Brand cogs are cogs we make that are intended to integrate other third party services primarily with your, Red instance. Red is a powerful tool when correctly equipped, and we hope these cogs help extend your Red-bot's capabilities.
+Brand cogs are cogs we make that are intended to integrate other third party services with your Red instance. Red is a powerful tool when correctly equipped, and we hope these cogs help extend your bot's capabilities in your own community.
 
 >[!TIP]
 >Unless otherwise specified, brand cogs are not authored, audited, or endorsed by the brands and tools that they interact with.
@@ -139,14 +156,16 @@ Integrate the AbuseIPDB API with your Red-DiscordBot to check and report IP addr
 
 ### [cloudflare](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/cloudflare)
 
-Utilize Cloudflare's URL scanner and Cloudflare Intel via Discord.
+Integrate Cloudflare's URL Scanner and Cloudflare Intel APIs with your Red-DiscordBot.
 
-```
-[p]cog install BeeHiveSafety cloudflare
-```
-```
-[p]load cloudflare
-```
+**Key features**
+- Scan URLs for threats using Cloudflare's URL Scanner, both manually and automatically.
+- Search and view historical URL scan results.
+- Enable automatic scanning of all posted URLs in your server, with optional logging to a channel.
+- Query Cloudflare Intel for domain, IP, ASN, and WHOIS intelligence directly from Discord.
+- Download detailed reports for domains and WHOIS lookups.
+
+> **Note:** You must set your Cloudflare API credentials using Red's shared API tokens for this cog to function.
 
 ### [virustotal](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/virustotal)
 
@@ -186,7 +205,7 @@ Integrate the Ransomware.live API with your Red-DiscordBot to monitor and receiv
 
 ### [automod](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/automod)
 
-Utilize OpenAI's frontier moderation models to keep chat clean in your server for free. `[p]automod`
+Utilize OpenAI's frontier moderation models to keep chat clean in your server. `[p]automod`
 
 ```
 [p]cog install BeeHiveSafety automod
@@ -211,7 +230,7 @@ Automatically identify songs shared in chat as files.
 
 ### [transcriber](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/transcriber)
 
-Automatically transcribe and moderate voice notes and other audio sent in your server using frontier AI models. `[p]transcriber`
+Automatically transcribe and moderate voice notes and other audio sent in your server using OpenAI. `[p]transcriber`
 
 ```
 [p]cog install BeeHiveSafety transcriber
@@ -222,6 +241,32 @@ Automatically transcribe and moderate voice notes and other audio sent in your s
 ```
 [p]set api openai api_key YOURAPIKEYHERE
 ```
+
+### [triageanalysis](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/triageanalysis)
+
+Integrate the [Tria.ge](https://tria.ge/) malware analysis sandbox with your Red-DiscordBot. Automatically or manually scan suspicious files, enforce punishments, and get rich analysis reports in Discord. `[p]triage`
+
+>[!TIP]
+>Visit [tria.ge/account](https://tria.ge/account) to generate an API key. 
+
+```
+[p]cog install BeeHiveSafety triageanalysis
+```
+```
+[p]load triageanalysis
+```
+```
+[p]set api triage api_key YOURAPIKEYHERE
+```
+
+## Proof-of-concept cogs
+
+These are cogs that we make to showcase the usefulness/application of one or two specific bits of tech functionality. Are they meant for your bot? Absolutely not. Is there a chance you might learn something cool from them code-wise? Absolutely.
+
+### [schoolworkai](https://github.com/BeeHiveSafety/BeeHiveCogs/tree/main/schoolworkai)
+
+A full-featured, privacy-focused AI homework assistant for Discord. SchoolworkAI provides `/ask`, `/answer`, `/explain`, and `/outline` commands for students, with onboarding, billing, invite rewards, and usage/rating stats.
+
 
 
 

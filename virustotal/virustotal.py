@@ -144,7 +144,7 @@ class VirusTotal(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.Cog.listener()
-    async def on_message(self, message):
+    async def on_message_without_command(self, message):
         """Automatically scan files if auto_scan is enabled"""
         guild = message.guild
         if guild is None:
@@ -298,7 +298,7 @@ class VirusTotal(commands.Cog):
                                                     from datetime import timedelta, datetime, timezone
                                                     until = datetime.now(timezone.utc) + timedelta(seconds=malware_action_timeout)
                                                     await member.edit(timeout=until, reason=reason)
-                                                    await ctx.send(f":warning: {member.mention} was **timed out** for {malware_action_timeout} seconds for sending a file flagged as malware by {malicious} vendors.")
+                                                    await ctx.send(f"{member.mention} was **timed out** for {malware_action_timeout} seconds for sending a file flagged as malware by {malicious} vendors.")
                                                     action_taken = True
                                                 else:
                                                     await ctx.send(":warning: Timeout action is not supported on this version of discord.py.")
@@ -316,10 +316,11 @@ class VirusTotal(commands.Cog):
                                                 pass
                                         # Send alert as an embed
                                         alert_embed = discord.Embed(
-                                            title="Malware detected",
+                                            title="Malware detected in file",
                                             description=f"Malware or suspicious behavor was detected in file `{file_name}`",
                                             color=0xfffffe
                                         )
+                                        embed.set_footer(text="Powered by VirusTotal | virustotal.com")
                                         await ctx.send(embed=alert_embed)
                                         # Log to log channel if set
                                         if log_channel:

@@ -91,7 +91,7 @@ class AutoMod(commands.Cog):
             if self.session is None or getattr(self.session, "closed", True):
                 self.session = aiohttp.ClientSession()
         except Exception as e:
-            raise RuntimeError(f"Failed to initialize Omni cog: {e}")
+            raise RuntimeError(f"Failed to initialize AutoMod cog: {e}")
 
     def normalize_text(self, text):
         """Normalize text to replace with standard alphabetical/numeric characters."""
@@ -188,7 +188,7 @@ class AutoMod(commands.Cog):
             embed = discord.Embed(
                 title="This conversation is subject to automatic moderation",
                 description=(
-                    "An agentic (AI) moderator is analyzing this conversation in **real-time**, watching for potentially harmful content and behaviors.\n\nYour messages and message content are subject to moderation, logging, transmission, analysis, and archival **at any time**.\n- Human review is not required for Omni to take action\n- **All** violations are automatically documented for staff review\n- Extreme or consistent abuse may result in your Discord account being globally banned."
+                    "An agentic (AI) moderator is analyzing this conversation in **real-time**, watching for potentially harmful content and behaviors.\n\nYour messages and message content are subject to moderation, logging, transmission, analysis, and archival **at any time**.\n- Human review is not required for AI to take action\n- **All** violations are automatically documented for staff review\n- Extreme or consistent abuse may result in your Discord account being globally banned."
                 ),
                 color=0xfffffe
             )
@@ -645,13 +645,13 @@ class AutoMod(commands.Cog):
             try:
                 # Prepare the action_taken string
                 if message_deleted and timeout_issued:
-                    action_taken = "Message deleted\nTimeout issued"
+                    action_taken = "🗑️ **Message deleted**\n🔇 **Timeout issued**"
                 elif message_deleted:
-                    action_taken = "Message deleted"
+                    action_taken = "🗑️ **Message deleted**"
                 elif timeout_issued:
-                    action_taken = "User timed out"
+                    action_taken = "🔇 **Timeout issued**"
                 else:
-                    action_taken = "No action taken"
+                    action_taken = ":x: **Violation ignored**"
 
                 # Prepare the payload
                 payload = {
@@ -858,7 +858,7 @@ class AutoMod(commands.Cog):
                         if tmpfiles_url:
                             image_url = tmpfiles_url
                     embed = await self._create_moderation_embed(
-                        message, category_scores, "Message processed by Omni", "No action taken", flagged_image_url=image_url
+                        message, category_scores, "Message processed by AI AutoMod", "No action taken", flagged_image_url=image_url
                     )
                     if error_code:
                         embed.add_field(name="Error", value=f":x: `{error_code}` Failed to send to moderation endpoint.", inline=False)
@@ -1337,7 +1337,7 @@ class AutoMod(commands.Cog):
             whitelisted_categories_names = ", ".join([cat.name for cat in guild.categories if cat.id in whitelisted_categories]) or "None"
             monitoring_warning_status = "Active" if monitoring_warning_enabled else "Disabled with additional liability"
 
-            embed = discord.Embed(title="Omni settings", description="Here is your server's current AI content moderation settings.\n\nCurious what Omni has done in your server?\n`omni stats`", color=0xfffffe)
+            embed = discord.Embed(title="AutoMod settings", description="Here is your server's current AI content moderation settings", color=0xfffffe)
             embed.add_field(name="Whitelisted channels", value=whitelisted_channels_names, inline=True)
             embed.add_field(name="Moderative threshold", value=f"{moderation_threshold * 100:.2f}%", inline=True)
             embed.add_field(name="Content scanning", value=":white_check_mark: **Enabled**" if moderation_enabled else ":x: Disabled", inline=True)
@@ -1363,7 +1363,7 @@ class AutoMod(commands.Cog):
             # Warning message
             warning_embed = discord.Embed(
                 title="You're about to perform a destructive operation",
-                description="This operation is computationally intensive and will reset all server and global statistics and counters for Omni. **This deletion is irreversible.**\n\nPlease confirm by typing `CONFIRM`.",
+                description="This operation is computationally intensive and will reset all server and global statistics and counters for the AI AutoMod. **This deletion is irreversible.**\n\nPlease confirm by typing `CONFIRM`.",
                 color=0xff4545
             )
             await ctx.send(embed=warning_embed)
@@ -1457,20 +1457,20 @@ class AutoMod(commands.Cog):
             log_channel = guild.get_channel(log_channel_id) if log_channel_id else None
 
             if not log_channel:
-                await ctx.send("Ask a staff member to set a logs channel for Omni before you can submit feedback on the moderation")
+                await ctx.send("Ask a staff member to set a logs channel for the AI AutoMod before you can submit feedback on the moderation")
                 return
 
             embed = discord.Embed(
-                title="How's our agentic moderation?",
+                title="How's our AI AutoMod?",
                 description=f"Your feedback matters and will be used to help us tune the assistive AI used in {ctx.guild.name}.",
-                color=0x45ABF5
+                color=0xfffffe
             )
 
             view = discord.ui.View()
 
             async def vote_callback(interaction, vote_type):
                 if interaction.user != ctx.author:
-                    await interaction.response.send_message(f"This feedback session doesn't belong to you.\n\nIf you'd like to provide feedback on the agentic moderation in this server, please use `{ctx.clean_prefix}omni vote` to start your own feedback session.", ephemeral=True)
+                    await interaction.response.send_message(f"This feedback session doesn't belong to you.\n\nIf you'd like to provide feedback on the agentic moderation in this server, please use `{ctx.clean_prefix}automod vote` to start your own feedback session.", ephemeral=True)
                     return
 
                 # Check if the vote can affect the threshold
@@ -1491,10 +1491,10 @@ class AutoMod(commands.Cog):
 
                 if vote_type == "too weak":
                     await self.config.guild(guild).too_weak_votes.set(await self.config.guild(guild).too_weak_votes() + 1)
-                    tips = f"- Review your channels to see what your members have been discussing\n- Evaluate appropriateness according to server rules and Discord policies\n- Consider lowering the threshold to catch more potential issues. - `{ctx.clean_prefix}omni threshold`"
+                    tips = f"- Review your channels to see what your members have been discussing\n- Evaluate appropriateness according to server rules and Discord policies\n- Consider lowering the threshold to catch more potential issues. - `{ctx.clean_prefix}automod threshold`"
                 elif vote_type == "too strict":
                     await self.config.guild(guild).too_tough_votes.set(await self.config.guild(guild).too_tough_votes() + 1)
-                    tips = f"- Review your channels to see what your members have been discussing\n- Evaluate appropriateness according to server rules and Discord policies\n- Consider raising the set threshold to allow more freedom. - `{ctx.clean_prefix}omni threshold`"
+                    tips = f"- Review your channels to see what your members have been discussing\n- Evaluate appropriateness according to server rules and Discord policies\n- Consider raising the set threshold to allow more freedom. - `{ctx.clean_prefix}automod threshold`"
                 elif vote_type == "just right":
                     await self.config.guild(guild).just_right_votes.set(await self.config.guild(guild).just_right_votes() + 1)
                     tips = f"- The current moderation settings seem to be well-balanced.\n- Continue monitoring to ensure it remains effective."
@@ -1506,7 +1506,7 @@ class AutoMod(commands.Cog):
                 )
 
                 if threshold_adjusted:
-                    feedback_embed.description += f"\n\n**Omni made automatic, intelligent adjustments based on user feedback.**\nPrevious threshold: `{old_threshold}`\nUpdated threshold: `{moderation_threshold}`"
+                    feedback_embed.description += f"\n\n**AI made automatic adjustments based on user feedback.**\n`{old_threshold}` -> `{moderation_threshold}`"
 
                 await log_channel.send(embed=feedback_embed)
 

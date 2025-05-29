@@ -38,7 +38,7 @@ class TriageAnalysis(commands.Cog):
             "autoscan_enabled": True,
             "autoscan_score_threshold": 7,
             "autoscan_punishment": "ban",  # none, kick, ban, timeout
-            "autoscan_timeout_seconds": 600,
+            "autoscan_timeout_seconds": 1200,
             "autoscan_log_channel": None,  # Channel ID for logging autoscan events
         }
         self.config.register_guild(**default_guild)
@@ -522,7 +522,7 @@ class TriageAnalysis(commands.Cog):
             await ctx.send(embed=embed)
 
             # Send typing while polling for analysis completion
-            max_wait = 600  # seconds
+            max_wait = 1200  # seconds
             poll_interval = 10  # seconds
             waited = 0
             status = None
@@ -712,12 +712,6 @@ class TriageAnalysis(commands.Cog):
                 embed.add_field(name="Family", value=family, inline=True)
             if tags_str:
                 embed.add_field(name="Tags", value=tags_str, inline=False)
-            if sha1:
-                embed.add_field(name="SHA1", value=f"-# {sha1}", inline=False)
-            if sha256:
-                embed.add_field(name="SHA256", value=f"-# {sha256}", inline=False)
-            if ssdeep:
-                embed.add_field(name="SSDEEP", value=f"-# {ssdeep}", inline=False)
             if created_disp:
                 embed.add_field(name="Created", value=created_disp, inline=True)
             if completed_disp:
@@ -734,10 +728,12 @@ class TriageAnalysis(commands.Cog):
                 embed.add_field(name="Domains", value=domains_str, inline=False)
             if ips_str:
                 embed.add_field(name="IPs", value=ips_str, inline=False)
-
-            embed.set_footer(text="Full overview report available on tria.ge.")
-
-            # Add a URL button to view the report on tria.ge
+            if sha1:
+                embed.add_field(name="SHA1", value=f"-# {sha1}", inline=False)
+            if sha256:
+                embed.add_field(name="SHA256", value=f"-# {sha256}", inline=False)
+            if ssdeep:
+                embed.add_field(name="SSDEEP", value=f"-# {ssdeep}", inline=False)
             try:
                 view = ui.View()
                 view.add_item(

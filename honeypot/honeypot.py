@@ -378,7 +378,7 @@ class Honeypot(commands.Cog, name="Honeypot"):
         timeout_days = config.get("timeout_days", 7)
         embed = discord.Embed(
             title="Honeypot trap triggered",
-            description=f"> {message.content}\n",
+            description=f"```{message.content}```",
             color=0xff4545,
             timestamp=message.created_at,
         )
